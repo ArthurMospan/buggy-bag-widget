@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Stage, Layer, Rect, Arrow, Circle, Text, Group } from 'react-konva';
 import type Konva from 'konva';
 import type { DrawShape, DrawTool } from '../types';
@@ -36,6 +36,7 @@ export function DrawingCanvas({
 
   // useState only for the in-progress draft shape (triggers Konva re-render)
   const [draft, setDraft] = useState<DrawShape | null>(null);
+  const draftRef = useRef<DrawShape | null>(null);
 
   const handleMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -60,7 +61,7 @@ export function DrawingCanvas({
       }
 
       // Start a rect or arrow draft
-      setDraft({
+      const newDraft: DrawShape = {
         id: uid(),
         type: tool,
         x,
@@ -68,73 +69,113 @@ export function DrawingCanvas({
         ...(tool === 'rect'
           ? { width: 0, height: 0 }
           : { points: [x, y, x, y] as [number, number, number, number] }),
-      });
+      };
+      draftRef.current = newDraft;
+      setDraft(newDraft);
     },
     [tool, onShapeComplete]
   );
 
   const handleMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (!isDrawing.current || !draft) return;
+      if (!isDrawing.current || !draftRef.current) return;
       const { x, y } = getStagePos(e);
 
+      let updated: DrawShape | null = null;
+
       if (tool === 'rect') {
-        setDraft((d) =>
-          d
-            ? {
-                ...d,
-                width: x - origin.current.x,
-                height: y - origin.current.y,
-              }
-            : d
-        );
+        updated = {
+          ...draftRef.current,
+          width: x - origin.current.x,
+          height: y - origin.current.y,
+        };
       } else if (tool === 'arrow') {
-        setDraft((d) =>
-          d
-            ? {
-                ...d,
-                points: [
-                  origin.current.x,
-                  origin.current.y,
-                  x,
-                  y,
-                ] as [number, number, number, number],
-              }
-            : d
-        );
+        updated = {
+          ...draftRef.current,
+          points: [
+            origin.current.x,
+            origin.current.y,
+            x,
+            y,
+          ] as [number, number, number, number],
+        };
+      }
+
+      if (updated) {
+        draftRef.current = updated;
+        setDraft(updated);
       }
     },
-    [draft, tool]
+    [tool]  // draftRef and origin are refs — not needed in deps
   );
 
   const handleMouseUp = useCallback(() => {
-    if (!isDrawing.current || !draft) return;
+    if (!isDrawing.current || !draftRef.current) return;
     isDrawing.current = false;
+    const current = draftRef.current;
+    draftRef.current = null;
 
-    // Discard degenerate rects (too small to be intentional)
     const tooSmall =
-      draft.type === 'rect' &&
-      Math.abs(draft.width ?? 0) < 8 &&
-      Math.abs(draft.height ?? 0) < 8;
+      (current.type === 'rect' &&
+        Math.abs(current.width ?? 0) < 8 &&
+        Math.abs(current.height ?? 0) < 8) ||
+      (current.type === 'arrow' &&
+        current.points !== undefined &&
+        Math.hypot(
+          current.points[2] - current.points[0],
+          current.points[3] - current.points[1]
+        ) < 8);
 
-    if (!tooSmall) {
-      onShapeComplete(draft);
-    }
+    if (!tooSmall) onShapeComplete(current);
     setDraft(null);
-  }, [draft, onShapeComplete]);
+  }, [onShapeComplete]);
 
   // Also handle mouse-up outside the stage (prevents ghost drafts if user releases outside)
   const handleMouseLeave = useCallback(() => {
-    if (isDrawing.current && draft) {
-      isDrawing.current = false;
-      const tooSmall =
-        draft.type === 'rect' &&
-        Math.abs(draft.width ?? 0) < 8 &&
-        Math.abs(draft.height ?? 0) < 8;
-      if (!tooSmall) onShapeComplete(draft);
-      setDraft(null);
-    }
-  }, [draft, onShapeComplete]);
+    if (!isDrawing.current || !draftRef.current) return;
+    isDrawing.current = false;
+    const current = draftRef.current;
+    draftRef.current = null;
+
+    const tooSmall =
+      (current.type === 'rect' &&
+        Math.abs(current.width ?? 0) < 8 &&
+        Math.abs(current.height ?? 0) < 8) ||
+      (current.type === 'arrow' &&
+        current.points !== undefined &&
+        Math.hypot(
+          current.points[2] - current.points[0],
+          current.points[3] - current.points[1]
+        ) < 8);
+
+    if (!tooSmall) onShapeComplete(current);
+    setDraft(null);
+  }, [onShapeComplete]);
+
+  // Clean up draft if mouse is released outside the browser window
+  useEffect(() => {
+    const onWindowMouseUp = () => {
+      if (isDrawing.current && draftRef.current) {
+        isDrawing.current = false;
+        const current = draftRef.current;
+        draftRef.current = null;
+        const tooSmall =
+          (current.type === 'rect' &&
+            Math.abs(current.width ?? 0) < 8 &&
+            Math.abs(current.height ?? 0) < 8) ||
+          (current.type === 'arrow' &&
+            current.points !== undefined &&
+            Math.hypot(
+              current.points[2] - current.points[0],
+              current.points[3] - current.points[1]
+            ) < 8);
+        if (!tooSmall) onShapeComplete(current);
+        setDraft(null);
+      }
+    };
+    window.addEventListener('mouseup', onWindowMouseUp);
+    return () => window.removeEventListener('mouseup', onWindowMouseUp);
+  }, [onShapeComplete]);
 
   return (
     <Stage
