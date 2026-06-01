@@ -11,22 +11,30 @@ interface DrawingToolbarProps {
 }
 
 const TOOLS: { tool: DrawTool; label: string; Icon: React.ElementType }[] = [
-  { tool: 'rect',  label: 'Виділити зону',     Icon: Square },
-  { tool: 'arrow', label: 'Намалювати стрілку', Icon: ArrowRight },
-  { tool: 'pin',   label: 'Поставити пін',      Icon: MapPin },
+  { tool: 'rect',  label: 'Область',  Icon: Square },
+  { tool: 'arrow', label: 'Стрілка',  Icon: ArrowRight },
+  { tool: 'pin',   label: 'Пін',      Icon: MapPin },
 ];
 
-export function DrawingToolbar({
-  activeTool,
-  onToolChange,
-  onSave,
-  onCancel,
-  saveLabel = 'Далі →',
-}: DrawingToolbarProps) {
+export function DrawingToolbar({ activeTool, onToolChange, onSave, onCancel, saveLabel = 'Далі →' }: DrawingToolbarProps) {
   return (
     <div
       data-buggy-bag="true"
-      className="fixed top-4 left-1/2 -translate-x-1/2 z-[10001] flex items-center gap-2 bg-white rounded-[16px] shadow-[0_8px_32px_rgba(0,0,0,0.2)] px-3 py-2"
+      style={{
+        position: 'fixed',
+        top: '16px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 10001,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        background: 'white',
+        borderRadius: '14px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+        padding: '8px 12px',
+        whiteSpace: 'nowrap',
+      }}
     >
       {TOOLS.map(({ tool, label, Icon }) => (
         <button
@@ -34,31 +42,59 @@ export function DrawingToolbar({
           type="button"
           onClick={() => onToolChange(tool)}
           title={label}
-          aria-pressed={activeTool === tool}
-          className={`flex items-center gap-[6px] h-[36px] px-[14px] rounded-[10px] text-[13px] font-bold transition-colors ${
-            activeTool === tool
-              ? 'bg-[#1f1f1f] text-white'
-              : 'bg-transparent text-[#9a9a9a] hover:bg-[#f0f0f0] hover:text-[#1f1f1f]'
-          }`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            height: '34px',
+            padding: '0 12px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            border: 'none',
+            cursor: 'pointer',
+            background: activeTool === tool ? '#1f1f1f' : 'transparent',
+            color: activeTool === tool ? 'white' : '#9a9a9a',
+          }}
         >
-          <Icon size={14} />
+          <Icon size={13} />
           {label}
         </button>
       ))}
 
-      <div className="w-px h-6 bg-[#e9e9e9] mx-1" aria-hidden="true" />
+      <div style={{ width: '1px', height: '20px', background: '#e9e9e9', margin: '0 4px' }} />
 
       <button
         type="button"
         onClick={onSave}
-        className="h-[36px] px-[18px] rounded-[10px] text-[13px] font-bold bg-[#1f1f1f] text-white hover:bg-[#303030] transition-colors"
+        style={{
+          height: '34px',
+          padding: '0 16px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          border: 'none',
+          cursor: 'pointer',
+          background: '#1f1f1f',
+          color: 'white',
+        }}
       >
         {saveLabel}
       </button>
       <button
         type="button"
         onClick={onCancel}
-        className="h-[36px] px-[18px] rounded-[10px] text-[13px] font-bold bg-[#f5f5f5] text-[#1f1f1f] hover:bg-[#ebebeb] transition-colors"
+        style={{
+          height: '34px',
+          padding: '0 16px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          border: '1px solid #e9e9e9',
+          cursor: 'pointer',
+          background: 'white',
+          color: '#1f1f1f',
+        }}
       >
         Скасувати
       </button>

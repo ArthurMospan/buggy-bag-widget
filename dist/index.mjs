@@ -20,34 +20,6 @@ function GodModeGuard({ children }) {
   return /* @__PURE__ */ jsx(Fragment, { children });
 }
 
-// src/components/FloatingButton.tsx
-import { Bug } from "lucide-react";
-import { jsx as jsx2, jsxs } from "react/jsx-runtime";
-function FloatingButton({ onCapture }) {
-  return /* @__PURE__ */ jsxs(
-    "div",
-    {
-      "data-buggy-bag": "true",
-      className: "fixed bottom-6 right-6 z-[9997] flex flex-col items-end gap-1",
-      children: [
-        /* @__PURE__ */ jsx2("span", { className: "text-[10px] font-mono text-white/40 select-none pr-[2px]", children: "Alt+B" }),
-        /* @__PURE__ */ jsx2(
-          "button",
-          {
-            type: "button",
-            onClick: onCapture,
-            "aria-label": "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
-            title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
-            className: "w-12 h-12 rounded-full flex items-center justify-center bg-[#1c1c1e] text-white border border-white/10 shadow-[0_8px_28px_rgba(0,0,0,0.5),0_2px_6px_rgba(0,0,0,0.3)] hover:bg-[#2c2c2e] hover:scale-105 active:scale-95 transition-all duration-150",
-            style: { opacity: 0.85 },
-            children: /* @__PURE__ */ jsx2(Bug, { size: 20, strokeWidth: 1.75 })
-          }
-        )
-      ]
-    }
-  );
-}
-
 // src/components/CaptureMode.tsx
 import { useEffect as useEffect3, useState as useState3, useCallback as useCallback2, useRef as useRef3 } from "react";
 
@@ -849,7 +821,7 @@ async function toPng(node, options = {}) {
 // src/components/DrawingCanvas.tsx
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Stage, Layer, Rect, Arrow, Circle, Text, Group } from "react-konva";
-import { jsx as jsx3, jsxs as jsxs2 } from "react/jsx-runtime";
+import { jsx as jsx2, jsxs } from "react/jsx-runtime";
 var pinCounter = 1;
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -969,7 +941,7 @@ function DrawingCanvas({
     window.addEventListener("mouseup", onWindowMouseUp);
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
   }, [onShapeComplete]);
-  return /* @__PURE__ */ jsx3(
+  return /* @__PURE__ */ jsx2(
     Stage,
     {
       width,
@@ -979,7 +951,7 @@ function DrawingCanvas({
       onMouseMove: handleMouseMove,
       onMouseUp: handleMouseUp,
       onMouseLeave: handleMouseLeave,
-      children: /* @__PURE__ */ jsxs2(Layer, { children: [
+      children: /* @__PURE__ */ jsxs(Layer, { children: [
         shapes.map(renderShape),
         draft && renderShape(draft)
       ] })
@@ -988,7 +960,7 @@ function DrawingCanvas({
 }
 function renderShape(s) {
   if (s.type === "rect") {
-    return /* @__PURE__ */ jsx3(
+    return /* @__PURE__ */ jsx2(
       Rect,
       {
         x: s.x,
@@ -1005,7 +977,7 @@ function renderShape(s) {
     );
   }
   if (s.type === "arrow") {
-    return /* @__PURE__ */ jsx3(
+    return /* @__PURE__ */ jsx2(
       Arrow,
       {
         points: s.points ? [...s.points] : [],
@@ -1020,9 +992,9 @@ function renderShape(s) {
     );
   }
   if (s.type === "pin") {
-    return /* @__PURE__ */ jsxs2(Group, { x: s.x, y: s.y, listening: false, children: [
-      /* @__PURE__ */ jsx3(Circle, { radius: 14, fill: "#ef4444" }),
-      /* @__PURE__ */ jsx3(
+    return /* @__PURE__ */ jsxs(Group, { x: s.x, y: s.y, listening: false, children: [
+      /* @__PURE__ */ jsx2(Circle, { radius: 14, fill: "#ef4444" }),
+      /* @__PURE__ */ jsx2(
         Text,
         {
           text: String(s.pinNumber ?? "?"),
@@ -1042,70 +1014,10 @@ function renderShape(s) {
   return null;
 }
 
-// src/components/DrawingToolbar.tsx
-import { Square, ArrowRight, MapPin } from "lucide-react";
-import { jsx as jsx4, jsxs as jsxs3 } from "react/jsx-runtime";
-var TOOLS = [
-  { tool: "rect", label: "\u0412\u0438\u0434\u0456\u043B\u0438\u0442\u0438 \u0437\u043E\u043D\u0443", Icon: Square },
-  { tool: "arrow", label: "\u041D\u0430\u043C\u0430\u043B\u044E\u0432\u0430\u0442\u0438 \u0441\u0442\u0440\u0456\u043B\u043A\u0443", Icon: ArrowRight },
-  { tool: "pin", label: "\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u043F\u0456\u043D", Icon: MapPin }
-];
-function DrawingToolbar({
-  activeTool,
-  onToolChange,
-  onSave,
-  onCancel,
-  saveLabel = "\u0414\u0430\u043B\u0456 \u2192"
-}) {
-  return /* @__PURE__ */ jsxs3(
-    "div",
-    {
-      "data-buggy-bag": "true",
-      className: "fixed top-4 left-1/2 -translate-x-1/2 z-[10001] flex items-center gap-2 bg-white rounded-[16px] shadow-[0_8px_32px_rgba(0,0,0,0.2)] px-3 py-2",
-      children: [
-        TOOLS.map(({ tool, label, Icon }) => /* @__PURE__ */ jsxs3(
-          "button",
-          {
-            type: "button",
-            onClick: () => onToolChange(tool),
-            title: label,
-            "aria-pressed": activeTool === tool,
-            className: `flex items-center gap-[6px] h-[36px] px-[14px] rounded-[10px] text-[13px] font-bold transition-colors ${activeTool === tool ? "bg-[#1f1f1f] text-white" : "bg-transparent text-[#9a9a9a] hover:bg-[#f0f0f0] hover:text-[#1f1f1f]"}`,
-            children: [
-              /* @__PURE__ */ jsx4(Icon, { size: 14 }),
-              label
-            ]
-          },
-          tool
-        )),
-        /* @__PURE__ */ jsx4("div", { className: "w-px h-6 bg-[#e9e9e9] mx-1", "aria-hidden": "true" }),
-        /* @__PURE__ */ jsx4(
-          "button",
-          {
-            type: "button",
-            onClick: onSave,
-            className: "h-[36px] px-[18px] rounded-[10px] text-[13px] font-bold bg-[#1f1f1f] text-white hover:bg-[#303030] transition-colors",
-            children: saveLabel
-          }
-        ),
-        /* @__PURE__ */ jsx4(
-          "button",
-          {
-            type: "button",
-            onClick: onCancel,
-            className: "h-[36px] px-[18px] rounded-[10px] text-[13px] font-bold bg-[#f5f5f5] text-[#1f1f1f] hover:bg-[#ebebeb] transition-colors",
-            children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438"
-          }
-        )
-      ]
-    }
-  );
-}
-
 // src/components/ShapeAnnotation.tsx
 import { useState as useState2, useRef as useRef2, useEffect as useEffect2 } from "react";
 import { Mic, MicOff, Check } from "lucide-react";
-import { jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
+import { jsx as jsx3, jsxs as jsxs2 } from "react/jsx-runtime";
 var POPUP_W = 288;
 var POPUP_H = 160;
 function calcPosition(shape, cw, ch) {
@@ -1210,7 +1122,7 @@ function ShapeAnnotation({
     onDismiss();
   };
   const stopProp = (e) => e.stopPropagation();
-  return /* @__PURE__ */ jsxs4(
+  return /* @__PURE__ */ jsxs2(
     "div",
     {
       "data-buggy-bag": "true",
@@ -1219,7 +1131,7 @@ function ShapeAnnotation({
       onClick: stopProp,
       onMouseDown: stopProp,
       children: [
-        /* @__PURE__ */ jsx5(
+        /* @__PURE__ */ jsx3(
           "label",
           {
             htmlFor: "buggy-annotation-text",
@@ -1227,7 +1139,7 @@ function ShapeAnnotation({
             children: "\u0412\u043A\u0430\u0436\u0456\u0442\u044C \u043F\u0440\u0438\u0447\u0438\u043D\u0443..."
           }
         ),
-        /* @__PURE__ */ jsx5(
+        /* @__PURE__ */ jsx3(
           "textarea",
           {
             id: "buggy-annotation-text",
@@ -1244,9 +1156,9 @@ function ShapeAnnotation({
             }
           }
         ),
-        micError && /* @__PURE__ */ jsx5("p", { className: "text-[11px] text-[#ef4444] mt-1 mb-1", children: micError }),
-        /* @__PURE__ */ jsxs4("div", { className: "flex gap-2 mt-2", children: [
-          /* @__PURE__ */ jsx5(
+        micError && /* @__PURE__ */ jsx3("p", { className: "text-[11px] text-[#ef4444] mt-1 mb-1", children: micError }),
+        /* @__PURE__ */ jsxs2("div", { className: "flex gap-2 mt-2", children: [
+          /* @__PURE__ */ jsx3(
             "button",
             {
               type: "button",
@@ -1255,10 +1167,10 @@ function ShapeAnnotation({
               "aria-label": listening ? "Stop voice recording" : "Start voice recording",
               "aria-pressed": listening,
               className: `w-[36px] h-[36px] rounded-[10px] flex items-center justify-center transition-colors shrink-0 ${listening ? "bg-[#ef4444] text-white animate-pulse" : "bg-[#f4f4f5] text-[#9a9a9a] hover:bg-[#e9e9e9] hover:text-[#1f1f1f]"}`,
-              children: listening ? /* @__PURE__ */ jsx5(MicOff, { size: 14 }) : /* @__PURE__ */ jsx5(Mic, { size: 14 })
+              children: listening ? /* @__PURE__ */ jsx3(MicOff, { size: 14 }) : /* @__PURE__ */ jsx3(Mic, { size: 14 })
             }
           ),
-          /* @__PURE__ */ jsx5(
+          /* @__PURE__ */ jsx3(
             "button",
             {
               type: "button",
@@ -1267,14 +1179,14 @@ function ShapeAnnotation({
               children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438"
             }
           ),
-          /* @__PURE__ */ jsxs4(
+          /* @__PURE__ */ jsxs2(
             "button",
             {
               type: "button",
               onClick: handleConfirm,
               className: "flex-1 h-[36px] rounded-[10px] text-[13px] font-bold bg-[#1f1f1f] text-white hover:bg-[#303030] transition-colors flex items-center justify-center gap-[6px]",
               children: [
-                /* @__PURE__ */ jsx5(Check, { size: 14 }),
+                /* @__PURE__ */ jsx3(Check, { size: 14 }),
                 "OK"
               ]
             }
@@ -1535,38 +1447,43 @@ function collectTechContext(clickedElement) {
 }
 
 // src/components/CaptureMode.tsx
-import { Mic as Mic2, MicOff as MicOff2, List, AlignLeft } from "lucide-react";
-import { jsx as jsx6, jsxs as jsxs5 } from "react/jsx-runtime";
-function CaptureMode({ apiKey, onSend, onCancel }) {
+import { jsx as jsx4, jsxs as jsxs3 } from "react/jsx-runtime";
+function ToolBtn({ active, onClick, title, children }) {
+  return /* @__PURE__ */ jsx4("button", { type: "button", onClick, title, style: {
+    width: "36px",
+    height: "36px",
+    borderRadius: "8px",
+    background: active ? "#1f1f1f" : "transparent",
+    border: "none",
+    cursor: "pointer",
+    color: active ? "white" : "#9a9a9a",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  }, children });
+}
+function CaptureMode({ initialTool, apiKey, onSend, onCancel }) {
   const [screenshotUrl, setScreenshotUrl] = useState3(null);
-  const [tool, setTool] = useState3("rect");
+  const [tool, setTool] = useState3(initialTool);
   const [shapes, setShapes] = useState3([]);
   const [annotations, setAnnotations] = useState3({});
   const [pendingShape, setPendingShape] = useState3(null);
-  const [showPanel, setShowPanel] = useState3(false);
-  const [descMode, setDescMode] = useState3("text");
   const [description, setDescription] = useState3("");
-  const [listening, setListening] = useState3(false);
-  const recRef = useRef3(null);
-  const [steps, setSteps] = useState3([]);
+  const [showSendPanel, setShowSendPanel] = useState3(false);
+  const techContextRef = useRef3(collectTechContext());
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
   const h = typeof window !== "undefined" ? window.innerHeight : 800;
-  const techContextRef = useRef3(collectTechContext());
-  useEffect3(() => {
-    const events = techContextRef.current.eventLog;
-    setSteps(events.map((e) => e.description));
-  }, []);
   useEffect3(() => {
     let cancelled = false;
-    const captureOpts = {
-      filter: (el) => el.getAttribute?.("data-buggy-bag") !== "true",
-      width: window.innerWidth,
-      height: window.innerHeight,
-      pixelRatio: 1
-    };
     const timer = setTimeout(async () => {
       try {
-        const dataUrl = await toPng(document.body, { ...captureOpts, skipFonts: true });
+        const dataUrl = await toPng(document.body, {
+          filter: (el) => el.getAttribute?.("data-buggy-bag") !== "true",
+          width: window.innerWidth,
+          height: window.innerHeight,
+          pixelRatio: 1,
+          skipFonts: true
+        });
         if (!cancelled) setScreenshotUrl(dataUrl);
       } catch (err) {
         console.error("[BuggyBag] screenshot failed:", err);
@@ -1585,7 +1502,6 @@ function CaptureMode({ apiKey, onSend, onCancel }) {
   const handleAnnotationConfirm = useCallback2((shapeId, text) => {
     setAnnotations((prev) => ({ ...prev, [shapeId]: text }));
     setPendingShape(null);
-    setShowPanel(true);
   }, []);
   const handleAnnotationDismiss = useCallback2(() => {
     setPendingShape((pending) => {
@@ -1593,251 +1509,268 @@ function CaptureMode({ apiKey, onSend, onCancel }) {
       return null;
     });
   }, []);
-  const toggleVoice = useCallback2(() => {
-    const w2 = window;
-    const SR = w2.SpeechRecognition ?? w2.webkitSpeechRecognition;
-    if (!SR) return;
-    if (listening) {
-      recRef.current?.stop();
-      setListening(false);
-      return;
-    }
-    const rec = new SR();
-    rec.lang = "uk-UA";
-    rec.continuous = true;
-    rec.interimResults = false;
-    rec.onresult = (e) => {
-      const transcript = Array.from(e.results).slice(e.resultIndex).map((r) => r[0].transcript).join(" ");
-      setDescription((prev) => (prev + " " + transcript).trim());
-    };
-    rec.onend = () => setListening(false);
-    rec.start();
-    recRef.current = rec;
-    setListening(true);
-  }, [listening]);
   const handleSend = useCallback2(() => {
     if (!screenshotUrl) return;
-    recRef.current?.stop();
-    const techContext = techContextRef.current;
     const payload = {
       api_key: apiKey,
       base64_image: screenshotUrl,
       shapes,
       annotations,
       description: description.trim() || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443",
-      tech_context: techContext
+      tech_context: techContextRef.current
     };
     onSend(payload);
   }, [screenshotUrl, shapes, annotations, description, apiKey, onSend]);
-  return /* @__PURE__ */ jsxs5(
-    "div",
-    {
-      "data-buggy-bag": "true",
-      className: "fixed inset-0 z-[10000]",
-      style: { userSelect: "none" },
-      children: [
-        screenshotUrl ? /* @__PURE__ */ jsx6(
-          "img",
-          {
-            src: screenshotUrl,
-            alt: "Page screenshot",
-            className: "absolute inset-0 w-full h-full object-cover pointer-events-none",
-            draggable: false
+  return /* @__PURE__ */ jsxs3("div", { "data-buggy-bag": "true", style: { position: "fixed", inset: 0, zIndex: 1e4, userSelect: "none" }, children: [
+    screenshotUrl ? /* @__PURE__ */ jsx4("img", { src: screenshotUrl, alt: "screenshot", style: {
+      position: "absolute",
+      inset: 0,
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      pointerEvents: "none"
+    }, draggable: false }) : /* @__PURE__ */ jsxs3("div", { style: {
+      position: "absolute",
+      inset: 0,
+      background: "rgba(0,0,0,0.6)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "column",
+      gap: "8px"
+    }, children: [
+      /* @__PURE__ */ jsx4("span", { style: { color: "rgba(255,255,255,0.9)", fontSize: "15px", fontWeight: "600" }, children: "\u23F8 \u0417\u0430\u043C\u043E\u0440\u043E\u0436\u0443\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443..." }),
+      /* @__PURE__ */ jsx4("span", { style: { color: "rgba(255,255,255,0.4)", fontSize: "12px" }, children: "\u0417\u0431\u0438\u0440\u0430\u044E \u0442\u0435\u0445\u043D\u0456\u0447\u043D\u0438\u0439 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442" })
+    ] }),
+    screenshotUrl && !pendingShape && !showSendPanel && /* @__PURE__ */ jsx4(DrawingCanvas, { width: w, height: h, tool, shapes, onShapeComplete: handleShapeComplete }),
+    pendingShape && /* @__PURE__ */ jsx4(
+      ShapeAnnotation,
+      {
+        shape: pendingShape,
+        containerWidth: w,
+        containerHeight: h,
+        onConfirm: handleAnnotationConfirm,
+        onDismiss: handleAnnotationDismiss
+      }
+    ),
+    screenshotUrl && !pendingShape && !showSendPanel && /* @__PURE__ */ jsxs3("div", { "data-buggy-bag": "true", style: {
+      position: "fixed",
+      bottom: "24px",
+      right: "24px",
+      background: "white",
+      borderRadius: "14px",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+      padding: "8px",
+      display: "flex",
+      alignItems: "center",
+      gap: "4px"
+    }, children: [
+      /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "rect", onClick: () => setTool("rect"), title: "\u0412\u0438\u0434\u0456\u043B\u0438\u0442\u0438 \u043E\u0431\u043B\u0430\u0441\u0442\u044C", children: /* @__PURE__ */ jsx4("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsx4("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) }) }),
+      /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "arrow", onClick: () => setTool("arrow"), title: "\u0421\u0442\u0440\u0456\u043B\u043A\u0430", children: /* @__PURE__ */ jsxs3("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+        /* @__PURE__ */ jsx4("path", { d: "M5 19L19 5" }),
+        /* @__PURE__ */ jsx4("path", { d: "M8 5h11v11" })
+      ] }) }),
+      /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "pin", onClick: () => setTool("pin"), title: "\u041F\u0456\u043D", children: /* @__PURE__ */ jsxs3("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+        /* @__PURE__ */ jsx4("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
+        /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "10", r: "2.5" })
+      ] }) }),
+      /* @__PURE__ */ jsx4("div", { style: { width: "1px", height: "20px", background: "#e9e9e9", margin: "0 2px" } }),
+      /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setShowSendPanel(true), style: {
+        height: "32px",
+        padding: "0 14px",
+        borderRadius: "8px",
+        background: "#1f1f1f",
+        color: "white",
+        border: "none",
+        cursor: "pointer",
+        fontSize: "12px",
+        fontWeight: "700"
+      }, children: "\u0414\u0430\u043B\u0456 \u2192" }),
+      /* @__PURE__ */ jsx4("button", { type: "button", onClick: onCancel, style: {
+        height: "32px",
+        padding: "0 10px",
+        borderRadius: "8px",
+        background: "transparent",
+        color: "#9a9a9a",
+        border: "none",
+        cursor: "pointer",
+        fontSize: "12px",
+        fontWeight: "600"
+      }, children: "\u2715" })
+    ] }),
+    screenshotUrl && showSendPanel && /* @__PURE__ */ jsx4("div", { style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "center",
+      paddingBottom: "24px"
+    }, children: /* @__PURE__ */ jsxs3("div", { style: {
+      width: "100%",
+      maxWidth: "480px",
+      margin: "0 16px",
+      background: "#1c1c1e",
+      borderRadius: "20px",
+      border: "1px solid rgba(255,255,255,0.1)",
+      padding: "16px"
+    }, children: [
+      /* @__PURE__ */ jsxs3("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }, children: [
+        /* @__PURE__ */ jsx4("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", padding: "2px 8px", borderRadius: "4px" }, children: techContextRef.current.route }),
+        techContextRef.current.component && /* @__PURE__ */ jsx4("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "#a5b4fc", background: "rgba(99,102,241,0.15)", padding: "2px 8px", borderRadius: "4px" }, children: techContextRef.current.component.name }),
+        techContextRef.current.networkRequests.filter((r) => r.isError).slice(0, 2).map((r, i) => /* @__PURE__ */ jsxs3("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "#fca5a5", background: "rgba(239,68,68,0.15)", padding: "2px 8px", borderRadius: "4px" }, children: [
+          r.status,
+          " ",
+          r.url.split("/").slice(-1)[0]
+        ] }, i)),
+        techContextRef.current.consoleErrors.length > 0 && /* @__PURE__ */ jsxs3("span", { style: { fontSize: "10px", color: "#fcd34d", background: "rgba(245,158,11,0.15)", padding: "2px 8px", borderRadius: "4px" }, children: [
+          techContextRef.current.consoleErrors.length,
+          " console error"
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx4(
+        "textarea",
+        {
+          value: description,
+          onChange: (e) => setDescription(e.target.value),
+          placeholder: "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u0449\u043E \u043D\u0435 \u0442\u0430\u043A...",
+          autoFocus: true,
+          rows: 3,
+          style: {
+            width: "100%",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "10px",
+            padding: "10px 12px",
+            fontSize: "13px",
+            color: "white",
+            resize: "none",
+            outline: "none",
+            fontFamily: "inherit",
+            boxSizing: "border-box"
           }
-        ) : /* @__PURE__ */ jsxs5("div", { className: "absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3", children: [
-          /* @__PURE__ */ jsx6("span", { className: "text-white/90 text-[15px] font-semibold animate-pulse", children: "\u23F8 \u0417\u0430\u043C\u043E\u0440\u043E\u0436\u0443\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443..." }),
-          /* @__PURE__ */ jsx6("span", { className: "text-white/40 text-[12px]", children: "\u0417\u0431\u0438\u0440\u0430\u044E \u0442\u0435\u0445\u043D\u0456\u0447\u043D\u0438\u0439 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442" })
-        ] }),
-        screenshotUrl && !pendingShape && !showPanel && /* @__PURE__ */ jsx6(
-          DrawingCanvas,
-          {
-            width: w,
-            height: h,
-            tool,
-            shapes,
-            onShapeComplete: handleShapeComplete
-          }
-        ),
-        pendingShape && /* @__PURE__ */ jsx6(
-          ShapeAnnotation,
-          {
-            shape: pendingShape,
-            containerWidth: w,
-            containerHeight: h,
-            onConfirm: handleAnnotationConfirm,
-            onDismiss: handleAnnotationDismiss
-          }
-        ),
-        screenshotUrl && !showPanel && /* @__PURE__ */ jsx6(
-          DrawingToolbar,
-          {
-            activeTool: tool,
-            onToolChange: setTool,
-            onSave: () => setShowPanel(true),
-            onCancel,
-            saveLabel: "\u0414\u0430\u043B\u0456 \u2192"
-          }
-        ),
-        screenshotUrl && showPanel && /* @__PURE__ */ jsx6(
-          "div",
-          {
-            className: "absolute inset-0 flex items-end justify-center pb-6",
-            style: { background: "rgba(0,0,0,0.55)" },
-            onClick: () => {
-            },
-            children: /* @__PURE__ */ jsxs5(
-              "div",
-              {
-                className: "w-full max-w-[520px] mx-4 rounded-[20px] overflow-hidden",
-                style: { background: "#1c1c1e", border: "1px solid rgba(255,255,255,0.1)" },
-                children: [
-                  /* @__PURE__ */ jsxs5("div", { className: "px-4 py-3 border-b border-white/[0.07] flex items-center gap-2 flex-wrap", children: [
-                    /* @__PURE__ */ jsx6("span", { className: "text-[10px] font-mono text-white/30", children: techContextRef.current.route }),
-                    techContextRef.current.component && /* @__PURE__ */ jsx6("span", { className: "text-[10px] bg-indigo-500/20 text-indigo-300 rounded px-2 py-0.5 font-mono", children: techContextRef.current.component.name }),
-                    techContextRef.current.networkRequests.filter((r) => r.isError).map((r, i) => /* @__PURE__ */ jsxs5("span", { className: "text-[10px] bg-red-500/20 text-red-300 rounded px-2 py-0.5 font-mono", children: [
-                      r.status,
-                      " ",
-                      r.url.split("/").slice(-2).join("/")
-                    ] }, i)),
-                    techContextRef.current.consoleErrors.length > 0 && /* @__PURE__ */ jsxs5("span", { className: "text-[10px] bg-amber-500/20 text-amber-300 rounded px-2 py-0.5", children: [
-                      techContextRef.current.consoleErrors.length,
-                      " console error",
-                      techContextRef.current.consoleErrors.length > 1 ? "s" : ""
-                    ] })
-                  ] }),
-                  /* @__PURE__ */ jsx6("div", { className: "flex border-b border-white/[0.07]", children: ["text", "voice"].map((m) => {
-                    const Icon = m === "text" ? AlignLeft : Mic2;
-                    const label = m === "text" ? "\u0422\u0435\u043A\u0441\u0442" : "\u0413\u043E\u043B\u043E\u0441";
-                    return /* @__PURE__ */ jsxs5(
-                      "button",
-                      {
-                        type: "button",
-                        onClick: () => setDescMode(m),
-                        className: "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold transition-colors",
-                        style: {
-                          color: descMode === m ? "#fff" : "rgba(255,255,255,0.35)",
-                          borderBottom: descMode === m ? "2px solid #818cf8" : "2px solid transparent"
-                        },
-                        children: [
-                          /* @__PURE__ */ jsx6(Icon, { size: 13 }),
-                          label
-                        ]
-                      },
-                      m
-                    );
-                  }) }),
-                  descMode === "text" && /* @__PURE__ */ jsx6("div", { className: "px-4 pt-3 pb-2", children: /* @__PURE__ */ jsx6(
-                    "textarea",
-                    {
-                      value: description,
-                      onChange: (e) => setDescription(e.target.value),
-                      placeholder: "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u0449\u043E \u043D\u0435 \u0442\u0430\u043A...",
-                      autoFocus: true,
-                      rows: 3,
-                      className: "w-full bg-white/5 rounded-[10px] text-[13px] text-white placeholder:text-white/25 resize-none outline-none border border-white/[0.08] focus:border-white/20 p-3 transition-colors"
-                    }
-                  ) }),
-                  descMode === "voice" && /* @__PURE__ */ jsx6("div", { className: "px-4 pt-3 pb-2", children: /* @__PURE__ */ jsxs5("div", { className: "flex items-start gap-3", children: [
-                    /* @__PURE__ */ jsx6(
-                      "button",
-                      {
-                        type: "button",
-                        onClick: toggleVoice,
-                        className: "w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors mt-0.5",
-                        style: { background: listening ? "#ef4444" : "rgba(255,255,255,0.08)" },
-                        title: listening ? "\u0417\u0443\u043F\u0438\u043D\u0438\u0442\u0438" : "\u0417\u0430\u043F\u0438\u0441\u0430\u0442\u0438 \u0433\u043E\u043B\u043E\u0441",
-                        children: listening ? /* @__PURE__ */ jsx6(MicOff2, { size: 16, className: "text-white" }) : /* @__PURE__ */ jsx6(Mic2, { size: 16, className: "text-white/70" })
-                      }
-                    ),
-                    /* @__PURE__ */ jsxs5("div", { className: "flex-1", children: [
-                      /* @__PURE__ */ jsx6("p", { className: "text-[11px] text-white/40 mb-1", children: listening ? "\u0421\u043B\u0443\u0445\u0430\u044E..." : "\u041D\u0430\u0442\u0438\u0441\u043D\u0438 \u0449\u043E\u0431 \u0437\u0430\u043F\u0438\u0441\u0430\u0442\u0438" }),
-                      /* @__PURE__ */ jsx6("p", { className: "text-[13px] text-white min-h-[40px]", children: description || /* @__PURE__ */ jsx6("span", { className: "text-white/25", children: "\u0422\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0446\u0456\u044F \u0437'\u044F\u0432\u0438\u0442\u044C\u0441\u044F \u0442\u0443\u0442..." }) })
-                    ] })
-                  ] }) }),
-                  steps.length > 0 && /* @__PURE__ */ jsxs5("div", { className: "px-4 pb-3", children: [
-                    /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-1.5 mb-1.5", children: [
-                      /* @__PURE__ */ jsx6(List, { size: 11, className: "text-white/30" }),
-                      /* @__PURE__ */ jsx6("span", { className: "text-[10px] text-white/30 uppercase tracking-wider font-semibold", children: "\u041A\u0440\u043E\u043A\u0438 \u0432\u0456\u0434\u0442\u0432\u043E\u0440\u0435\u043D\u043D\u044F (\u0430\u0432\u0442\u043E)" })
-                    ] }),
-                    /* @__PURE__ */ jsx6("div", { className: "bg-white/[0.04] rounded-[8px] px-3 py-2 max-h-[80px] overflow-y-auto", children: steps.slice(-5).map((step, i) => /* @__PURE__ */ jsxs5("p", { className: "text-[11px] text-white/50 font-mono leading-relaxed", children: [
-                      i + 1,
-                      ". ",
-                      step
-                    ] }, i)) })
-                  ] }),
-                  /* @__PURE__ */ jsxs5("div", { className: "flex gap-2 px-4 pb-4", children: [
-                    /* @__PURE__ */ jsx6(
-                      "button",
-                      {
-                        type: "button",
-                        onClick: () => setShowPanel(false),
-                        className: "px-4 py-2 rounded-[10px] text-[12px] font-semibold text-white/50 transition-colors",
-                        style: { background: "rgba(255,255,255,0.06)" },
-                        children: "\u2190 \u041D\u0430\u0437\u0430\u0434"
-                      }
-                    ),
-                    /* @__PURE__ */ jsx6(
-                      "button",
-                      {
-                        type: "button",
-                        onClick: onCancel,
-                        className: "px-4 py-2 rounded-[10px] text-[12px] font-semibold text-white/50 transition-colors",
-                        style: { background: "rgba(255,255,255,0.06)" },
-                        children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438"
-                      }
-                    ),
-                    /* @__PURE__ */ jsx6(
-                      "button",
-                      {
-                        type: "button",
-                        onClick: handleSend,
-                        disabled: !screenshotUrl,
-                        className: "flex-1 py-2 rounded-[10px] text-[13px] font-bold text-white transition-colors disabled:opacity-40",
-                        style: { background: "#4f46e5" },
-                        children: "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u043D\u0430 \u043F\u043E\u0440\u0442\u0430\u043B \u2192"
-                      }
-                    )
-                  ] })
-                ]
-              }
-            )
-          }
-        )
-      ]
-    }
-  );
+        }
+      ),
+      techContextRef.current.eventLog.length > 0 && /* @__PURE__ */ jsxs3("div", { style: { marginTop: "10px" }, children: [
+        /* @__PURE__ */ jsx4("div", { style: { fontSize: "10px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }, children: "\u041A\u0440\u043E\u043A\u0438 \u0432\u0456\u0434\u0442\u0432\u043E\u0440\u0435\u043D\u043D\u044F (\u0430\u0432\u0442\u043E)" }),
+        /* @__PURE__ */ jsx4("div", { style: { background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "8px 10px", maxHeight: "80px", overflowY: "auto" }, children: techContextRef.current.eventLog.slice(-6).map((e, i) => /* @__PURE__ */ jsxs3("div", { style: { fontSize: "11px", fontFamily: "monospace", color: e.type === "console_error" || e.type === "network_error" ? "#fca5a5" : "rgba(255,255,255,0.45)", lineHeight: "1.6" }, children: [
+          i + 1,
+          ". ",
+          e.description
+        ] }, i)) })
+      ] }),
+      /* @__PURE__ */ jsxs3("div", { style: { display: "flex", gap: "8px", marginTop: "10px" }, children: [
+        /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setShowSendPanel(false), style: {
+          padding: "9px 16px",
+          borderRadius: "10px",
+          fontSize: "12px",
+          fontWeight: "600",
+          background: "rgba(255,255,255,0.06)",
+          border: "none",
+          cursor: "pointer",
+          color: "rgba(255,255,255,0.5)"
+        }, children: "\u2190 \u041D\u0430\u0437\u0430\u0434" }),
+        /* @__PURE__ */ jsx4("button", { type: "button", onClick: onCancel, style: {
+          padding: "9px 16px",
+          borderRadius: "10px",
+          fontSize: "12px",
+          fontWeight: "600",
+          background: "rgba(255,255,255,0.06)",
+          border: "none",
+          cursor: "pointer",
+          color: "rgba(255,255,255,0.4)"
+        }, children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438" }),
+        /* @__PURE__ */ jsx4("button", { type: "button", onClick: handleSend, style: {
+          flex: 1,
+          padding: "9px",
+          borderRadius: "10px",
+          fontSize: "13px",
+          fontWeight: "700",
+          background: "#4f46e5",
+          color: "white",
+          border: "none",
+          cursor: "pointer"
+        }, children: "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u043D\u0430 \u043F\u043E\u0440\u0442\u0430\u043B \u2192" })
+      ] })
+    ] }) })
+  ] });
 }
 
 // src/styles.gen.ts
-var styles = '.container {\n    width: 100%\n}\n@media (min-width: 640px) {\n    .container {\n        max-width: 640px\n    }\n}\n@media (min-width: 768px) {\n    .container {\n        max-width: 768px\n    }\n}\n@media (min-width: 1024px) {\n    .container {\n        max-width: 1024px\n    }\n}\n@media (min-width: 1280px) {\n    .container {\n        max-width: 1280px\n    }\n}\n@media (min-width: 1536px) {\n    .container {\n        max-width: 1536px\n    }\n}\n.sr-only {\n    position: absolute;\n    width: 1px;\n    height: 1px;\n    padding: 0;\n    margin: -1px;\n    overflow: hidden;\n    clip: rect(0, 0, 0, 0);\n    white-space: nowrap;\n    border-width: 0\n}\n.pointer-events-none {\n    pointer-events: none\n}\n.visible {\n    visibility: visible\n}\n.fixed {\n    position: fixed\n}\n.absolute {\n    position: absolute\n}\n.relative {\n    position: relative\n}\n.inset-0 {\n    inset: 0px\n}\n.-right-1 {\n    right: -0.25rem\n}\n.-top-1 {\n    top: -0.25rem\n}\n.bottom-24 {\n    bottom: 6rem\n}\n.bottom-6 {\n    bottom: 1.5rem\n}\n.left-1 {\n    left: 0.25rem\n}\n.left-1\\/2 {\n    left: 50%\n}\n.left-\\[12px\\] {\n    left: 12px\n}\n.right-6 {\n    right: 1.5rem\n}\n.top-1 {\n    top: 0.25rem\n}\n.top-1\\/2 {\n    top: 50%\n}\n.top-4 {\n    top: 1rem\n}\n.z-\\[10000\\] {\n    z-index: 10000\n}\n.z-\\[10001\\] {\n    z-index: 10001\n}\n.z-\\[10002\\] {\n    z-index: 10002\n}\n.z-\\[9997\\] {\n    z-index: 9997\n}\n.z-\\[9998\\] {\n    z-index: 9998\n}\n.z-\\[9999\\] {\n    z-index: 9999\n}\n.mx-1 {\n    margin-left: 0.25rem;\n    margin-right: 0.25rem\n}\n.mx-4 {\n    margin-left: 1rem;\n    margin-right: 1rem\n}\n.mx-auto {\n    margin-left: auto;\n    margin-right: auto\n}\n.mb-1 {\n    margin-bottom: 0.25rem\n}\n.mb-1\\.5 {\n    margin-bottom: 0.375rem\n}\n.mb-2 {\n    margin-bottom: 0.5rem\n}\n.mb-3 {\n    margin-bottom: 0.75rem\n}\n.mb-4 {\n    margin-bottom: 1rem\n}\n.mb-6 {\n    margin-bottom: 1.5rem\n}\n.ml-1 {\n    margin-left: 0.25rem\n}\n.mt-0 {\n    margin-top: 0px\n}\n.mt-0\\.5 {\n    margin-top: 0.125rem\n}\n.mt-1 {\n    margin-top: 0.25rem\n}\n.mt-2 {\n    margin-top: 0.5rem\n}\n.mt-6 {\n    margin-top: 1.5rem\n}\n.line-clamp-2 {\n    overflow: hidden;\n    display: -webkit-box;\n    -webkit-box-orient: vertical;\n    -webkit-line-clamp: 2\n}\n.block {\n    display: block\n}\n.flex {\n    display: flex\n}\n.inline-flex {\n    display: inline-flex\n}\n.hidden {\n    display: none\n}\n.h-10 {\n    height: 2.5rem\n}\n.h-12 {\n    height: 3rem\n}\n.h-6 {\n    height: 1.5rem\n}\n.h-\\[28px\\] {\n    height: 28px\n}\n.h-\\[32px\\] {\n    height: 32px\n}\n.h-\\[36px\\] {\n    height: 36px\n}\n.h-full {\n    height: 100%\n}\n.max-h-\\[80px\\] {\n    max-height: 80px\n}\n.max-h-\\[calc\\(100vh-200px\\)\\] {\n    max-height: calc(100vh - 200px)\n}\n.min-h-\\[40px\\] {\n    min-height: 40px\n}\n.w-10 {\n    width: 2.5rem\n}\n.w-12 {\n    width: 3rem\n}\n.w-\\[288px\\] {\n    width: 288px\n}\n.w-\\[32px\\] {\n    width: 32px\n}\n.w-\\[36px\\] {\n    width: 36px\n}\n.w-full {\n    width: 100%\n}\n.w-px {\n    width: 1px\n}\n.min-w-0 {\n    min-width: 0px\n}\n.max-w-\\[1200px\\] {\n    max-width: 1200px\n}\n.max-w-\\[480px\\] {\n    max-width: 480px\n}\n.max-w-\\[520px\\] {\n    max-width: 520px\n}\n.max-w-\\[640px\\] {\n    max-width: 640px\n}\n.max-w-\\[900px\\] {\n    max-width: 900px\n}\n.flex-1 {\n    flex: 1 1 0%\n}\n.flex-shrink {\n    flex-shrink: 1\n}\n.shrink-0 {\n    flex-shrink: 0\n}\n.-translate-x-1 {\n    --tw-translate-x: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-x-1\\/2 {\n    --tw-translate-x: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1 {\n    --tw-translate-y: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1\\/2 {\n    --tw-translate-y: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.transform {\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n@keyframes pulse {\n    50% {\n        opacity: .5\n    }\n}\n.animate-pulse {\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\n@keyframes spin {\n    to {\n        transform: rotate(360deg)\n    }\n}\n.animate-spin {\n    animation: spin 1s linear infinite\n}\n.cursor-default {\n    cursor: default\n}\n.select-none {\n    -webkit-user-select: none;\n       -moz-user-select: none;\n            user-select: none\n}\n.resize-none {\n    resize: none\n}\n.resize {\n    resize: both\n}\n.flex-col {\n    flex-direction: column\n}\n.flex-wrap {\n    flex-wrap: wrap\n}\n.items-start {\n    align-items: flex-start\n}\n.items-end {\n    align-items: flex-end\n}\n.items-center {\n    align-items: center\n}\n.justify-center {\n    justify-content: center\n}\n.justify-between {\n    justify-content: space-between\n}\n.gap-1 {\n    gap: 0.25rem\n}\n.gap-1\\.5 {\n    gap: 0.375rem\n}\n.gap-2 {\n    gap: 0.5rem\n}\n.gap-3 {\n    gap: 0.75rem\n}\n.gap-4 {\n    gap: 1rem\n}\n.gap-\\[6px\\] {\n    gap: 6px\n}\n.self-start {\n    align-self: flex-start\n}\n.overflow-hidden {\n    overflow: hidden\n}\n.overflow-y-auto {\n    overflow-y: auto\n}\n.rounded {\n    border-radius: 0.25rem\n}\n.rounded-\\[10px\\] {\n    border-radius: 10px\n}\n.rounded-\\[12px\\] {\n    border-radius: 12px\n}\n.rounded-\\[16px\\] {\n    border-radius: 16px\n}\n.rounded-\\[20px\\] {\n    border-radius: 20px\n}\n.rounded-\\[24px\\] {\n    border-radius: 24px\n}\n.rounded-\\[8px\\] {\n    border-radius: 8px\n}\n.rounded-full {\n    border-radius: 9999px\n}\n.border {\n    border-width: 1px\n}\n.border-2 {\n    border-width: 2px\n}\n.border-b {\n    border-bottom-width: 1px\n}\n.border-t {\n    border-top-width: 1px\n}\n.border-\\[\\#f0f0f0\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\n.border-red-500 {\n    --tw-border-opacity: 1;\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\n.border-transparent {\n    border-color: transparent\n}\n.border-white {\n    --tw-border-opacity: 1;\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\n.border-white\\/10 {\n    border-color: rgb(255 255 255 / 0.1)\n}\n.border-white\\/\\[0\\.07\\] {\n    border-color: rgb(255 255 255 / 0.07)\n}\n.border-white\\/\\[0\\.08\\] {\n    border-color: rgb(255 255 255 / 0.08)\n}\n.bg-\\[\\#1c1c1e\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(28 28 30 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#1f1f1f\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#e9e9e9\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#ef4444\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f0f0f0\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f4f4f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f5f5f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\n.bg-amber-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1))\n}\n.bg-amber-500\\/20 {\n    background-color: rgb(245 158 11 / 0.2)\n}\n.bg-black {\n    --tw-bg-opacity: 1;\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\n.bg-black\\/40 {\n    background-color: rgb(0 0 0 / 0.4)\n}\n.bg-black\\/60 {\n    background-color: rgb(0 0 0 / 0.6)\n}\n.bg-indigo-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(99 102 241 / var(--tw-bg-opacity, 1))\n}\n.bg-indigo-500\\/20 {\n    background-color: rgb(99 102 241 / 0.2)\n}\n.bg-red-50 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500\\/20 {\n    background-color: rgb(239 68 68 / 0.2)\n}\n.bg-transparent {\n    background-color: transparent\n}\n.bg-white {\n    --tw-bg-opacity: 1;\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\n.bg-white\\/5 {\n    background-color: rgb(255 255 255 / 0.05)\n}\n.bg-white\\/\\[0\\.04\\] {\n    background-color: rgb(255 255 255 / 0.04)\n}\n.object-contain {\n    -o-object-fit: contain;\n       object-fit: contain\n}\n.object-cover {\n    -o-object-fit: cover;\n       object-fit: cover\n}\n.p-0 {\n    padding: 0px\n}\n.p-1 {\n    padding: 0.25rem\n}\n.p-3 {\n    padding: 0.75rem\n}\n.p-4 {\n    padding: 1rem\n}\n.p-\\[10px\\] {\n    padding: 10px\n}\n.p-\\[12px\\] {\n    padding: 12px\n}\n.p-\\[16px\\] {\n    padding: 16px\n}\n.p-\\[20px\\] {\n    padding: 20px\n}\n.p-\\[24px\\] {\n    padding: 24px\n}\n.px-1 {\n    padding-left: 0.25rem;\n    padding-right: 0.25rem\n}\n.px-2 {\n    padding-left: 0.5rem;\n    padding-right: 0.5rem\n}\n.px-3 {\n    padding-left: 0.75rem;\n    padding-right: 0.75rem\n}\n.px-4 {\n    padding-left: 1rem;\n    padding-right: 1rem\n}\n.px-6 {\n    padding-left: 1.5rem;\n    padding-right: 1.5rem\n}\n.px-\\[12px\\] {\n    padding-left: 12px;\n    padding-right: 12px\n}\n.px-\\[14px\\] {\n    padding-left: 14px;\n    padding-right: 14px\n}\n.px-\\[16px\\] {\n    padding-left: 16px;\n    padding-right: 16px\n}\n.px-\\[18px\\] {\n    padding-left: 18px;\n    padding-right: 18px\n}\n.py-0 {\n    padding-top: 0px;\n    padding-bottom: 0px\n}\n.py-0\\.5 {\n    padding-top: 0.125rem;\n    padding-bottom: 0.125rem\n}\n.py-12 {\n    padding-top: 3rem;\n    padding-bottom: 3rem\n}\n.py-2 {\n    padding-top: 0.5rem;\n    padding-bottom: 0.5rem\n}\n.py-2\\.5 {\n    padding-top: 0.625rem;\n    padding-bottom: 0.625rem\n}\n.py-3 {\n    padding-top: 0.75rem;\n    padding-bottom: 0.75rem\n}\n.py-5 {\n    padding-top: 1.25rem;\n    padding-bottom: 1.25rem\n}\n.py-8 {\n    padding-top: 2rem;\n    padding-bottom: 2rem\n}\n.pb-2 {\n    padding-bottom: 0.5rem\n}\n.pb-3 {\n    padding-bottom: 0.75rem\n}\n.pb-4 {\n    padding-bottom: 1rem\n}\n.pb-6 {\n    padding-bottom: 1.5rem\n}\n.pl-\\[12px\\] {\n    padding-left: 12px\n}\n.pl-\\[36px\\] {\n    padding-left: 36px\n}\n.pr-\\[12px\\] {\n    padding-right: 12px\n}\n.pr-\\[2px\\] {\n    padding-right: 2px\n}\n.pt-12 {\n    padding-top: 3rem\n}\n.pt-3 {\n    padding-top: 0.75rem\n}\n.pt-4 {\n    padding-top: 1rem\n}\n.pt-6 {\n    padding-top: 1.5rem\n}\n.text-center {\n    text-align: center\n}\n.font-mono {\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\n.text-\\[10px\\] {\n    font-size: 10px\n}\n.text-\\[11px\\] {\n    font-size: 11px\n}\n.text-\\[12px\\] {\n    font-size: 12px\n}\n.text-\\[13px\\] {\n    font-size: 13px\n}\n.text-\\[15px\\] {\n    font-size: 15px\n}\n.text-\\[18px\\] {\n    font-size: 18px\n}\n.font-bold {\n    font-weight: 700\n}\n.font-semibold {\n    font-weight: 600\n}\n.uppercase {\n    text-transform: uppercase\n}\n.italic {\n    font-style: italic\n}\n.leading-none {\n    line-height: 1\n}\n.leading-relaxed {\n    line-height: 1.625\n}\n.leading-snug {\n    line-height: 1.375\n}\n.tracking-wider {\n    letter-spacing: 0.05em\n}\n.text-\\[\\#1f1f1f\\] {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#9a9a9a\\] {\n    --tw-text-opacity: 1;\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#ef4444\\] {\n    --tw-text-opacity: 1;\n    color: rgb(239 68 68 / var(--tw-text-opacity, 1))\n}\n.text-amber-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 211 77 / var(--tw-text-opacity, 1))\n}\n.text-indigo-300 {\n    --tw-text-opacity: 1;\n    color: rgb(165 180 252 / var(--tw-text-opacity, 1))\n}\n.text-red-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 165 165 / var(--tw-text-opacity, 1))\n}\n.text-white {\n    --tw-text-opacity: 1;\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\n.text-white\\/25 {\n    color: rgb(255 255 255 / 0.25)\n}\n.text-white\\/30 {\n    color: rgb(255 255 255 / 0.3)\n}\n.text-white\\/40 {\n    color: rgb(255 255 255 / 0.4)\n}\n.text-white\\/50 {\n    color: rgb(255 255 255 / 0.5)\n}\n.text-white\\/70 {\n    color: rgb(255 255 255 / 0.7)\n}\n.text-white\\/90 {\n    color: rgb(255 255 255 / 0.9)\n}\n.opacity-60 {\n    opacity: 0.6\n}\n.shadow {\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_28px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.5\\)\\2c 0_2px_6px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.3\\)\\] {\n    --tw-shadow: 0 8px 28px rgba(0,0,0,0.5),0 2px 6px rgba(0,0,0,0.3);\n    --tw-shadow-colored: 0 8px 28px var(--tw-shadow-color), 0 2px 6px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.2\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.2);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.22\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.22);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-lg {\n    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-sm {\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.outline-none {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.outline {\n    outline-style: solid\n}\n.blur {\n    --tw-blur: blur(8px);\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.filter {\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.backdrop-blur-sm {\n    --tw-backdrop-blur: blur(4px);\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.backdrop-filter {\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.transition-all {\n    transition-property: all;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-colors {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.duration-150 {\n    transition-duration: 150ms\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::-moz-placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.placeholder\\:text-white\\/25::-moz-placeholder {\n    color: rgb(255 255 255 / 0.25)\n}\n.placeholder\\:text-white\\/25::placeholder {\n    color: rgb(255 255 255 / 0.25)\n}\n.hover\\:scale-105:hover {\n    --tw-scale-x: 1.05;\n    --tw-scale-y: 1.05;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.hover\\:bg-\\[\\#2c2c2e\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(44 44 46 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#303030\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#dc2626\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#e9e9e9\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.focus\\:border-\\[\\#1f1f1f\\]:focus {\n    --tw-border-opacity: 1;\n    border-color: rgb(31 31 31 / var(--tw-border-opacity, 1))\n}\n.focus\\:border-white\\/20:focus {\n    border-color: rgb(255 255 255 / 0.2)\n}\n.focus\\:outline-none:focus {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.active\\:scale-95:active {\n    --tw-scale-x: .95;\n    --tw-scale-y: .95;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.disabled\\:cursor-not-allowed:disabled {\n    cursor: not-allowed\n}\n.disabled\\:opacity-40:disabled {\n    opacity: 0.4\n}\n.disabled\\:opacity-50:disabled {\n    opacity: 0.5\n}\n';
+var styles = '.container {\n    width: 100%\n}\n@media (min-width: 640px) {\n    .container {\n        max-width: 640px\n    }\n}\n@media (min-width: 768px) {\n    .container {\n        max-width: 768px\n    }\n}\n@media (min-width: 1024px) {\n    .container {\n        max-width: 1024px\n    }\n}\n@media (min-width: 1280px) {\n    .container {\n        max-width: 1280px\n    }\n}\n@media (min-width: 1536px) {\n    .container {\n        max-width: 1536px\n    }\n}\n.sr-only {\n    position: absolute;\n    width: 1px;\n    height: 1px;\n    padding: 0;\n    margin: -1px;\n    overflow: hidden;\n    clip: rect(0, 0, 0, 0);\n    white-space: nowrap;\n    border-width: 0\n}\n.pointer-events-none {\n    pointer-events: none\n}\n.visible {\n    visibility: visible\n}\n.fixed {\n    position: fixed\n}\n.absolute {\n    position: absolute\n}\n.relative {\n    position: relative\n}\n.inset-0 {\n    inset: 0px\n}\n.-right-1 {\n    right: -0.25rem\n}\n.-top-1 {\n    top: -0.25rem\n}\n.bottom-24 {\n    bottom: 6rem\n}\n.bottom-6 {\n    bottom: 1.5rem\n}\n.left-1 {\n    left: 0.25rem\n}\n.left-\\[12px\\] {\n    left: 12px\n}\n.right-6 {\n    right: 1.5rem\n}\n.top-1 {\n    top: 0.25rem\n}\n.top-1\\/2 {\n    top: 50%\n}\n.top-4 {\n    top: 1rem\n}\n.z-\\[10002\\] {\n    z-index: 10002\n}\n.z-\\[9998\\] {\n    z-index: 9998\n}\n.mx-1 {\n    margin-left: 0.25rem;\n    margin-right: 0.25rem\n}\n.mx-4 {\n    margin-left: 1rem;\n    margin-right: 1rem\n}\n.mx-auto {\n    margin-left: auto;\n    margin-right: auto\n}\n.mb-1 {\n    margin-bottom: 0.25rem\n}\n.mb-2 {\n    margin-bottom: 0.5rem\n}\n.mb-3 {\n    margin-bottom: 0.75rem\n}\n.mb-4 {\n    margin-bottom: 1rem\n}\n.mb-6 {\n    margin-bottom: 1.5rem\n}\n.ml-1 {\n    margin-left: 0.25rem\n}\n.mt-0 {\n    margin-top: 0px\n}\n.mt-1 {\n    margin-top: 0.25rem\n}\n.mt-2 {\n    margin-top: 0.5rem\n}\n.mt-6 {\n    margin-top: 1.5rem\n}\n.line-clamp-2 {\n    overflow: hidden;\n    display: -webkit-box;\n    -webkit-box-orient: vertical;\n    -webkit-line-clamp: 2\n}\n.block {\n    display: block\n}\n.flex {\n    display: flex\n}\n.inline-flex {\n    display: inline-flex\n}\n.hidden {\n    display: none\n}\n.h-10 {\n    height: 2.5rem\n}\n.h-12 {\n    height: 3rem\n}\n.h-6 {\n    height: 1.5rem\n}\n.h-\\[28px\\] {\n    height: 28px\n}\n.h-\\[32px\\] {\n    height: 32px\n}\n.h-\\[36px\\] {\n    height: 36px\n}\n.h-full {\n    height: 100%\n}\n.max-h-\\[calc\\(100vh-200px\\)\\] {\n    max-height: calc(100vh - 200px)\n}\n.w-10 {\n    width: 2.5rem\n}\n.w-12 {\n    width: 3rem\n}\n.w-\\[288px\\] {\n    width: 288px\n}\n.w-\\[32px\\] {\n    width: 32px\n}\n.w-\\[36px\\] {\n    width: 36px\n}\n.w-full {\n    width: 100%\n}\n.w-px {\n    width: 1px\n}\n.min-w-0 {\n    min-width: 0px\n}\n.max-w-\\[1200px\\] {\n    max-width: 1200px\n}\n.max-w-\\[480px\\] {\n    max-width: 480px\n}\n.max-w-\\[640px\\] {\n    max-width: 640px\n}\n.max-w-\\[900px\\] {\n    max-width: 900px\n}\n.flex-1 {\n    flex: 1 1 0%\n}\n.flex-shrink {\n    flex-shrink: 1\n}\n.shrink-0 {\n    flex-shrink: 0\n}\n.-translate-x-1 {\n    --tw-translate-x: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1 {\n    --tw-translate-y: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1\\/2 {\n    --tw-translate-y: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.transform {\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n@keyframes pulse {\n    50% {\n        opacity: .5\n    }\n}\n.animate-pulse {\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\n@keyframes spin {\n    to {\n        transform: rotate(360deg)\n    }\n}\n.animate-spin {\n    animation: spin 1s linear infinite\n}\n.cursor-default {\n    cursor: default\n}\n.select-none {\n    -webkit-user-select: none;\n       -moz-user-select: none;\n            user-select: none\n}\n.resize-none {\n    resize: none\n}\n.resize {\n    resize: both\n}\n.flex-col {\n    flex-direction: column\n}\n.flex-wrap {\n    flex-wrap: wrap\n}\n.items-start {\n    align-items: flex-start\n}\n.items-end {\n    align-items: flex-end\n}\n.items-center {\n    align-items: center\n}\n.justify-center {\n    justify-content: center\n}\n.justify-between {\n    justify-content: space-between\n}\n.gap-1 {\n    gap: 0.25rem\n}\n.gap-2 {\n    gap: 0.5rem\n}\n.gap-3 {\n    gap: 0.75rem\n}\n.gap-4 {\n    gap: 1rem\n}\n.gap-\\[6px\\] {\n    gap: 6px\n}\n.self-start {\n    align-self: flex-start\n}\n.overflow-hidden {\n    overflow: hidden\n}\n.overflow-y-auto {\n    overflow-y: auto\n}\n.rounded {\n    border-radius: 0.25rem\n}\n.rounded-\\[10px\\] {\n    border-radius: 10px\n}\n.rounded-\\[16px\\] {\n    border-radius: 16px\n}\n.rounded-\\[24px\\] {\n    border-radius: 24px\n}\n.rounded-\\[8px\\] {\n    border-radius: 8px\n}\n.rounded-full {\n    border-radius: 9999px\n}\n.border {\n    border-width: 1px\n}\n.border-2 {\n    border-width: 2px\n}\n.border-b {\n    border-bottom-width: 1px\n}\n.border-t {\n    border-top-width: 1px\n}\n.border-\\[\\#f0f0f0\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\n.border-red-500 {\n    --tw-border-opacity: 1;\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\n.border-transparent {\n    border-color: transparent\n}\n.border-white {\n    --tw-border-opacity: 1;\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\n.bg-\\[\\#1f1f1f\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#ef4444\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f0f0f0\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f4f4f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f5f5f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\n.bg-amber-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1))\n}\n.bg-black {\n    --tw-bg-opacity: 1;\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\n.bg-black\\/40 {\n    background-color: rgb(0 0 0 / 0.4)\n}\n.bg-indigo-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(99 102 241 / var(--tw-bg-opacity, 1))\n}\n.bg-red-50 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-transparent {\n    background-color: transparent\n}\n.bg-white {\n    --tw-bg-opacity: 1;\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\n.object-contain {\n    -o-object-fit: contain;\n       object-fit: contain\n}\n.object-cover {\n    -o-object-fit: cover;\n       object-fit: cover\n}\n.p-0 {\n    padding: 0px\n}\n.p-1 {\n    padding: 0.25rem\n}\n.p-3 {\n    padding: 0.75rem\n}\n.p-4 {\n    padding: 1rem\n}\n.p-\\[10px\\] {\n    padding: 10px\n}\n.p-\\[12px\\] {\n    padding: 12px\n}\n.p-\\[16px\\] {\n    padding: 16px\n}\n.p-\\[20px\\] {\n    padding: 20px\n}\n.p-\\[24px\\] {\n    padding: 24px\n}\n.px-1 {\n    padding-left: 0.25rem;\n    padding-right: 0.25rem\n}\n.px-2 {\n    padding-left: 0.5rem;\n    padding-right: 0.5rem\n}\n.px-3 {\n    padding-left: 0.75rem;\n    padding-right: 0.75rem\n}\n.px-4 {\n    padding-left: 1rem;\n    padding-right: 1rem\n}\n.px-6 {\n    padding-left: 1.5rem;\n    padding-right: 1.5rem\n}\n.px-\\[12px\\] {\n    padding-left: 12px;\n    padding-right: 12px\n}\n.px-\\[16px\\] {\n    padding-left: 16px;\n    padding-right: 16px\n}\n.px-\\[18px\\] {\n    padding-left: 18px;\n    padding-right: 18px\n}\n.py-0 {\n    padding-top: 0px;\n    padding-bottom: 0px\n}\n.py-12 {\n    padding-top: 3rem;\n    padding-bottom: 3rem\n}\n.py-2 {\n    padding-top: 0.5rem;\n    padding-bottom: 0.5rem\n}\n.py-3 {\n    padding-top: 0.75rem;\n    padding-bottom: 0.75rem\n}\n.py-5 {\n    padding-top: 1.25rem;\n    padding-bottom: 1.25rem\n}\n.py-8 {\n    padding-top: 2rem;\n    padding-bottom: 2rem\n}\n.pb-2 {\n    padding-bottom: 0.5rem\n}\n.pb-3 {\n    padding-bottom: 0.75rem\n}\n.pb-4 {\n    padding-bottom: 1rem\n}\n.pb-6 {\n    padding-bottom: 1.5rem\n}\n.pl-\\[12px\\] {\n    padding-left: 12px\n}\n.pl-\\[36px\\] {\n    padding-left: 36px\n}\n.pr-\\[12px\\] {\n    padding-right: 12px\n}\n.pt-12 {\n    padding-top: 3rem\n}\n.pt-3 {\n    padding-top: 0.75rem\n}\n.pt-4 {\n    padding-top: 1rem\n}\n.pt-6 {\n    padding-top: 1.5rem\n}\n.text-center {\n    text-align: center\n}\n.font-mono {\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\n.text-\\[11px\\] {\n    font-size: 11px\n}\n.text-\\[12px\\] {\n    font-size: 12px\n}\n.text-\\[13px\\] {\n    font-size: 13px\n}\n.text-\\[18px\\] {\n    font-size: 18px\n}\n.font-bold {\n    font-weight: 700\n}\n.font-semibold {\n    font-weight: 600\n}\n.uppercase {\n    text-transform: uppercase\n}\n.italic {\n    font-style: italic\n}\n.leading-none {\n    line-height: 1\n}\n.leading-relaxed {\n    line-height: 1.625\n}\n.leading-snug {\n    line-height: 1.375\n}\n.tracking-wider {\n    letter-spacing: 0.05em\n}\n.text-\\[\\#1f1f1f\\] {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#9a9a9a\\] {\n    --tw-text-opacity: 1;\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#ef4444\\] {\n    --tw-text-opacity: 1;\n    color: rgb(239 68 68 / var(--tw-text-opacity, 1))\n}\n.text-amber-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 211 77 / var(--tw-text-opacity, 1))\n}\n.text-indigo-300 {\n    --tw-text-opacity: 1;\n    color: rgb(165 180 252 / var(--tw-text-opacity, 1))\n}\n.text-red-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 165 165 / var(--tw-text-opacity, 1))\n}\n.text-white {\n    --tw-text-opacity: 1;\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\n.opacity-60 {\n    opacity: 0.6\n}\n.shadow {\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.22\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.22);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-lg {\n    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-sm {\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.outline-none {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.outline {\n    outline-style: solid\n}\n.blur {\n    --tw-blur: blur(8px);\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.filter {\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.backdrop-blur-sm {\n    --tw-backdrop-blur: blur(4px);\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.backdrop-filter {\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.transition {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-all {\n    transition-property: all;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-colors {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.duration-150 {\n    transition-duration: 150ms\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::-moz-placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.hover\\:bg-\\[\\#303030\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#dc2626\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#e9e9e9\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.focus\\:border-\\[\\#1f1f1f\\]:focus {\n    --tw-border-opacity: 1;\n    border-color: rgb(31 31 31 / var(--tw-border-opacity, 1))\n}\n.focus\\:outline-none:focus {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.disabled\\:cursor-not-allowed:disabled {\n    cursor: not-allowed\n}\n.disabled\\:opacity-50:disabled {\n    opacity: 0.5\n}\n';
 var styles_gen_default = styles;
 
 // src/components/BuggyBag.tsx
-import { Fragment as Fragment2, jsx as jsx7, jsxs as jsxs6 } from "react/jsx-runtime";
+import { Fragment as Fragment2, jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
+function RectIcon() {
+  return /* @__PURE__ */ jsx5("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsx5("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) });
+}
+function ArrowIcon() {
+  return /* @__PURE__ */ jsxs4("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+    /* @__PURE__ */ jsx5("path", { d: "M5 19L19 5" }),
+    /* @__PURE__ */ jsx5("path", { d: "M8 5h11v11" })
+  ] });
+}
+function PinIcon() {
+  return /* @__PURE__ */ jsxs4("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+    /* @__PURE__ */ jsx5("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
+    /* @__PURE__ */ jsx5("circle", { cx: "12", cy: "10", r: "3" })
+  ] });
+}
+function BugIcon() {
+  return /* @__PURE__ */ jsxs4("svg", { width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", children: [
+    /* @__PURE__ */ jsx5("path", { d: "M8 2l1.88 1.88" }),
+    /* @__PURE__ */ jsx5("path", { d: "M14.12 3.88L16 2" }),
+    /* @__PURE__ */ jsx5("path", { d: "M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" }),
+    /* @__PURE__ */ jsx5("path", { d: "M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z" }),
+    /* @__PURE__ */ jsx5("path", { d: "M12 20v-9" }),
+    /* @__PURE__ */ jsx5("path", { d: "M6.53 9C4.6 8.8 3 7 3 5" }),
+    /* @__PURE__ */ jsx5("path", { d: "M6 13H2" }),
+    /* @__PURE__ */ jsx5("path", { d: "M3 21c0-2.1 1.7-3.9 3.8-4" }),
+    /* @__PURE__ */ jsx5("path", { d: "M20.97 5c0 2.1-1.6 3.8-3.5 4" }),
+    /* @__PURE__ */ jsx5("path", { d: "M22 13h-4" }),
+    /* @__PURE__ */ jsx5("path", { d: "M17.2 17c2.1.1 3.8 1.9 3.8 4" })
+  ] });
+}
 function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
-  const [capturing, setCapturing] = useState4(false);
-  const [toastVisible, setToastVisible] = useState4(false);
-  const [toastError, setToastError] = useState4(false);
+  const [expanded, setExpanded] = useState4(false);
+  const [activeTool, setActiveTool] = useState4(null);
+  const [toast, setToast] = useState4(null);
   useEffect4(() => {
     initCollector();
   }, []);
   const handleKeyDown = useCallback3((e) => {
     if (e.altKey && e.key.toLowerCase() === "b") {
       e.preventDefault();
-      setCapturing((v) => !v);
+      setExpanded((v) => !v);
+      setActiveTool(null);
     }
-    if (e.key === "Escape" && capturing) {
-      setCapturing(false);
+    if (e.key === "Escape") {
+      setExpanded(false);
+      setActiveTool(null);
     }
-  }, [capturing]);
+  }, []);
   useEffect4(() => {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
+  useEffect4(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("bb") === "on") {
+      localStorage.setItem("BUGGY_BAG_ACCESS", "active");
+      p.delete("bb");
+      window.history.replaceState({}, "", window.location.pathname + (p.toString() ? "?" + p.toString() : ""));
+    }
+  }, []);
+  const handleToolSelect = (tool) => {
+    setExpanded(false);
+    setActiveTool(tool);
+  };
   const handleSend = async (payload) => {
-    setCapturing(false);
+    setActiveTool(null);
     if (!apiEndpoint || !apiKey) {
-      showToast(false);
+      showToast("\u0412\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E (\u0431\u0435\u0437 API)", true);
       return;
     }
     try {
@@ -1846,70 +1779,135 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, api_key: apiKey })
       });
-      showToast(!res.ok);
+      showToast(res.ok ? "\u2713 \u0412\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E" : "\u26A0 \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430", res.ok);
     } catch {
-      showToast(true);
+      showToast("\u26A0 \u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u0456\u0434\u043F\u0440\u0430\u0432\u0438\u0442\u0438", false);
     }
   };
-  const showToast = (isError) => {
-    setToastError(isError);
-    setToastVisible(true);
-    setTimeout(() => setToastVisible(false), 4e3);
+  const showToast = (msg, ok) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 4e3);
   };
-  return /* @__PURE__ */ jsxs6(Fragment2, { children: [
-    !capturing && /* @__PURE__ */ jsx7(FloatingButton, { onCapture: () => setCapturing(true) }),
-    capturing && /* @__PURE__ */ jsx7(
+  const tools = [
+    { tool: "rect", icon: /* @__PURE__ */ jsx5(RectIcon, {}), title: "\u0412\u0438\u0434\u0456\u043B\u0438\u0442\u0438 \u043E\u0431\u043B\u0430\u0441\u0442\u044C" },
+    { tool: "arrow", icon: /* @__PURE__ */ jsx5(ArrowIcon, {}), title: "\u041D\u0430\u043C\u0430\u043B\u044E\u0432\u0430\u0442\u0438 \u0441\u0442\u0440\u0456\u043B\u043A\u0443" },
+    { tool: "pin", icon: /* @__PURE__ */ jsx5(PinIcon, {}), title: "\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u043F\u0456\u043D" }
+  ];
+  return /* @__PURE__ */ jsxs4(Fragment2, { children: [
+    !activeTool && /* @__PURE__ */ jsxs4("div", { "data-buggy-bag": "true", style: {
+      position: "fixed",
+      bottom: "24px",
+      right: "24px",
+      zIndex: 9997,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "8px"
+    }, children: [
+      expanded && /* @__PURE__ */ jsx5("div", { style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px",
+        alignItems: "center"
+      }, children: tools.map(({ tool, icon, title }) => /* @__PURE__ */ jsx5(
+        "button",
+        {
+          type: "button",
+          onClick: () => handleToolSelect(tool),
+          title,
+          style: {
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            background: "white",
+            border: "1px solid rgba(0,0,0,0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "#1f1f1f",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+          },
+          children: icon
+        },
+        tool
+      )) }),
+      /* @__PURE__ */ jsx5("span", { style: {
+        fontSize: "10px",
+        fontFamily: "monospace",
+        background: "rgba(0,0,0,0.55)",
+        color: "rgba(255,255,255,0.85)",
+        padding: "2px 6px",
+        borderRadius: "4px",
+        userSelect: "none"
+      }, children: "Alt+B" }),
+      /* @__PURE__ */ jsx5(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setExpanded((v) => !v);
+          },
+          title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
+          style: {
+            width: "48px",
+            height: "48px",
+            borderRadius: "50%",
+            background: expanded ? "#4f46e5" : "#1c1c1e",
+            border: "1px solid rgba(255,255,255,0.15)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "white",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.4)",
+            transition: "background 0.15s"
+          },
+          children: /* @__PURE__ */ jsx5(BugIcon, {})
+        }
+      )
+    ] }),
+    activeTool && /* @__PURE__ */ jsx5(
       CaptureMode,
       {
+        initialTool: activeTool,
         apiKey: apiKey ?? "",
         onSend: handleSend,
-        onCancel: () => setCapturing(false)
+        onCancel: () => setActiveTool(null)
       }
     ),
-    toastVisible && /* @__PURE__ */ jsxs6(
-      "div",
-      {
-        "data-buggy-bag": "true",
-        className: "fixed bottom-24 right-6 z-[9999] flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-[12px] font-semibold shadow-lg",
-        style: {
-          background: toastError ? "#3f1c1c" : "#1c1c1e",
-          color: toastError ? "#fca5a5" : "#ffffff",
-          border: `1px solid ${toastError ? "#7f1d1d" : "rgba(255,255,255,0.1)"}`
-        },
-        children: [
-          toastError ? "\u26A0 \u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u0456\u0434\u043F\u0440\u0430\u0432\u0438\u0442\u0438" : "\u2713 \u0412\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u043D\u0430 \u043F\u043E\u0440\u0442\u0430\u043B",
-          !toastError && portalUrl && /* @__PURE__ */ jsx7(
-            "a",
-            {
-              href: portalUrl,
-              target: "_blank",
-              rel: "noopener noreferrer",
-              style: { color: "#818cf8", marginLeft: 4 },
-              children: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u2192"
-            }
-          )
-        ]
-      }
-    )
+    toast && /* @__PURE__ */ jsxs4("div", { "data-buggy-bag": "true", style: {
+      position: "fixed",
+      bottom: "90px",
+      right: "24px",
+      zIndex: 9999,
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      padding: "10px 16px",
+      borderRadius: "12px",
+      background: toast.ok ? "#1c1c1e" : "#3f1c1c",
+      color: toast.ok ? "white" : "#fca5a5",
+      border: `1px solid ${toast.ok ? "rgba(255,255,255,0.1)" : "#7f1d1d"}`,
+      fontSize: "13px",
+      fontWeight: "600"
+    }, children: [
+      toast.msg,
+      toast.ok && portalUrl && /* @__PURE__ */ jsx5(
+        "a",
+        {
+          href: portalUrl,
+          target: "_blank",
+          rel: "noopener noreferrer",
+          style: { color: "#818cf8", marginLeft: "4px", fontSize: "12px" },
+          children: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u2192"
+        }
+      )
+    ] })
   ] });
-}
-function isActive() {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem("BUGGY_BAG_ACCESS") === "active";
-}
-function activateFromUrl() {
-  if (typeof window === "undefined") return;
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("bb") === "on") {
-    localStorage.setItem("BUGGY_BAG_ACCESS", "active");
-    params.delete("bb");
-    const newUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "") + window.location.hash;
-    window.history.replaceState({}, "", newUrl);
-  }
 }
 function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
   useEffect4(() => {
-    activateFromUrl();
     const host = document.createElement("div");
     host.setAttribute("data-buggy-bag", "true");
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;";
@@ -1925,7 +1923,7 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
     shadow.appendChild(mountPoint);
     const root = createRoot(mountPoint);
     root.render(
-      /* @__PURE__ */ jsx7(GodModeGuard, { children: /* @__PURE__ */ jsx7(BuggyBagInner, { apiEndpoint, apiKey, portalUrl }) })
+      /* @__PURE__ */ jsx5(GodModeGuard, { children: /* @__PURE__ */ jsx5(BuggyBagInner, { apiEndpoint, apiKey, portalUrl }) })
     );
     return () => {
       host.remove();
@@ -1933,6 +1931,12 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
     };
   }, []);
   return null;
+}
+function isActive() {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("BUGGY_BAG_ACCESS") === "active";
+}
+function activateFromUrl() {
 }
 export {
   BuggyBag,

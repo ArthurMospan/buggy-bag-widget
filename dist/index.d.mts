@@ -1,15 +1,11 @@
 interface BuggyBagProps {
-    /** Portal API endpoint, e.g. "https://portal.example.com/api/bugs/submit" */
     apiEndpoint?: string;
     apiKey?: string;
-    /** URL of the portal for the "Open portal" toast link */
     portalUrl?: string;
 }
-/** Returns true if buggy-bag is currently active */
-declare function isActive(): boolean;
-/** Activate via URL param ?bb=on (call in your app's root) */
-declare function activateFromUrl(): void;
 declare function BuggyBag({ apiEndpoint, apiKey, portalUrl }?: BuggyBagProps): null;
+declare function isActive(): boolean;
+declare function activateFromUrl(): void;
 
 type DrawTool = 'rect' | 'arrow' | 'pin';
 type BugSeverity = 'low' | 'medium' | 'high' | 'critical';

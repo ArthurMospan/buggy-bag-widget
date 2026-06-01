@@ -2,71 +2,59 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import type { DrawShape, DrawTool, SubmitBugPayload } from '../types';
 import { DrawingCanvas } from './DrawingCanvas';
-import { DrawingToolbar } from './DrawingToolbar';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext } from '../lib/collector';
-import { Mic, MicOff, List, AlignLeft } from 'lucide-react';
 
 interface CaptureModeProps {
+  initialTool: DrawTool;
   apiKey: string;
   onSend: (payload: SubmitBugPayload) => void;
   onCancel: () => void;
 }
 
-type DescMode = 'text' | 'voice';
+function ToolBtn({ active, onClick, title, children }: {
+  active: boolean; onClick: () => void; title: string; children: React.ReactNode;
+}) {
+  return (
+    <button type="button" onClick={onClick} title={title} style={{
+      width: '36px', height: '36px', borderRadius: '8px',
+      background: active ? '#1f1f1f' : 'transparent',
+      border: 'none', cursor: 'pointer', color: active ? 'white' : '#9a9a9a',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>{children}</button>
+  );
+}
 
-// Speech Recognition types are declared in src/declarations.d.ts
-
-export function CaptureMode({ apiKey, onSend, onCancel }: CaptureModeProps) {
+export function CaptureMode({ initialTool, apiKey, onSend, onCancel }: CaptureModeProps) {
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
-  const [tool, setTool] = useState<DrawTool>('rect');
+  const [tool, setTool] = useState<DrawTool>(initialTool);
   const [shapes, setShapes] = useState<DrawShape[]>([]);
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
   const [pendingShape, setPendingShape] = useState<DrawShape | null>(null);
-
-  // Description panel
-  const [showPanel, setShowPanel] = useState(false);
-  const [descMode, setDescMode] = useState<DescMode>('text');
   const [description, setDescription] = useState('');
-  const [listening, setListening] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recRef = useRef<any>(null);
-
-  // Event log for "steps" tab
-  const [steps, setSteps] = useState<string[]>([]);
+  const [showSendPanel, setShowSendPanel] = useState(false);
+  const techContextRef = useRef(collectTechContext());
 
   const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const h = typeof window !== 'undefined' ? window.innerHeight : 800;
 
-  // Collect tech context at mount time (before freeze/screenshot)
-  const techContextRef = useRef(collectTechContext());
-
-  useEffect(() => {
-    // Populate steps from event log
-    const events = techContextRef.current.eventLog;
-    setSteps(events.map(e => e.description));
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
-    const captureOpts = {
-      filter: (el: Element) => el.getAttribute?.('data-buggy-bag') !== 'true',
-      width: window.innerWidth,
-      height: window.innerHeight,
-      pixelRatio: 1,
-    };
-
     const timer = setTimeout(async () => {
       try {
-        // skipFonts avoids CORS errors with remote fonts
-        const dataUrl = await toPng(document.body, { ...captureOpts, skipFonts: true });
+        const dataUrl = await toPng(document.body, {
+          filter: (el: Element) => el.getAttribute?.('data-buggy-bag') !== 'true',
+          width: window.innerWidth,
+          height: window.innerHeight,
+          pixelRatio: 1,
+          skipFonts: true,
+        });
         if (!cancelled) setScreenshotUrl(dataUrl);
       } catch (err) {
         console.error('[BuggyBag] screenshot failed:', err);
         if (!cancelled) onCancel();
       }
     }, 80);
-
     return () => { cancelled = true; clearTimeout(timer); };
   }, [onCancel]);
 
@@ -78,7 +66,6 @@ export function CaptureMode({ apiKey, onSend, onCancel }: CaptureModeProps) {
   const handleAnnotationConfirm = useCallback((shapeId: string, text: string) => {
     setAnnotations(prev => ({ ...prev, [shapeId]: text }));
     setPendingShape(null);
-    setShowPanel(true); // open description panel after first annotation
   }, []);
 
   const handleAnnotationDismiss = useCallback(() => {
@@ -88,87 +75,45 @@ export function CaptureMode({ apiKey, onSend, onCancel }: CaptureModeProps) {
     });
   }, []);
 
-  // Voice — using any to avoid SpeechRecognition lib availability issues
-  const toggleVoice = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!SR) return;
-
-    if (listening) {
-      recRef.current?.stop();
-      setListening(false);
-      return;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rec = new SR() as any;
-    rec.lang = 'uk-UA';
-    rec.continuous = true;
-    rec.interimResults = false;
-    rec.onresult = (e: any) => {
-      const transcript = Array.from(e.results as any[])
-        .slice(e.resultIndex)
-        .map((r: any) => r[0].transcript)
-        .join(' ');
-      setDescription(prev => (prev + ' ' + transcript).trim());
-    };
-    rec.onend = () => setListening(false);
-    rec.start();
-    recRef.current = rec;
-    setListening(true);
-  }, [listening]);
-
   const handleSend = useCallback(() => {
     if (!screenshotUrl) return;
-    recRef.current?.stop();
-
-    const techContext = techContextRef.current;
-
     const payload: SubmitBugPayload = {
       api_key: apiKey,
       base64_image: screenshotUrl,
       shapes,
       annotations,
       description: description.trim() || 'Без опису',
-      tech_context: techContext,
+      tech_context: techContextRef.current,
     };
-
     onSend(payload);
   }, [screenshotUrl, shapes, annotations, description, apiKey, onSend]);
 
   return (
-    <div
-      data-buggy-bag="true"
-      className="fixed inset-0 z-[10000]"
-      style={{ userSelect: 'none' }}
-    >
-      {/* Screenshot background */}
+    <div data-buggy-bag="true" style={{ position: 'fixed', inset: 0, zIndex: 10000, userSelect: 'none' }}>
+
+      {/* Screenshot or loading */}
       {screenshotUrl ? (
-        <img
-          src={screenshotUrl}
-          alt="Page screenshot"
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          draggable={false}
-        />
+        <img src={screenshotUrl} alt="screenshot" style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          objectFit: 'cover', pointerEvents: 'none',
+        }} draggable={false} />
       ) : (
-        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3">
-          <span className="text-white/90 text-[15px] font-semibold animate-pulse">
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px',
+        }}>
+          <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '15px', fontWeight: '600' }}>
             ⏸ Заморожую сторінку...
           </span>
-          <span className="text-white/40 text-[12px]">Збираю технічний контекст</span>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>
+            Збираю технічний контекст
+          </span>
         </div>
       )}
 
       {/* Drawing canvas */}
-      {screenshotUrl && !pendingShape && !showPanel && (
-        <DrawingCanvas
-          width={w}
-          height={h}
-          tool={tool}
-          shapes={shapes}
-          onShapeComplete={handleShapeComplete}
-        />
+      {screenshotUrl && !pendingShape && !showSendPanel && (
+        <DrawingCanvas width={w} height={h} tool={tool} shapes={shapes} onShapeComplete={handleShapeComplete} />
       )}
 
       {/* Annotation popup */}
@@ -182,158 +127,125 @@ export function CaptureMode({ apiKey, onSend, onCancel }: CaptureModeProps) {
         />
       )}
 
-      {/* Toolbar */}
-      {screenshotUrl && !showPanel && (
-        <DrawingToolbar
-          activeTool={tool}
-          onToolChange={setTool}
-          onSave={() => setShowPanel(true)}
-          onCancel={onCancel}
-          saveLabel="Далі →"
-        />
+      {/* Bottom-right mini toolbar */}
+      {screenshotUrl && !pendingShape && !showSendPanel && (
+        <div data-buggy-bag="true" style={{
+          position: 'fixed', bottom: '24px', right: '24px',
+          background: 'white', borderRadius: '14px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+          padding: '8px', display: 'flex', alignItems: 'center', gap: '4px',
+        }}>
+          <ToolBtn active={tool === 'rect'} onClick={() => setTool('rect')} title="Виділити область">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+            </svg>
+          </ToolBtn>
+          <ToolBtn active={tool === 'arrow'} onClick={() => setTool('arrow')} title="Стрілка">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 19L19 5"/><path d="M8 5h11v11"/>
+            </svg>
+          </ToolBtn>
+          <ToolBtn active={tool === 'pin'} onClick={() => setTool('pin')} title="Пін">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+              <circle cx="12" cy="10" r="2.5"/>
+            </svg>
+          </ToolBtn>
+          <div style={{ width: '1px', height: '20px', background: '#e9e9e9', margin: '0 2px' }} />
+          <button type="button" onClick={() => setShowSendPanel(true)} style={{
+            height: '32px', padding: '0 14px', borderRadius: '8px',
+            background: '#1f1f1f', color: 'white', border: 'none',
+            cursor: 'pointer', fontSize: '12px', fontWeight: '700',
+          }}>Далі →</button>
+          <button type="button" onClick={onCancel} style={{
+            height: '32px', padding: '0 10px', borderRadius: '8px',
+            background: 'transparent', color: '#9a9a9a', border: 'none',
+            cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+          }}>✕</button>
+        </div>
       )}
 
-      {/* Description panel */}
-      {screenshotUrl && showPanel && (
-        <div
-          className="absolute inset-0 flex items-end justify-center pb-6"
-          style={{ background: 'rgba(0,0,0,0.55)' }}
-          onClick={() => {}}
-        >
-          <div
-            className="w-full max-w-[520px] mx-4 rounded-[20px] overflow-hidden"
-            style={{ background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.1)' }}
-          >
-            {/* Tech context summary bar */}
-            <div className="px-4 py-3 border-b border-white/[0.07] flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-mono text-white/30">
+      {/* Send panel */}
+      {screenshotUrl && showSendPanel && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '24px',
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '480px', margin: '0 16px',
+            background: '#1c1c1e', borderRadius: '20px',
+            border: '1px solid rgba(255,255,255,0.1)',
+            padding: '16px',
+          }}>
+            {/* Tech context chips */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              <span style={{ fontSize: '10px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
                 {techContextRef.current.route}
               </span>
               {techContextRef.current.component && (
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 rounded px-2 py-0.5 font-mono">
+                <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#a5b4fc', background: 'rgba(99,102,241,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
                   {techContextRef.current.component.name}
                 </span>
               )}
-              {techContextRef.current.networkRequests.filter(r => r.isError).map((r, i) => (
-                <span key={i} className="text-[10px] bg-red-500/20 text-red-300 rounded px-2 py-0.5 font-mono">
-                  {r.status} {r.url.split('/').slice(-2).join('/')}
+              {techContextRef.current.networkRequests.filter(r => r.isError).slice(0, 2).map((r, i) => (
+                <span key={i} style={{ fontSize: '10px', fontFamily: 'monospace', color: '#fca5a5', background: 'rgba(239,68,68,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                  {r.status} {r.url.split('/').slice(-1)[0]}
                 </span>
               ))}
               {techContextRef.current.consoleErrors.length > 0 && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 rounded px-2 py-0.5">
-                  {techContextRef.current.consoleErrors.length} console error{techContextRef.current.consoleErrors.length > 1 ? 's' : ''}
+                <span style={{ fontSize: '10px', color: '#fcd34d', background: 'rgba(245,158,11,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                  {techContextRef.current.consoleErrors.length} console error
                 </span>
               )}
             </div>
 
-            {/* Mode tabs */}
-            <div className="flex border-b border-white/[0.07]">
-              {(['text', 'voice'] as DescMode[]).map(m => {
-                const Icon = m === 'text' ? AlignLeft : Mic;
-                const label = m === 'text' ? 'Текст' : 'Голос';
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setDescMode(m)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold transition-colors"
-                    style={{
-                      color: descMode === m ? '#fff' : 'rgba(255,255,255,0.35)',
-                      borderBottom: descMode === m ? '2px solid #818cf8' : '2px solid transparent',
-                    }}
-                  >
-                    <Icon size={13} />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Опишіть що не так..."
+              autoFocus
+              rows={3}
+              style={{
+                width: '100%', background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px',
+                padding: '10px 12px', fontSize: '13px', color: 'white',
+                resize: 'none', outline: 'none', fontFamily: 'inherit',
+                boxSizing: 'border-box',
+              }}
+            />
 
-            {/* Text mode */}
-            {descMode === 'text' && (
-              <div className="px-4 pt-3 pb-2">
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="Опишіть що не так..."
-                  autoFocus
-                  rows={3}
-                  className="w-full bg-white/5 rounded-[10px] text-[13px] text-white placeholder:text-white/25 resize-none outline-none border border-white/[0.08] focus:border-white/20 p-3 transition-colors"
-                />
-              </div>
-            )}
-
-            {/* Voice mode */}
-            {descMode === 'voice' && (
-              <div className="px-4 pt-3 pb-2">
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={toggleVoice}
-                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors mt-0.5"
-                    style={{ background: listening ? '#ef4444' : 'rgba(255,255,255,0.08)' }}
-                    title={listening ? 'Зупинити' : 'Записати голос'}
-                  >
-                    {listening ? <MicOff size={16} className="text-white" /> : <Mic size={16} className="text-white/70" />}
-                  </button>
-                  <div className="flex-1">
-                    <p className="text-[11px] text-white/40 mb-1">
-                      {listening ? 'Слухаю...' : 'Натисни щоб записати'}
-                    </p>
-                    <p className="text-[13px] text-white min-h-[40px]">
-                      {description || <span className="text-white/25">Транскрипція з'явиться тут...</span>}
-                    </p>
-                  </div>
+            {/* Auto steps from event log */}
+            {techContextRef.current.eventLog.length > 0 && (
+              <div style={{ marginTop: '10px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+                  Кроки відтворення (авто)
                 </div>
-              </div>
-            )}
-
-            {/* Steps preview */}
-            {steps.length > 0 && (
-              <div className="px-4 pb-3">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <List size={11} className="text-white/30" />
-                  <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">
-                    Кроки відтворення (авто)
-                  </span>
-                </div>
-                <div className="bg-white/[0.04] rounded-[8px] px-3 py-2 max-h-[80px] overflow-y-auto">
-                  {steps.slice(-5).map((step, i) => (
-                    <p key={i} className="text-[11px] text-white/50 font-mono leading-relaxed">
-                      {i + 1}. {step}
-                    </p>
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '8px 10px', maxHeight: '80px', overflowY: 'auto' }}>
+                  {techContextRef.current.eventLog.slice(-6).map((e, i) => (
+                    <div key={i} style={{ fontSize: '11px', fontFamily: 'monospace', color: e.type === 'console_error' || e.type === 'network_error' ? '#fca5a5' : 'rgba(255,255,255,0.45)', lineHeight: '1.6' }}>
+                      {i + 1}. {e.description}
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex gap-2 px-4 pb-4">
-              <button
-                type="button"
-                onClick={() => setShowPanel(false)}
-                className="px-4 py-2 rounded-[10px] text-[12px] font-semibold text-white/50 transition-colors"
-                style={{ background: 'rgba(255,255,255,0.06)' }}
-              >
-                ← Назад
-              </button>
-              <button
-                type="button"
-                onClick={onCancel}
-                className="px-4 py-2 rounded-[10px] text-[12px] font-semibold text-white/50 transition-colors"
-                style={{ background: 'rgba(255,255,255,0.06)' }}
-              >
-                Скасувати
-              </button>
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!screenshotUrl}
-                className="flex-1 py-2 rounded-[10px] text-[13px] font-bold text-white transition-colors disabled:opacity-40"
-                style={{ background: '#4f46e5' }}
-              >
-                Надіслати на портал →
-              </button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+              <button type="button" onClick={() => setShowSendPanel(false)} style={{
+                padding: '9px 16px', borderRadius: '10px', fontSize: '12px',
+                fontWeight: '600', background: 'rgba(255,255,255,0.06)',
+                border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)',
+              }}>← Назад</button>
+              <button type="button" onClick={onCancel} style={{
+                padding: '9px 16px', borderRadius: '10px', fontSize: '12px',
+                fontWeight: '600', background: 'rgba(255,255,255,0.06)',
+                border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)',
+              }}>Скасувати</button>
+              <button type="button" onClick={handleSend} style={{
+                flex: 1, padding: '9px', borderRadius: '10px', fontSize: '13px',
+                fontWeight: '700', background: '#4f46e5', color: 'white',
+                border: 'none', cursor: 'pointer',
+              }}>Надіслати на портал →</button>
             </div>
           </div>
         </div>
