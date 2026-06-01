@@ -31,6 +31,7 @@ export function Button({
   const iconSize = size === 'lg' ? 16 : size === 'sm' ? 12 : 14;
   return (
     <button
+      type="button"
       className={`inline-flex items-center justify-center gap-[6px] font-bold leading-none transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
       {...props}
     >

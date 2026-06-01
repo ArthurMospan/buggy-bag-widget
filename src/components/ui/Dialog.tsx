@@ -14,12 +14,14 @@ const SIZE_MAP = {
   md: 'max-w-[640px]',
   lg: 'max-w-[900px]',
   xl: 'max-w-[1200px]',
-};
+} as const;
 
 export function Dialog({ isOpen, onClose, title, children, size = 'md' }: DialogProps) {
   useEffect(() => {
-    if (isOpen) document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'unset'; };
+    if (!isOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -38,6 +40,7 @@ export function Dialog({ isOpen, onClose, title, children, size = 'md' }: Dialog
             <h2 className="text-[18px] font-bold text-[#1f1f1f]">{title}</h2>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="p-1 text-[#9a9a9a] hover:text-[#1f1f1f] hover:bg-[#f4f4f5] rounded-[8px] transition-colors"
             >
               <X size={20} />
