@@ -61,10 +61,10 @@ function FloatingButton({
             type: "button",
             onClick: onDashboard,
             "aria-label": "Open Bug Dashboard",
-            className: "relative w-[44px] h-[44px] bg-white border border-[#e9e9e9] text-[#1f1f1f] rounded-full shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200 flex items-center justify-center",
+            className: "relative w-10 h-10 rounded-full flex items-center justify-center bg-white/15 backdrop-blur-md border border-white/25 text-white shadow-[0_4px_20px_rgba(0,0,0,0.35)] hover:bg-white/25 hover:scale-110 active:scale-95 transition-all duration-150",
             children: [
-              /* @__PURE__ */ jsx2(List, { size: 18 }),
-              activeBugCount > 0 && /* @__PURE__ */ jsx2("span", { className: "absolute -top-1 -right-1 w-[18px] h-[18px] bg-[#ef4444] text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none", children: activeBugCount > 9 ? "9+" : activeBugCount })
+              /* @__PURE__ */ jsx2(List, { size: 16, strokeWidth: 1.75 }),
+              activeBugCount > 0 && /* @__PURE__ */ jsx2("span", { className: "absolute -top-1 -right-1 w-[17px] h-[17px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none shadow-sm", children: activeBugCount > 9 ? "9+" : activeBugCount })
             ]
           }
         ),
@@ -74,8 +74,8 @@ function FloatingButton({
             type: "button",
             onClick: onCapture,
             "aria-label": "Capture Bug Screenshot",
-            className: "w-[52px] h-[52px] bg-[#1f1f1f] text-white rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.25)] hover:bg-[#303030] hover:scale-105 transition-all duration-200 flex items-center justify-center",
-            children: /* @__PURE__ */ jsx2(Bug, { size: 22 })
+            className: "w-12 h-12 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md border border-white/20 text-white shadow-[0_8px_32px_rgba(0,0,0,0.45)] hover:bg-black/65 hover:scale-110 active:scale-95 transition-all duration-150",
+            children: /* @__PURE__ */ jsx2(Bug, { size: 20, strokeWidth: 1.75 })
           }
         )
       ]
@@ -1150,10 +1150,8 @@ function BuggyBag({ apiEndpoint, projectId } = {}) {
       /* @__PURE__ */ jsx13(GodModeGuard, { children: /* @__PURE__ */ jsx13(BuggyBagInner, { apiEndpoint, projectId }) })
     );
     return () => {
-      setTimeout(() => {
-        root.unmount();
-        host.remove();
-      }, 0);
+      root.unmount();
+      host.remove();
     };
   }, []);
   return null;

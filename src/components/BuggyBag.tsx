@@ -103,12 +103,8 @@ export function BuggyBag({ apiEndpoint, projectId }: BuggyBagProps = {}) {
     );
 
     return () => {
-      // Defer unmount one tick to avoid React StrictMode's double-invoke
-      // trying to unmount a root that's already being re-mounted.
-      setTimeout(() => {
-        root.unmount();
-        host.remove();
-      }, 0);
+      root.unmount();
+      host.remove();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
