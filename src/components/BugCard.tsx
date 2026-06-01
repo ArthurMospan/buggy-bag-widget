@@ -4,6 +4,18 @@ import type { Bug } from '../types';
 import { Surface } from './ui/Surface';
 import { Button } from './ui/Button';
 
+function pluralizeShapes(n: number): string {
+  const abs = Math.abs(n);
+  if (abs % 100 >= 11 && abs % 100 <= 14) return 'фігур';
+  switch (abs % 10) {
+    case 1: return 'фігура';
+    case 2:
+    case 3:
+    case 4: return 'фігури';
+    default: return 'фігур';
+  }
+}
+
 interface BugCardProps {
   bug: Bug;
   onStatusChange: (id: string, status: Bug['status']) => void;
@@ -95,7 +107,7 @@ export function BugCard({ bug, onStatusChange }: BugCardProps) {
             </div>
           )}
           <p className="text-[11px] text-[#9a9a9a]">
-            {bug.shapes.length} фігур{bug.shapes.length === 1 ? 'а' : 'и'} намальовано
+            {bug.shapes.length} {pluralizeShapes(bug.shapes.length)} намальовано
           </p>
         </div>
       )}

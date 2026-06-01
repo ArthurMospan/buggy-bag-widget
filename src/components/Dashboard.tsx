@@ -43,9 +43,15 @@ export function Dashboard({ isOpen, onClose, bugs, onStatusChange }: DashboardPr
   const countFor = (status: Bug['status']) =>
     bugs.filter((b) => b.status === status).length;
 
+  const handleClose = () => {
+    setFilter('all');
+    setShowAIReport(false);
+    onClose();
+  };
+
   return (
     <>
-      <Dialog isOpen={isOpen} onClose={onClose} title="Bug Inbox" size="lg">
+      <Dialog isOpen={isOpen} onClose={handleClose} title="Bug Inbox" size="lg">
         {/* Filter tabs */}
         <div className="flex gap-1 mb-4 bg-[#f4f4f5] rounded-[12px] p-1">
           {FILTERS.map(({ value, label }) => (
