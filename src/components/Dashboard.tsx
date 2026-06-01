@@ -1,20 +1,8 @@
 import React, { useState } from 'react';
 import { Dialog } from './ui/Dialog';
 import { BugCard } from './BugCard';
+import { AIReport } from './AIReport';
 import type { Bug } from '../types';
-
-// Temporary placeholder — replaced when AIReport.tsx is created in Task 11
-function AIReportPlaceholder({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-[24px] p-8 text-center">
-        <p className="text-[14px] text-[#1f1f1f] mb-4">AI Report — coming in Task 11</p>
-        <button type="button" onClick={onClose} className="text-[13px] text-[#9a9a9a] hover:text-[#1f1f1f]">Закрити</button>
-      </div>
-    </div>
-  );
-}
 
 type FilterStatus = 'all' | Bug['status'];
 
@@ -103,9 +91,10 @@ export function Dashboard({ isOpen, onClose, bugs, onStatusChange }: DashboardPr
         )}
       </Dialog>
 
-      <AIReportPlaceholder
+      <AIReport
         isOpen={showAIReport}
         onClose={() => setShowAIReport(false)}
+        activeBugs={activeBugs}
       />
     </>
   );
