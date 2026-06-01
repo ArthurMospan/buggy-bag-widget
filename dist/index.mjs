@@ -1152,7 +1152,9 @@ function BuggyBag({ apiEndpoint, projectId } = {}) {
       /* @__PURE__ */ jsx13(GodModeGuard, { children: /* @__PURE__ */ jsx13(BuggyBagInner, { apiEndpoint, projectId }) })
     );
     return () => {
-      root.unmount();
+      setTimeout(() => {
+        root.unmount();
+      }, 0);
       rootRef.current = null;
     };
   }, []);

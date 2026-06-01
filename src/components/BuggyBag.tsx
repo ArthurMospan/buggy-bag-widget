@@ -106,7 +106,9 @@ export function BuggyBag({ apiEndpoint, projectId }: BuggyBagProps = {}) {
     );
 
     return () => {
-      root.unmount();
+      setTimeout(() => {
+        root.unmount();
+      }, 0);
       rootRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
