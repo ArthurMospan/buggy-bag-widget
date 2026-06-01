@@ -58,12 +58,8 @@ export function CaptureMode({ apiKey, onSend, onCancel }: CaptureModeProps) {
 
     const timer = setTimeout(async () => {
       try {
-        let dataUrl: string;
-        try {
-          dataUrl = await toPng(document.body, captureOpts);
-        } catch {
-          dataUrl = await toPng(document.body, { ...captureOpts, skipFonts: true });
-        }
+        // skipFonts avoids CORS errors with remote fonts
+        const dataUrl = await toPng(document.body, { ...captureOpts, skipFonts: true });
         if (!cancelled) setScreenshotUrl(dataUrl);
       } catch (err) {
         console.error('[BuggyBag] screenshot failed:', err);
