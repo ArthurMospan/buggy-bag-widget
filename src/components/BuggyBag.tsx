@@ -95,11 +95,11 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
               ))}
             </div>
           )}
-          <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(0,0,0,0.55)', color: 'rgba(255,255,255,0.85)', padding: '2px 6px', borderRadius: '4px', userSelect: 'none' }}>
+          <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(0,0,0,0.35)', color: 'rgba(255,255,255,0.6)', padding: '2px 6px', borderRadius: '4px', userSelect: 'none' }}>
             Alt+B
           </span>
           <button type="button" onClick={() => setExpanded(v => !v)} title="Зафіксувати баг (Alt+B)"
-            style={{ width: '48px', height: '48px', borderRadius: '50%', background: expanded ? '#4f46e5' : '#1c1c1e', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', boxShadow: '0 8px 28px rgba(0,0,0,0.4)', transition: 'background 0.15s' }}>
+            style={{ width: '48px', height: '48px', borderRadius: '50%', background: expanded ? 'rgba(79,70,229,0.85)' : 'rgba(28,28,30,0.65)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.85)', boxShadow: '0 4px 16px rgba(0,0,0,0.25)', transition: 'all 0.15s', backdropFilter: 'blur(8px)' }}>
             <BugIcon />
           </button>
         </div>
@@ -133,9 +133,31 @@ export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {})
       window.history.replaceState({}, '', window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
     }
 
+
+    // ── Voice bridge for Shadow DOM SpeechRecognition ──
+    let _rec: any = null;
+    const startVoice = () => {
+      const w = window as any;
+      const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+      if (!SR) return;
+      _rec = new SR();
+      _rec.lang = 'uk-UA';
+      _rec.continuous = true;
+      _rec.interimResults = false;
+      _rec.onresult = (e: any) => {
+        const transcript = Array.from(e.results as any[]).slice(e.resultIndex).map((r: any) => r[0].transcript).join(' ');
+        window.dispatchEvent(new CustomEvent('buggy-bag:transcript', { detail: transcript }));
+      };
+      _rec.onend = () => window.dispatchEvent(new CustomEvent('buggy-bag:voice-end'));
+      _rec.onerror = () => window.dispatchEvent(new CustomEvent('buggy-bag:voice-end'));
+      _rec.start();
+    };
+    window.addEventListener('buggy-bag:start-voice', startVoice);
+    window.addEventListener('buggy-bag:stop-voice', () => { _rec?.stop(); _rec = null; });
+
     // ── Keyboard shortcut in main document context ──
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.altKey && (e.key === 'b' || e.key === 'B' || e.key === 'і' || e.key === 'І')) {
+      if (e.altKey && e.code === 'KeyB') {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent('buggy-bag:toggle'));
       }
