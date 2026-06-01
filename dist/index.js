@@ -39,7 +39,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/components/BuggyBag.tsx
-var import_react4 = require("react");
+var import_react5 = require("react");
 var import_client = require("react-dom/client");
 
 // src/guard.tsx
@@ -59,7 +59,7 @@ function GodModeGuard({ children }) {
 }
 
 // src/components/CaptureMode.tsx
-var import_react3 = require("react");
+var import_react4 = require("react");
 
 // node_modules/html-to-image/es/util.js
 function resolveUrl(url, baseUrl) {
@@ -1052,6 +1052,189 @@ function renderShape(s) {
   return null;
 }
 
+// src/components/ShapeAnnotation.tsx
+var import_react3 = require("react");
+var import_lucide_react = require("lucide-react");
+var import_jsx_runtime3 = require("react/jsx-runtime");
+var POPUP_W = 288;
+var POPUP_H = 160;
+function calcPosition(shape, cw, ch) {
+  let cx;
+  let cy;
+  if (shape.type === "rect") {
+    const left = shape.width !== void 0 && shape.width < 0 ? shape.x + shape.width : shape.x;
+    const top = shape.height !== void 0 && shape.height < 0 ? shape.y + shape.height : shape.y;
+    const w = Math.abs(shape.width ?? 0);
+    const h = Math.abs(shape.height ?? 0);
+    cx = left + w / 2;
+    cy = top + h + 12;
+  } else if (shape.type === "arrow" && shape.points) {
+    cx = shape.points[2];
+    cy = shape.points[3] + 12;
+  } else {
+    cx = shape.x;
+    cy = shape.y + 26;
+  }
+  const x = Math.max(8, Math.min(cx - POPUP_W / 2, cw - POPUP_W - 8));
+  let y = cy;
+  if (y + POPUP_H > ch - 8) {
+    if (shape.type === "rect") {
+      const top = shape.height !== void 0 && shape.height < 0 ? shape.y + shape.height : shape.y;
+      y = top - POPUP_H - 8;
+    } else if (shape.type === "arrow" && shape.points) {
+      y = Math.min(shape.points[1], shape.points[3]) - POPUP_H - 8;
+    } else {
+      y = shape.y - POPUP_H - 30;
+    }
+  }
+  y = Math.max(8, y);
+  return { x, y };
+}
+function ShapeAnnotation({
+  shape,
+  containerWidth,
+  containerHeight,
+  onConfirm,
+  onDismiss
+}) {
+  const [text, setText] = (0, import_react3.useState)("");
+  const [listening, setListening] = (0, import_react3.useState)(false);
+  const [micError, setMicError] = (0, import_react3.useState)(null);
+  const recRef = (0, import_react3.useRef)(null);
+  const { x, y } = calcPosition(shape, containerWidth, containerHeight);
+  const toggleVoice = () => {
+    setMicError(null);
+    const w = window;
+    const SpeechRec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      setMicError("\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0454 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u0438\u0439 \u0432\u0432\u0456\u0434");
+      return;
+    }
+    if (recRef.current) {
+      recRef.current.stop();
+      recRef.current = null;
+      setListening(false);
+      return;
+    }
+    const rec = new SpeechRec();
+    rec.lang = "uk-UA";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setText((prev) => (prev ? prev + " " + transcript : transcript).trim());
+    };
+    rec.onerror = (err) => {
+      recRef.current = null;
+      setListening(false);
+      if (err.error === "not-allowed") {
+        setMicError("\u0414\u043E\u0437\u0432\u043E\u043B\u044C\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u0434\u043E \u043C\u0456\u043A\u0440\u043E\u0444\u043E\u043D\u0430 \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0456");
+      } else if (err.error === "no-speech") {
+        setMicError("\u041D\u0435 \u0447\u0443\u0442\u043D\u043E \u043C\u043E\u0432\u0438 \u2014 \u0441\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437");
+      } else if (err.error !== "aborted") {
+        setMicError("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u043F\u0438\u0441\u0443 \u0433\u043E\u043B\u043E\u0441\u0443");
+      }
+    };
+    rec.onend = () => {
+      recRef.current = null;
+      setListening(false);
+    };
+    recRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
+  (0, import_react3.useEffect)(() => {
+    return () => {
+      if (recRef.current) {
+        recRef.current.stop();
+        recRef.current = null;
+      }
+    };
+  }, []);
+  const handleConfirm = () => {
+    recRef.current?.stop();
+    onConfirm(shape.id, text.trim());
+  };
+  const handleDismiss = () => {
+    recRef.current?.stop();
+    onDismiss();
+  };
+  const stopProp = (e) => e.stopPropagation();
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+    "div",
+    {
+      "data-buggy-bag": "true",
+      className: "absolute z-[10002] w-[288px] bg-white rounded-[16px] shadow-[0_8px_32px_rgba(0,0,0,0.22)] p-3",
+      style: { left: x, top: y },
+      onClick: stopProp,
+      onMouseDown: stopProp,
+      children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          "label",
+          {
+            htmlFor: "buggy-annotation-text",
+            className: "block text-[11px] font-bold text-[#9a9a9a] uppercase tracking-wider mb-2 cursor-default",
+            children: "\u0412\u043A\u0430\u0436\u0456\u0442\u044C \u043F\u0440\u0438\u0447\u0438\u043D\u0443..."
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          "textarea",
+          {
+            id: "buggy-annotation-text",
+            value: text,
+            onChange: (e) => setText(e.target.value),
+            placeholder: "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u0443...",
+            rows: 3,
+            autoFocus: true,
+            style: { userSelect: "text" },
+            className: "w-full bg-[#f4f4f5] rounded-[10px] text-[13px] text-[#1f1f1f] placeholder:text-[#a3a3a3] resize-none outline-none border border-transparent focus:border-[#1f1f1f] p-[10px] transition-colors leading-relaxed",
+            onKeyDown: (e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleConfirm();
+              if (e.key === "Escape") handleDismiss();
+            }
+          }
+        ),
+        micError && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-[11px] text-[#ef4444] mt-1 mb-1", children: micError }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex gap-2 mt-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            "button",
+            {
+              type: "button",
+              onClick: toggleVoice,
+              title: listening ? "\u0417\u0443\u043F\u0438\u043D\u0438\u0442\u0438 \u0437\u0430\u043F\u0438\u0441" : "\u0414\u0438\u043A\u0442\u0443\u0432\u0430\u0442\u0438 \u0433\u043E\u043B\u043E\u0441\u043E\u043C",
+              "aria-label": listening ? "Stop voice recording" : "Start voice recording",
+              "aria-pressed": listening,
+              className: `w-[36px] h-[36px] rounded-[10px] flex items-center justify-center transition-colors shrink-0 ${listening ? "bg-[#ef4444] text-white animate-pulse" : "bg-[#f4f4f5] text-[#9a9a9a] hover:bg-[#e9e9e9] hover:text-[#1f1f1f]"}`,
+              children: listening ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_lucide_react.MicOff, { size: 14 }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_lucide_react.Mic, { size: 14 })
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            "button",
+            {
+              type: "button",
+              onClick: handleDismiss,
+              className: "flex-1 h-[36px] rounded-[10px] text-[13px] font-bold bg-[#f5f5f5] text-[#1f1f1f] hover:bg-[#ebebeb] transition-colors",
+              children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438"
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+            "button",
+            {
+              type: "button",
+              onClick: handleConfirm,
+              className: "flex-1 h-[36px] rounded-[10px] text-[13px] font-bold bg-[#1f1f1f] text-white hover:bg-[#303030] transition-colors flex items-center justify-center gap-[6px]",
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_lucide_react.Check, { size: 14 }),
+                "OK"
+              ]
+            }
+          )
+        ] })
+      ]
+    }
+  );
+}
+
 // src/lib/collector.ts
 var MAX_NETWORK = 20;
 var MAX_CONSOLE = 10;
@@ -1302,20 +1485,21 @@ function collectTechContext(clickedElement) {
 }
 
 // src/components/CaptureMode.tsx
-var import_jsx_runtime3 = require("react/jsx-runtime");
+var import_jsx_runtime4 = require("react/jsx-runtime");
 function ToolBtn({ active, onClick, title, children }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", onClick, title, style: { width: "34px", height: "34px", borderRadius: "8px", background: active ? "#1f1f1f" : "transparent", border: "none", cursor: "pointer", color: active ? "white" : "#9a9a9a", display: "flex", alignItems: "center", justifyContent: "center" }, children });
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", onClick, title, style: { width: "34px", height: "34px", borderRadius: "8px", background: active ? "#1f1f1f" : "transparent", border: "none", cursor: "pointer", color: active ? "white" : "#9a9a9a", display: "flex", alignItems: "center", justifyContent: "center" }, children });
 }
 function CaptureMode({ initialTool, apiKey, onSend, onCancel }) {
-  const [screenshotUrl, setScreenshotUrl] = (0, import_react3.useState)(null);
-  const [tool, setTool] = (0, import_react3.useState)(initialTool);
-  const [shapes, setShapes] = (0, import_react3.useState)([]);
-  const [description, setDescription] = (0, import_react3.useState)("");
-  const [showSendPanel, setShowSendPanel] = (0, import_react3.useState)(false);
-  const techContextRef = (0, import_react3.useRef)(collectTechContext());
+  const [screenshotUrl, setScreenshotUrl] = (0, import_react4.useState)(null);
+  const [tool, setTool] = (0, import_react4.useState)(initialTool);
+  const [shapes, setShapes] = (0, import_react4.useState)([]);
+  const [annotations, setAnnotations] = (0, import_react4.useState)({});
+  const [pendingShape, setPendingShape] = (0, import_react4.useState)(null);
+  const [showSendPanel, setShowSendPanel] = (0, import_react4.useState)(false);
+  const techContextRef = (0, import_react4.useRef)(collectTechContext());
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
   const h = typeof window !== "undefined" ? window.innerHeight : 800;
-  (0, import_react3.useEffect)(() => {
+  (0, import_react4.useEffect)(() => {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
@@ -1337,77 +1521,101 @@ function CaptureMode({ initialTool, apiKey, onSend, onCancel }) {
       clearTimeout(timer);
     };
   }, [onCancel]);
-  const handleShapeComplete = (0, import_react3.useCallback)((shape) => {
+  const handleShapeComplete = (0, import_react4.useCallback)((shape) => {
     setShapes((prev) => [...prev, shape]);
+    setPendingShape(shape);
   }, []);
-  const handleSend = (0, import_react3.useCallback)(() => {
+  const handleAnnotationConfirm = (0, import_react4.useCallback)((shapeId, text) => {
+    setAnnotations((prev) => ({ ...prev, [shapeId]: text }));
+    setPendingShape(null);
+  }, []);
+  const handleAnnotationDismiss = (0, import_react4.useCallback)(() => {
+    setPendingShape((pending) => {
+      if (pending) setShapes((prev) => prev.filter((s) => s.id !== pending.id));
+      return null;
+    });
+  }, []);
+  const handleSend = (0, import_react4.useCallback)(() => {
     if (!screenshotUrl) return;
     onSend({
       api_key: apiKey,
       base64_image: screenshotUrl,
       shapes,
-      annotations: {},
-      description: description.trim() || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443",
+      annotations,
+      description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443",
       tech_context: techContextRef.current
     });
-  }, [screenshotUrl, shapes, description, apiKey, onSend]);
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", inset: 0, zIndex: 1e4, userSelect: "none" }, children: [
-    screenshotUrl ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("img", { src: screenshotUrl, alt: "screenshot", style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }, draggable: false }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "8px" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { color: "rgba(255,255,255,0.9)", fontSize: "15px", fontWeight: "600" }, children: "\u23F8 \u0417\u0430\u043C\u043E\u0440\u043E\u0436\u0443\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443..." }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { color: "rgba(255,255,255,0.4)", fontSize: "12px" }, children: "\u0417\u0431\u0438\u0440\u0430\u044E \u0442\u0435\u0445\u043D\u0456\u0447\u043D\u0438\u0439 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442" })
+  }, [screenshotUrl, shapes, annotations, apiKey, onSend]);
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", inset: 0, zIndex: 1e4, userSelect: "none" }, children: [
+    screenshotUrl ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("img", { src: screenshotUrl, alt: "screenshot", style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }, draggable: false }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "8px" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { color: "rgba(255,255,255,0.9)", fontSize: "15px", fontWeight: "600" }, children: "\u23F8 \u0417\u0430\u043C\u043E\u0440\u043E\u0436\u0443\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443..." }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { color: "rgba(255,255,255,0.4)", fontSize: "12px" }, children: "\u0417\u0431\u0438\u0440\u0430\u044E \u0442\u0435\u0445\u043D\u0456\u0447\u043D\u0438\u0439 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442" })
     ] }),
-    screenshotUrl && !showSendPanel && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(DrawingCanvas, { width: w, height: h, tool, shapes, onShapeComplete: handleShapeComplete }),
-    screenshotUrl && !showSendPanel && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "24px", right: "24px", background: "white", borderRadius: "14px", boxShadow: "0 8px 32px rgba(0,0,0,0.25)", padding: "8px", display: "flex", alignItems: "center", gap: "4px" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ToolBtn, { active: tool === "rect", onClick: () => setTool("rect"), title: "\u041E\u0431\u043B\u0430\u0441\u0442\u044C", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ToolBtn, { active: tool === "arrow", onClick: () => setTool("arrow"), title: "\u0421\u0442\u0440\u0456\u043B\u043A\u0430", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M5 19L19 5" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M8 5h11v11" })
+    screenshotUrl && !pendingShape && !showSendPanel && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(DrawingCanvas, { width: w, height: h, tool, shapes, onShapeComplete: handleShapeComplete }),
+    pendingShape && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+      ShapeAnnotation,
+      {
+        shape: pendingShape,
+        containerWidth: w,
+        containerHeight: h,
+        onConfirm: handleAnnotationConfirm,
+        onDismiss: handleAnnotationDismiss
+      }
+    ),
+    screenshotUrl && !pendingShape && !showSendPanel && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "24px", right: "24px", background: "white", borderRadius: "14px", boxShadow: "0 8px 32px rgba(0,0,0,0.25)", padding: "8px", display: "flex", alignItems: "center", gap: "4px" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ToolBtn, { active: tool === "rect", onClick: () => setTool("rect"), title: "\u041E\u0431\u043B\u0430\u0441\u0442\u044C", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ToolBtn, { active: tool === "arrow", onClick: () => setTool("arrow"), title: "\u0421\u0442\u0440\u0456\u043B\u043A\u0430", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M5 19L19 5" }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M8 5h11v11" })
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ToolBtn, { active: tool === "pin", onClick: () => setTool("pin"), title: "\u041F\u0456\u043D", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "12", cy: "10", r: "2.5" })
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ToolBtn, { active: tool === "pin", onClick: () => setTool("pin"), title: "\u041F\u0456\u043D", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "12", cy: "10", r: "2.5" })
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { width: "1px", height: "20px", background: "#e9e9e9", margin: "0 2px" } }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", onClick: () => setShowSendPanel(true), style: { height: "32px", padding: "0 14px", borderRadius: "8px", background: "#1f1f1f", color: "white", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }, children: "\u0414\u0430\u043B\u0456 \u2192" }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", onClick: onCancel, style: { height: "32px", padding: "0 10px", borderRadius: "8px", background: "transparent", color: "#9a9a9a", border: "none", cursor: "pointer", fontSize: "14px" }, children: "\u2715" })
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { width: "1px", height: "20px", background: "#e9e9e9", margin: "0 2px" } }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", onClick: () => setShowSendPanel(true), style: { height: "32px", padding: "0 14px", borderRadius: "8px", background: "#1f1f1f", color: "white", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }, children: "\u0414\u0430\u043B\u0456 \u2192" }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", onClick: onCancel, style: { height: "32px", padding: "0 10px", borderRadius: "8px", background: "transparent", color: "#9a9a9a", border: "none", cursor: "pointer", fontSize: "14px" }, children: "\u2715" })
     ] }),
-    screenshotUrl && showSendPanel && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: "24px" }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { width: "100%", maxWidth: "480px", margin: "0 16px", background: "#1c1c1e", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.1)", padding: "16px" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", padding: "2px 8px", borderRadius: "4px" }, children: techContextRef.current.route }),
-        techContextRef.current.component && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "#a5b4fc", background: "rgba(99,102,241,0.15)", padding: "2px 8px", borderRadius: "4px" }, children: techContextRef.current.component.name }),
-        techContextRef.current.networkRequests.filter((r) => r.isError).slice(0, 2).map((r, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "#fca5a5", background: "rgba(239,68,68,0.15)", padding: "2px 8px", borderRadius: "4px" }, children: [
+    screenshotUrl && showSendPanel && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: "24px" }, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { width: "100%", maxWidth: "480px", margin: "0 16px", background: "#1c1c1e", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.1)", padding: "16px" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { marginBottom: "12px" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.6)", marginBottom: "8px" }, children: [
+          shapes.length,
+          " ",
+          shapes.length === 1 ? "\u0430\u043D\u043E\u0442\u0430\u0446\u0456\u044F" : "\u0430\u043D\u043E\u0442\u0430\u0446\u0456\u0457"
+        ] }),
+        Object.values(annotations).filter(Boolean).map((text, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginBottom: "4px", display: "flex", gap: "6px" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { style: { color: "#6366f1", fontWeight: "700" }, children: [
+            i + 1,
+            "."
+          ] }),
+          " ",
+          text
+        ] }, i))
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "12px" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", padding: "2px 7px", borderRadius: "4px" }, children: techContextRef.current.route }),
+        techContextRef.current.component && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "#a5b4fc", background: "rgba(99,102,241,0.15)", padding: "2px 7px", borderRadius: "4px" }, children: techContextRef.current.component.name }),
+        techContextRef.current.networkRequests.filter((r) => r.isError).slice(0, 2).map((r, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { style: { fontSize: "10px", color: "#fca5a5", background: "rgba(239,68,68,0.15)", padding: "2px 7px", borderRadius: "4px", fontFamily: "monospace" }, children: [
           r.status,
           " ",
           r.url.split("/").slice(-1)[0]
         ] }, i)),
-        techContextRef.current.consoleErrors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { style: { fontSize: "10px", color: "#fcd34d", background: "rgba(245,158,11,0.15)", padding: "2px 8px", borderRadius: "4px" }, children: [
+        techContextRef.current.consoleErrors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { style: { fontSize: "10px", color: "#fcd34d", background: "rgba(245,158,11,0.15)", padding: "2px 7px", borderRadius: "4px" }, children: [
           techContextRef.current.consoleErrors.length,
-          " console error"
+          " errors"
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-        "textarea",
-        {
-          value: description,
-          onChange: (e) => setDescription(e.target.value),
-          placeholder: "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u0449\u043E \u043D\u0435 \u0442\u0430\u043A...",
-          autoFocus: true,
-          rows: 3,
-          style: { width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", padding: "10px 12px", fontSize: "13px", color: "white", resize: "none", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }
-        }
-      ),
-      techContextRef.current.eventLog.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { marginTop: "10px" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { fontSize: "10px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "5px" }, children: "\u041A\u0440\u043E\u043A\u0438 \u0432\u0456\u0434\u0442\u0432\u043E\u0440\u0435\u043D\u043D\u044F (\u0430\u0432\u0442\u043E)" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "7px 10px", maxHeight: "72px", overflowY: "auto" }, children: techContextRef.current.eventLog.slice(-5).map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { fontSize: "11px", fontFamily: "monospace", color: e.type === "console_error" || e.type === "network_error" ? "#fca5a5" : "rgba(255,255,255,0.4)", lineHeight: "1.6" }, children: [
+      techContextRef.current.eventLog.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { marginBottom: "12px" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { fontSize: "10px", fontWeight: "700", color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "5px" }, children: "\u041A\u0440\u043E\u043A\u0438 \u0434\u043E \u0431\u0430\u0433\u0430 (\u0430\u0432\u0442\u043E)" }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "7px 10px", maxHeight: "64px", overflowY: "auto" }, children: techContextRef.current.eventLog.slice(-5).map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { fontSize: "11px", fontFamily: "monospace", color: e.type === "console_error" || e.type === "network_error" ? "#fca5a5" : "rgba(255,255,255,0.35)", lineHeight: "1.6" }, children: [
           i + 1,
           ". ",
           e.description
         ] }, i)) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { display: "flex", gap: "8px", marginTop: "10px" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", onClick: () => setShowSendPanel(false), style: { padding: "9px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.5)" }, children: "\u2190 \u041D\u0430\u0437\u0430\u0434" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", onClick: onCancel, style: { padding: "9px 12px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)" }, children: "\u2715" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", onClick: handleSend, style: { flex: 1, padding: "9px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", background: "#4f46e5", color: "white", border: "none", cursor: "pointer" }, children: "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u043D\u0430 \u043F\u043E\u0440\u0442\u0430\u043B \u2192" })
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: { display: "flex", gap: "8px" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", onClick: () => setShowSendPanel(false), style: { padding: "10px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.5)" }, children: "\u2190 \u041D\u0430\u0437\u0430\u0434" }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", onClick: handleSend, style: { flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", background: "#4f46e5", color: "white", border: "none", cursor: "pointer" }, children: "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u043D\u0430 \u043F\u043E\u0440\u0442\u0430\u043B \u2192" })
       ] })
     ] }) })
   ] });
@@ -1418,45 +1626,45 @@ var styles = '.container {\n    width: 100%\n}\n@media (min-width: 640px) {\n   
 var styles_gen_default = styles;
 
 // src/components/BuggyBag.tsx
-var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_jsx_runtime5 = require("react/jsx-runtime");
 function RectIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) });
 }
 function ArrowIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M5 19L19 5" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M8 5h11v11" })
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M5 19L19 5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M8 5h11v11" })
   ] });
 }
 function PinIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "12", cy: "10", r: "3" })
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("circle", { cx: "12", cy: "10", r: "3" })
   ] });
 }
 function BugIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M8 2l1.88 1.88" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M14.12 3.88L16 2" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M12 20v-9" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M6.53 9C4.6 8.8 3 7 3 5" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M6 13H2" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M3 21c0-2.1 1.7-3.9 3.8-4" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M20.97 5c0 2.1-1.6 3.8-3.5 4" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M22 13h-4" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M17.2 17c2.1.1 3.8 1.9 3.8 4" })
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M8 2l1.88 1.88" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M14.12 3.88L16 2" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M12 20v-9" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M6.53 9C4.6 8.8 3 7 3 5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M6 13H2" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M3 21c0-2.1 1.7-3.9 3.8-4" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M20.97 5c0 2.1-1.6 3.8-3.5 4" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M22 13h-4" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M17.2 17c2.1.1 3.8 1.9 3.8 4" })
   ] });
 }
 function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
-  const [expanded, setExpanded] = (0, import_react4.useState)(false);
-  const [activeTool, setActiveTool] = (0, import_react4.useState)(null);
-  const [toast, setToast] = (0, import_react4.useState)(null);
-  (0, import_react4.useEffect)(() => {
+  const [expanded, setExpanded] = (0, import_react5.useState)(false);
+  const [activeTool, setActiveTool] = (0, import_react5.useState)(null);
+  const [toast, setToast] = (0, import_react5.useState)(null);
+  (0, import_react5.useEffect)(() => {
     initCollector();
   }, []);
-  (0, import_react4.useEffect)(() => {
+  (0, import_react5.useEffect)(() => {
     const handler = () => {
       setExpanded((v) => !v);
       setActiveTool(null);
@@ -1498,13 +1706,13 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
     setTimeout(() => setToast(null), 4e3);
   };
   const tools = [
-    { tool: "rect", icon: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(RectIcon, {}), title: "\u0412\u0438\u0434\u0456\u043B\u0438\u0442\u0438 \u043E\u0431\u043B\u0430\u0441\u0442\u044C" },
-    { tool: "arrow", icon: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ArrowIcon, {}), title: "\u041D\u0430\u043C\u0430\u043B\u044E\u0432\u0430\u0442\u0438 \u0441\u0442\u0440\u0456\u043B\u043A\u0443" },
-    { tool: "pin", icon: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(PinIcon, {}), title: "\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u043F\u0456\u043D" }
+    { tool: "rect", icon: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(RectIcon, {}), title: "\u0412\u0438\u0434\u0456\u043B\u0438\u0442\u0438 \u043E\u0431\u043B\u0430\u0441\u0442\u044C" },
+    { tool: "arrow", icon: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ArrowIcon, {}), title: "\u041D\u0430\u043C\u0430\u043B\u044E\u0432\u0430\u0442\u0438 \u0441\u0442\u0440\u0456\u043B\u043A\u0443" },
+    { tool: "pin", icon: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(PinIcon, {}), title: "\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u043F\u0456\u043D" }
   ];
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
-    !activeTool && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "24px", right: "24px", zIndex: 9997, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }, children: [
-      expanded && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }, children: tools.map(({ tool, icon, title }) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+    !activeTool && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "24px", right: "24px", zIndex: 9997, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }, children: [
+      expanded && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }, children: tools.map(({ tool, icon, title }) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
         "button",
         {
           type: "button",
@@ -1515,27 +1723,27 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         },
         tool
       )) }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { fontSize: "10px", fontFamily: "monospace", background: "rgba(0,0,0,0.55)", color: "rgba(255,255,255,0.85)", padding: "2px 6px", borderRadius: "4px", userSelect: "none" }, children: "Alt+B" }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: { fontSize: "10px", fontFamily: "monospace", background: "rgba(0,0,0,0.55)", color: "rgba(255,255,255,0.85)", padding: "2px 6px", borderRadius: "4px", userSelect: "none" }, children: "Alt+B" }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
         "button",
         {
           type: "button",
           onClick: () => setExpanded((v) => !v),
           title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
           style: { width: "48px", height: "48px", borderRadius: "50%", background: expanded ? "#4f46e5" : "#1c1c1e", border: "1px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", boxShadow: "0 8px 28px rgba(0,0,0,0.4)", transition: "background 0.15s" },
-          children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(BugIcon, {})
+          children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(BugIcon, {})
         }
       )
     ] }),
-    activeTool && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(CaptureMode, { initialTool: activeTool, apiKey: apiKey ?? "", onSend: handleSend, onCancel: () => setActiveTool(null) }),
-    toast && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "90px", right: "24px", zIndex: 9999, display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderRadius: "12px", background: toast.ok ? "#1c1c1e" : "#3f1c1c", color: toast.ok ? "white" : "#fca5a5", border: `1px solid ${toast.ok ? "rgba(255,255,255,0.1)" : "#7f1d1d"}`, fontSize: "13px", fontWeight: "600" }, children: [
+    activeTool && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(CaptureMode, { initialTool: activeTool, apiKey: apiKey ?? "", onSend: handleSend, onCancel: () => setActiveTool(null) }),
+    toast && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "90px", right: "24px", zIndex: 9999, display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderRadius: "12px", background: toast.ok ? "#1c1c1e" : "#3f1c1c", color: toast.ok ? "white" : "#fca5a5", border: `1px solid ${toast.ok ? "rgba(255,255,255,0.1)" : "#7f1d1d"}`, fontSize: "13px", fontWeight: "600" }, children: [
       toast.msg,
-      toast.ok && portalUrl && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("a", { href: portalUrl, target: "_blank", rel: "noopener noreferrer", style: { color: "#818cf8", marginLeft: "4px", fontSize: "12px" }, children: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u2192" })
+      toast.ok && portalUrl && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("a", { href: portalUrl, target: "_blank", rel: "noopener noreferrer", style: { color: "#818cf8", marginLeft: "4px", fontSize: "12px" }, children: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u2192" })
     ] })
   ] });
 }
 function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
-  (0, import_react4.useEffect)(() => {
+  (0, import_react5.useEffect)(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("bb") === "on") {
       localStorage.setItem("BUGGY_BAG_ACCESS", "active");
@@ -1567,7 +1775,7 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
     shadow.appendChild(mountPoint);
     const root = (0, import_client.createRoot)(mountPoint);
     root.render(
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(GodModeGuard, { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(BuggyBagInner, { apiEndpoint, apiKey, portalUrl }) })
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(GodModeGuard, { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(BuggyBagInner, { apiEndpoint, apiKey, portalUrl }) })
     );
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
