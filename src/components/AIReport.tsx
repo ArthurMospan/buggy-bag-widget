@@ -7,9 +7,10 @@ interface AIReportProps {
   isOpen: boolean;
   onClose: () => void;
   activeBugs: Bug[];
+  aiEndpoint: string;
 }
 
-export function AIReport({ isOpen, onClose, activeBugs }: AIReportProps) {
+export function AIReport({ isOpen, onClose, activeBugs, aiEndpoint }: AIReportProps) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -30,7 +31,7 @@ export function AIReport({ isOpen, onClose, activeBugs }: AIReportProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/generate-ai-prompt', {
+      const res = await fetch(aiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

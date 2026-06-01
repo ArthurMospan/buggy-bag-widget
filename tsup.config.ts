@@ -1,39 +1,40 @@
 import { defineConfig } from 'tsup';
-import type { Plugin } from 'esbuild';
+import { writeFileSync } from 'fs';
 import { readFile } from 'fs/promises';
+import path from 'path';
 import postcss from 'postcss';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
 
-// Intercepts every .css import and returns the PostCSS-processed result as a
-// JS string export so the widget can inject it into its shadow root at runtime.
-const cssToStringPlugin: Plugin = {
-  name: 'css-to-string',
-  setup(build) {
-    build.onLoad({ filter: /\.css$/ }, async ({ path: filePath }) => {
-      const source = await readFile(filePath, 'utf8');
-      const result = await postcss([tailwindcss, autoprefixer]).process(source, {
-        from: filePath,
-      });
-      return {
-        contents: `export default ${JSON.stringify(result.css)}`,
-        loader: 'js',
-      };
-    });
-  },
-};
+// Process styles.css with PostCSS/Tailwind and write the result as a TypeScript
+// module before tsup/esbuild runs. This sidesteps tsup 8.x's CSS extraction
+// pipeline which intercepts .css imports before esbuild plugins can handle them
+// (causing styles_default = {} in the bundle instead of the CSS string).
+async function generateStyles() {
+  const cssPath = path.join(process.cwd(), 'src/styles.css');
+  const genPath = path.join(process.cwd(), 'src/styles.gen.ts');
+  const source = await readFile(cssPath, 'utf8');
+  const result = await postcss([tailwindcss, autoprefixer]).process(source, {
+    from: cssPath,
+  });
+  writeFileSync(genPath, `const styles = ${JSON.stringify(result.css)};\nexport default styles;\n`);
+}
 
-export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['cjs', 'esm'],
-  dts: true,
-  sourcemap: true,
-  clean: true,
-  external: ['react', 'react-dom'],
-  esbuildPlugins: [cssToStringPlugin],
-  esbuildOptions(options, context) {
-    if (context.format === 'esm') {
-      options.banner = { js: '"use client";' };
-    }
-  },
+export default defineConfig(async () => {
+  await generateStyles();
+
+  return {
+    entry: ['src/index.ts'],
+    format: ['cjs', 'esm'],
+    dts: true,
+    sourcemap: true,
+    clean: true,
+    external: ['react', 'react-dom'],
+    noExternal: ['html-to-image'],
+    esbuildOptions(options, context) {
+      if (context.format === 'esm') {
+        options.banner = { js: '"use client";' };
+      }
+    },
+  };
 });

@@ -88,6 +88,801 @@ function FloatingButton({
 // src/components/CaptureMode.tsx
 import { useEffect as useEffect3, useState as useState3, useCallback as useCallback2 } from "react";
 
+// node_modules/html-to-image/es/util.js
+function resolveUrl(url, baseUrl) {
+  if (url.match(/^[a-z]+:\/\//i)) {
+    return url;
+  }
+  if (url.match(/^\/\//)) {
+    return window.location.protocol + url;
+  }
+  if (url.match(/^[a-z]+:/i)) {
+    return url;
+  }
+  const doc = document.implementation.createHTMLDocument();
+  const base = doc.createElement("base");
+  const a = doc.createElement("a");
+  doc.head.appendChild(base);
+  doc.body.appendChild(a);
+  if (baseUrl) {
+    base.href = baseUrl;
+  }
+  a.href = url;
+  return a.href;
+}
+var uuid = /* @__PURE__ */ (() => {
+  let counter = 0;
+  const random = () => (
+    // eslint-disable-next-line no-bitwise
+    `0000${(Math.random() * 36 ** 4 << 0).toString(36)}`.slice(-4)
+  );
+  return () => {
+    counter += 1;
+    return `u${random()}${counter}`;
+  };
+})();
+function toArray(arrayLike) {
+  const arr = [];
+  for (let i = 0, l = arrayLike.length; i < l; i++) {
+    arr.push(arrayLike[i]);
+  }
+  return arr;
+}
+var styleProps = null;
+function getStyleProperties(options = {}) {
+  if (styleProps) {
+    return styleProps;
+  }
+  if (options.includeStyleProperties) {
+    styleProps = options.includeStyleProperties;
+    return styleProps;
+  }
+  styleProps = toArray(window.getComputedStyle(document.documentElement));
+  return styleProps;
+}
+function px(node, styleProperty) {
+  const win = node.ownerDocument.defaultView || window;
+  const val = win.getComputedStyle(node).getPropertyValue(styleProperty);
+  return val ? parseFloat(val.replace("px", "")) : 0;
+}
+function getNodeWidth(node) {
+  const leftBorder = px(node, "border-left-width");
+  const rightBorder = px(node, "border-right-width");
+  return node.clientWidth + leftBorder + rightBorder;
+}
+function getNodeHeight(node) {
+  const topBorder = px(node, "border-top-width");
+  const bottomBorder = px(node, "border-bottom-width");
+  return node.clientHeight + topBorder + bottomBorder;
+}
+function getImageSize(targetNode, options = {}) {
+  const width = options.width || getNodeWidth(targetNode);
+  const height = options.height || getNodeHeight(targetNode);
+  return { width, height };
+}
+function getPixelRatio() {
+  let ratio;
+  let FINAL_PROCESS;
+  try {
+    FINAL_PROCESS = process;
+  } catch (e) {
+  }
+  const val = FINAL_PROCESS && FINAL_PROCESS.env ? FINAL_PROCESS.env.devicePixelRatio : null;
+  if (val) {
+    ratio = parseInt(val, 10);
+    if (Number.isNaN(ratio)) {
+      ratio = 1;
+    }
+  }
+  return ratio || window.devicePixelRatio || 1;
+}
+var canvasDimensionLimit = 16384;
+function checkCanvasDimensions(canvas) {
+  if (canvas.width > canvasDimensionLimit || canvas.height > canvasDimensionLimit) {
+    if (canvas.width > canvasDimensionLimit && canvas.height > canvasDimensionLimit) {
+      if (canvas.width > canvas.height) {
+        canvas.height *= canvasDimensionLimit / canvas.width;
+        canvas.width = canvasDimensionLimit;
+      } else {
+        canvas.width *= canvasDimensionLimit / canvas.height;
+        canvas.height = canvasDimensionLimit;
+      }
+    } else if (canvas.width > canvasDimensionLimit) {
+      canvas.height *= canvasDimensionLimit / canvas.width;
+      canvas.width = canvasDimensionLimit;
+    } else {
+      canvas.width *= canvasDimensionLimit / canvas.height;
+      canvas.height = canvasDimensionLimit;
+    }
+  }
+}
+function createImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      img.decode().then(() => {
+        requestAnimationFrame(() => resolve(img));
+      });
+    };
+    img.onerror = reject;
+    img.crossOrigin = "anonymous";
+    img.decoding = "async";
+    img.src = url;
+  });
+}
+async function svgToDataURL(svg) {
+  return Promise.resolve().then(() => new XMLSerializer().serializeToString(svg)).then(encodeURIComponent).then((html) => `data:image/svg+xml;charset=utf-8,${html}`);
+}
+async function nodeToDataURL(node, width, height) {
+  const xmlns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(xmlns, "svg");
+  const foreignObject = document.createElementNS(xmlns, "foreignObject");
+  svg.setAttribute("width", `${width}`);
+  svg.setAttribute("height", `${height}`);
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  foreignObject.setAttribute("width", "100%");
+  foreignObject.setAttribute("height", "100%");
+  foreignObject.setAttribute("x", "0");
+  foreignObject.setAttribute("y", "0");
+  foreignObject.setAttribute("externalResourcesRequired", "true");
+  svg.appendChild(foreignObject);
+  foreignObject.appendChild(node);
+  return svgToDataURL(svg);
+}
+var isInstanceOfElement = (node, instance) => {
+  if (node instanceof instance)
+    return true;
+  const nodePrototype = Object.getPrototypeOf(node);
+  if (nodePrototype === null)
+    return false;
+  return nodePrototype.constructor.name === instance.name || isInstanceOfElement(nodePrototype, instance);
+};
+
+// node_modules/html-to-image/es/clone-pseudos.js
+function formatCSSText(style) {
+  const content = style.getPropertyValue("content");
+  return `${style.cssText} content: '${content.replace(/'|"/g, "")}';`;
+}
+function formatCSSProperties(style, options) {
+  return getStyleProperties(options).map((name) => {
+    const value = style.getPropertyValue(name);
+    const priority = style.getPropertyPriority(name);
+    return `${name}: ${value}${priority ? " !important" : ""};`;
+  }).join(" ");
+}
+function getPseudoElementStyle(className, pseudo, style, options) {
+  const selector = `.${className}:${pseudo}`;
+  const cssText = style.cssText ? formatCSSText(style) : formatCSSProperties(style, options);
+  return document.createTextNode(`${selector}{${cssText}}`);
+}
+function clonePseudoElement(nativeNode, clonedNode, pseudo, options) {
+  const style = window.getComputedStyle(nativeNode, pseudo);
+  const content = style.getPropertyValue("content");
+  if (content === "" || content === "none") {
+    return;
+  }
+  const className = uuid();
+  try {
+    clonedNode.className = `${clonedNode.className} ${className}`;
+  } catch (err) {
+    return;
+  }
+  const styleElement = document.createElement("style");
+  styleElement.appendChild(getPseudoElementStyle(className, pseudo, style, options));
+  clonedNode.appendChild(styleElement);
+}
+function clonePseudoElements(nativeNode, clonedNode, options) {
+  clonePseudoElement(nativeNode, clonedNode, ":before", options);
+  clonePseudoElement(nativeNode, clonedNode, ":after", options);
+}
+
+// node_modules/html-to-image/es/mimes.js
+var WOFF = "application/font-woff";
+var JPEG = "image/jpeg";
+var mimes = {
+  woff: WOFF,
+  woff2: WOFF,
+  ttf: "application/font-truetype",
+  eot: "application/vnd.ms-fontobject",
+  png: "image/png",
+  jpg: JPEG,
+  jpeg: JPEG,
+  gif: "image/gif",
+  tiff: "image/tiff",
+  svg: "image/svg+xml",
+  webp: "image/webp"
+};
+function getExtension(url) {
+  const match = /\.([^./]*?)$/g.exec(url);
+  return match ? match[1] : "";
+}
+function getMimeType(url) {
+  const extension = getExtension(url).toLowerCase();
+  return mimes[extension] || "";
+}
+
+// node_modules/html-to-image/es/dataurl.js
+function getContentFromDataUrl(dataURL) {
+  return dataURL.split(/,/)[1];
+}
+function isDataUrl(url) {
+  return url.search(/^(data:)/) !== -1;
+}
+function makeDataUrl(content, mimeType) {
+  return `data:${mimeType};base64,${content}`;
+}
+async function fetchAsDataURL(url, init, process2) {
+  const res = await fetch(url, init);
+  if (res.status === 404) {
+    throw new Error(`Resource "${res.url}" not found`);
+  }
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onloadend = () => {
+      try {
+        resolve(process2({ res, result: reader.result }));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+var cache = {};
+function getCacheKey(url, contentType, includeQueryParams) {
+  let key = url.replace(/\?.*/, "");
+  if (includeQueryParams) {
+    key = url;
+  }
+  if (/ttf|otf|eot|woff2?/i.test(key)) {
+    key = key.replace(/.*\//, "");
+  }
+  return contentType ? `[${contentType}]${key}` : key;
+}
+async function resourceToDataURL(resourceUrl, contentType, options) {
+  const cacheKey = getCacheKey(resourceUrl, contentType, options.includeQueryParams);
+  if (cache[cacheKey] != null) {
+    return cache[cacheKey];
+  }
+  if (options.cacheBust) {
+    resourceUrl += (/\?/.test(resourceUrl) ? "&" : "?") + (/* @__PURE__ */ new Date()).getTime();
+  }
+  let dataURL;
+  try {
+    const content = await fetchAsDataURL(resourceUrl, options.fetchRequestInit, ({ res, result }) => {
+      if (!contentType) {
+        contentType = res.headers.get("Content-Type") || "";
+      }
+      return getContentFromDataUrl(result);
+    });
+    dataURL = makeDataUrl(content, contentType);
+  } catch (error) {
+    dataURL = options.imagePlaceholder || "";
+    let msg = `Failed to fetch resource: ${resourceUrl}`;
+    if (error) {
+      msg = typeof error === "string" ? error : error.message;
+    }
+    if (msg) {
+      console.warn(msg);
+    }
+  }
+  cache[cacheKey] = dataURL;
+  return dataURL;
+}
+
+// node_modules/html-to-image/es/clone-node.js
+async function cloneCanvasElement(canvas) {
+  const dataURL = canvas.toDataURL();
+  if (dataURL === "data:,") {
+    return canvas.cloneNode(false);
+  }
+  return createImage(dataURL);
+}
+async function cloneVideoElement(video, options) {
+  if (video.currentSrc) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = video.clientWidth;
+    canvas.height = video.clientHeight;
+    ctx === null || ctx === void 0 ? void 0 : ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataURL2 = canvas.toDataURL();
+    return createImage(dataURL2);
+  }
+  const poster = video.poster;
+  const contentType = getMimeType(poster);
+  const dataURL = await resourceToDataURL(poster, contentType, options);
+  return createImage(dataURL);
+}
+async function cloneIFrameElement(iframe, options) {
+  var _a;
+  try {
+    if ((_a = iframe === null || iframe === void 0 ? void 0 : iframe.contentDocument) === null || _a === void 0 ? void 0 : _a.body) {
+      return await cloneNode(iframe.contentDocument.body, options, true);
+    }
+  } catch (_b) {
+  }
+  return iframe.cloneNode(false);
+}
+async function cloneSingleNode(node, options) {
+  if (isInstanceOfElement(node, HTMLCanvasElement)) {
+    return cloneCanvasElement(node);
+  }
+  if (isInstanceOfElement(node, HTMLVideoElement)) {
+    return cloneVideoElement(node, options);
+  }
+  if (isInstanceOfElement(node, HTMLIFrameElement)) {
+    return cloneIFrameElement(node, options);
+  }
+  return node.cloneNode(isSVGElement(node));
+}
+var isSlotElement = (node) => node.tagName != null && node.tagName.toUpperCase() === "SLOT";
+var isSVGElement = (node) => node.tagName != null && node.tagName.toUpperCase() === "SVG";
+async function cloneChildren(nativeNode, clonedNode, options) {
+  var _a, _b;
+  if (isSVGElement(clonedNode)) {
+    return clonedNode;
+  }
+  let children = [];
+  if (isSlotElement(nativeNode) && nativeNode.assignedNodes) {
+    children = toArray(nativeNode.assignedNodes());
+  } else if (isInstanceOfElement(nativeNode, HTMLIFrameElement) && ((_a = nativeNode.contentDocument) === null || _a === void 0 ? void 0 : _a.body)) {
+    children = toArray(nativeNode.contentDocument.body.childNodes);
+  } else {
+    children = toArray(((_b = nativeNode.shadowRoot) !== null && _b !== void 0 ? _b : nativeNode).childNodes);
+  }
+  if (children.length === 0 || isInstanceOfElement(nativeNode, HTMLVideoElement)) {
+    return clonedNode;
+  }
+  await children.reduce((deferred, child) => deferred.then(() => cloneNode(child, options)).then((clonedChild) => {
+    if (clonedChild) {
+      clonedNode.appendChild(clonedChild);
+    }
+  }), Promise.resolve());
+  return clonedNode;
+}
+function cloneCSSStyle(nativeNode, clonedNode, options) {
+  const targetStyle = clonedNode.style;
+  if (!targetStyle) {
+    return;
+  }
+  const sourceStyle = window.getComputedStyle(nativeNode);
+  if (sourceStyle.cssText) {
+    targetStyle.cssText = sourceStyle.cssText;
+    targetStyle.transformOrigin = sourceStyle.transformOrigin;
+  } else {
+    getStyleProperties(options).forEach((name) => {
+      let value = sourceStyle.getPropertyValue(name);
+      if (name === "font-size" && value.endsWith("px")) {
+        const reducedFont = Math.floor(parseFloat(value.substring(0, value.length - 2))) - 0.1;
+        value = `${reducedFont}px`;
+      }
+      if (isInstanceOfElement(nativeNode, HTMLIFrameElement) && name === "display" && value === "inline") {
+        value = "block";
+      }
+      if (name === "d" && clonedNode.getAttribute("d")) {
+        value = `path(${clonedNode.getAttribute("d")})`;
+      }
+      targetStyle.setProperty(name, value, sourceStyle.getPropertyPriority(name));
+    });
+  }
+}
+function cloneInputValue(nativeNode, clonedNode) {
+  if (isInstanceOfElement(nativeNode, HTMLTextAreaElement)) {
+    clonedNode.innerHTML = nativeNode.value;
+  }
+  if (isInstanceOfElement(nativeNode, HTMLInputElement)) {
+    clonedNode.setAttribute("value", nativeNode.value);
+  }
+}
+function cloneSelectValue(nativeNode, clonedNode) {
+  if (isInstanceOfElement(nativeNode, HTMLSelectElement)) {
+    const clonedSelect = clonedNode;
+    const selectedOption = Array.from(clonedSelect.children).find((child) => nativeNode.value === child.getAttribute("value"));
+    if (selectedOption) {
+      selectedOption.setAttribute("selected", "");
+    }
+  }
+}
+function decorate(nativeNode, clonedNode, options) {
+  if (isInstanceOfElement(clonedNode, Element)) {
+    cloneCSSStyle(nativeNode, clonedNode, options);
+    clonePseudoElements(nativeNode, clonedNode, options);
+    cloneInputValue(nativeNode, clonedNode);
+    cloneSelectValue(nativeNode, clonedNode);
+  }
+  return clonedNode;
+}
+async function ensureSVGSymbols(clone, options) {
+  const uses = clone.querySelectorAll ? clone.querySelectorAll("use") : [];
+  if (uses.length === 0) {
+    return clone;
+  }
+  const processedDefs = {};
+  for (let i = 0; i < uses.length; i++) {
+    const use = uses[i];
+    const id = use.getAttribute("xlink:href");
+    if (id) {
+      const exist = clone.querySelector(id);
+      const definition = document.querySelector(id);
+      if (!exist && definition && !processedDefs[id]) {
+        processedDefs[id] = await cloneNode(definition, options, true);
+      }
+    }
+  }
+  const nodes = Object.values(processedDefs);
+  if (nodes.length) {
+    const ns = "http://www.w3.org/1999/xhtml";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("xmlns", ns);
+    svg.style.position = "absolute";
+    svg.style.width = "0";
+    svg.style.height = "0";
+    svg.style.overflow = "hidden";
+    svg.style.display = "none";
+    const defs = document.createElementNS(ns, "defs");
+    svg.appendChild(defs);
+    for (let i = 0; i < nodes.length; i++) {
+      defs.appendChild(nodes[i]);
+    }
+    clone.appendChild(svg);
+  }
+  return clone;
+}
+async function cloneNode(node, options, isRoot) {
+  if (!isRoot && options.filter && !options.filter(node)) {
+    return null;
+  }
+  return Promise.resolve(node).then((clonedNode) => cloneSingleNode(clonedNode, options)).then((clonedNode) => cloneChildren(node, clonedNode, options)).then((clonedNode) => decorate(node, clonedNode, options)).then((clonedNode) => ensureSVGSymbols(clonedNode, options));
+}
+
+// node_modules/html-to-image/es/embed-resources.js
+var URL_REGEX = /url\((['"]?)([^'"]+?)\1\)/g;
+var URL_WITH_FORMAT_REGEX = /url\([^)]+\)\s*format\((["']?)([^"']+)\1\)/g;
+var FONT_SRC_REGEX = /src:\s*(?:url\([^)]+\)\s*format\([^)]+\)[,;]\s*)+/g;
+function toRegex(url) {
+  const escaped = url.replace(/([.*+?^${}()|\[\]\/\\])/g, "\\$1");
+  return new RegExp(`(url\\(['"]?)(${escaped})(['"]?\\))`, "g");
+}
+function parseURLs(cssText) {
+  const urls = [];
+  cssText.replace(URL_REGEX, (raw, quotation, url) => {
+    urls.push(url);
+    return raw;
+  });
+  return urls.filter((url) => !isDataUrl(url));
+}
+async function embed(cssText, resourceURL, baseURL, options, getContentFromUrl) {
+  try {
+    const resolvedURL = baseURL ? resolveUrl(resourceURL, baseURL) : resourceURL;
+    const contentType = getMimeType(resourceURL);
+    let dataURL;
+    if (getContentFromUrl) {
+      const content = await getContentFromUrl(resolvedURL);
+      dataURL = makeDataUrl(content, contentType);
+    } else {
+      dataURL = await resourceToDataURL(resolvedURL, contentType, options);
+    }
+    return cssText.replace(toRegex(resourceURL), `$1${dataURL}$3`);
+  } catch (error) {
+  }
+  return cssText;
+}
+function filterPreferredFontFormat(str, { preferredFontFormat }) {
+  return !preferredFontFormat ? str : str.replace(FONT_SRC_REGEX, (match) => {
+    while (true) {
+      const [src, , format] = URL_WITH_FORMAT_REGEX.exec(match) || [];
+      if (!format) {
+        return "";
+      }
+      if (format === preferredFontFormat) {
+        return `src: ${src};`;
+      }
+    }
+  });
+}
+function shouldEmbed(url) {
+  return url.search(URL_REGEX) !== -1;
+}
+async function embedResources(cssText, baseUrl, options) {
+  if (!shouldEmbed(cssText)) {
+    return cssText;
+  }
+  const filteredCSSText = filterPreferredFontFormat(cssText, options);
+  const urls = parseURLs(filteredCSSText);
+  return urls.reduce((deferred, url) => deferred.then((css) => embed(css, url, baseUrl, options)), Promise.resolve(filteredCSSText));
+}
+
+// node_modules/html-to-image/es/embed-images.js
+async function embedProp(propName, node, options) {
+  var _a;
+  const propValue = (_a = node.style) === null || _a === void 0 ? void 0 : _a.getPropertyValue(propName);
+  if (propValue) {
+    const cssString = await embedResources(propValue, null, options);
+    node.style.setProperty(propName, cssString, node.style.getPropertyPriority(propName));
+    return true;
+  }
+  return false;
+}
+async function embedBackground(clonedNode, options) {
+  ;
+  await embedProp("background", clonedNode, options) || await embedProp("background-image", clonedNode, options);
+  await embedProp("mask", clonedNode, options) || await embedProp("-webkit-mask", clonedNode, options) || await embedProp("mask-image", clonedNode, options) || await embedProp("-webkit-mask-image", clonedNode, options);
+}
+async function embedImageNode(clonedNode, options) {
+  const isImageElement = isInstanceOfElement(clonedNode, HTMLImageElement);
+  if (!(isImageElement && !isDataUrl(clonedNode.src)) && !(isInstanceOfElement(clonedNode, SVGImageElement) && !isDataUrl(clonedNode.href.baseVal))) {
+    return;
+  }
+  const url = isImageElement ? clonedNode.src : clonedNode.href.baseVal;
+  const dataURL = await resourceToDataURL(url, getMimeType(url), options);
+  await new Promise((resolve, reject) => {
+    clonedNode.onload = resolve;
+    clonedNode.onerror = options.onImageErrorHandler ? (...attributes) => {
+      try {
+        resolve(options.onImageErrorHandler(...attributes));
+      } catch (error) {
+        reject(error);
+      }
+    } : reject;
+    const image = clonedNode;
+    if (image.decode) {
+      image.decode = resolve;
+    }
+    if (image.loading === "lazy") {
+      image.loading = "eager";
+    }
+    if (isImageElement) {
+      clonedNode.srcset = "";
+      clonedNode.src = dataURL;
+    } else {
+      clonedNode.href.baseVal = dataURL;
+    }
+  });
+}
+async function embedChildren(clonedNode, options) {
+  const children = toArray(clonedNode.childNodes);
+  const deferreds = children.map((child) => embedImages(child, options));
+  await Promise.all(deferreds).then(() => clonedNode);
+}
+async function embedImages(clonedNode, options) {
+  if (isInstanceOfElement(clonedNode, Element)) {
+    await embedBackground(clonedNode, options);
+    await embedImageNode(clonedNode, options);
+    await embedChildren(clonedNode, options);
+  }
+}
+
+// node_modules/html-to-image/es/apply-style.js
+function applyStyle(node, options) {
+  const { style } = node;
+  if (options.backgroundColor) {
+    style.backgroundColor = options.backgroundColor;
+  }
+  if (options.width) {
+    style.width = `${options.width}px`;
+  }
+  if (options.height) {
+    style.height = `${options.height}px`;
+  }
+  const manual = options.style;
+  if (manual != null) {
+    Object.keys(manual).forEach((key) => {
+      style[key] = manual[key];
+    });
+  }
+  return node;
+}
+
+// node_modules/html-to-image/es/embed-webfonts.js
+var cssFetchCache = {};
+async function fetchCSS(url) {
+  let cache2 = cssFetchCache[url];
+  if (cache2 != null) {
+    return cache2;
+  }
+  const res = await fetch(url);
+  const cssText = await res.text();
+  cache2 = { url, cssText };
+  cssFetchCache[url] = cache2;
+  return cache2;
+}
+async function embedFonts(data, options) {
+  let cssText = data.cssText;
+  const regexUrl = /url\(["']?([^"')]+)["']?\)/g;
+  const fontLocs = cssText.match(/url\([^)]+\)/g) || [];
+  const loadFonts = fontLocs.map(async (loc) => {
+    let url = loc.replace(regexUrl, "$1");
+    if (!url.startsWith("https://")) {
+      url = new URL(url, data.url).href;
+    }
+    return fetchAsDataURL(url, options.fetchRequestInit, ({ result }) => {
+      cssText = cssText.replace(loc, `url(${result})`);
+      return [loc, result];
+    });
+  });
+  return Promise.all(loadFonts).then(() => cssText);
+}
+function parseCSS(source) {
+  if (source == null) {
+    return [];
+  }
+  const result = [];
+  const commentsRegex = /(\/\*[\s\S]*?\*\/)/gi;
+  let cssText = source.replace(commentsRegex, "");
+  const keyframesRegex = new RegExp("((@.*?keyframes [\\s\\S]*?){([\\s\\S]*?}\\s*?)})", "gi");
+  while (true) {
+    const matches = keyframesRegex.exec(cssText);
+    if (matches === null) {
+      break;
+    }
+    result.push(matches[0]);
+  }
+  cssText = cssText.replace(keyframesRegex, "");
+  const importRegex = /@import[\s\S]*?url\([^)]*\)[\s\S]*?;/gi;
+  const combinedCSSRegex = "((\\s*?(?:\\/\\*[\\s\\S]*?\\*\\/)?\\s*?@media[\\s\\S]*?){([\\s\\S]*?)}\\s*?})|(([\\s\\S]*?){([\\s\\S]*?)})";
+  const unifiedRegex = new RegExp(combinedCSSRegex, "gi");
+  while (true) {
+    let matches = importRegex.exec(cssText);
+    if (matches === null) {
+      matches = unifiedRegex.exec(cssText);
+      if (matches === null) {
+        break;
+      } else {
+        importRegex.lastIndex = unifiedRegex.lastIndex;
+      }
+    } else {
+      unifiedRegex.lastIndex = importRegex.lastIndex;
+    }
+    result.push(matches[0]);
+  }
+  return result;
+}
+async function getCSSRules(styleSheets, options) {
+  const ret = [];
+  const deferreds = [];
+  styleSheets.forEach((sheet) => {
+    if ("cssRules" in sheet) {
+      try {
+        toArray(sheet.cssRules || []).forEach((item, index) => {
+          if (item.type === CSSRule.IMPORT_RULE) {
+            let importIndex = index + 1;
+            const url = item.href;
+            const deferred = fetchCSS(url).then((metadata) => embedFonts(metadata, options)).then((cssText) => parseCSS(cssText).forEach((rule) => {
+              try {
+                sheet.insertRule(rule, rule.startsWith("@import") ? importIndex += 1 : sheet.cssRules.length);
+              } catch (error) {
+                console.error("Error inserting rule from remote css", {
+                  rule,
+                  error
+                });
+              }
+            })).catch((e) => {
+              console.error("Error loading remote css", e.toString());
+            });
+            deferreds.push(deferred);
+          }
+        });
+      } catch (e) {
+        const inline = styleSheets.find((a) => a.href == null) || document.styleSheets[0];
+        if (sheet.href != null) {
+          deferreds.push(fetchCSS(sheet.href).then((metadata) => embedFonts(metadata, options)).then((cssText) => parseCSS(cssText).forEach((rule) => {
+            inline.insertRule(rule, inline.cssRules.length);
+          })).catch((err) => {
+            console.error("Error loading remote stylesheet", err);
+          }));
+        }
+        console.error("Error inlining remote css file", e);
+      }
+    }
+  });
+  return Promise.all(deferreds).then(() => {
+    styleSheets.forEach((sheet) => {
+      if ("cssRules" in sheet) {
+        try {
+          toArray(sheet.cssRules || []).forEach((item) => {
+            ret.push(item);
+          });
+        } catch (e) {
+          console.error(`Error while reading CSS rules from ${sheet.href}`, e);
+        }
+      }
+    });
+    return ret;
+  });
+}
+function getWebFontRules(cssRules) {
+  return cssRules.filter((rule) => rule.type === CSSRule.FONT_FACE_RULE).filter((rule) => shouldEmbed(rule.style.getPropertyValue("src")));
+}
+async function parseWebFontRules(node, options) {
+  if (node.ownerDocument == null) {
+    throw new Error("Provided element is not within a Document");
+  }
+  const styleSheets = toArray(node.ownerDocument.styleSheets);
+  const cssRules = await getCSSRules(styleSheets, options);
+  return getWebFontRules(cssRules);
+}
+function normalizeFontFamily(font) {
+  return font.trim().replace(/["']/g, "");
+}
+function getUsedFonts(node) {
+  const fonts = /* @__PURE__ */ new Set();
+  function traverse(node2) {
+    const fontFamily = node2.style.fontFamily || getComputedStyle(node2).fontFamily;
+    fontFamily.split(",").forEach((font) => {
+      fonts.add(normalizeFontFamily(font));
+    });
+    Array.from(node2.children).forEach((child) => {
+      if (child instanceof HTMLElement) {
+        traverse(child);
+      }
+    });
+  }
+  traverse(node);
+  return fonts;
+}
+async function getWebFontCSS(node, options) {
+  const rules = await parseWebFontRules(node, options);
+  const usedFonts = getUsedFonts(node);
+  const cssTexts = await Promise.all(rules.filter((rule) => usedFonts.has(normalizeFontFamily(rule.style.fontFamily))).map((rule) => {
+    const baseUrl = rule.parentStyleSheet ? rule.parentStyleSheet.href : null;
+    return embedResources(rule.cssText, baseUrl, options);
+  }));
+  return cssTexts.join("\n");
+}
+async function embedWebFonts(clonedNode, options) {
+  const cssText = options.fontEmbedCSS != null ? options.fontEmbedCSS : options.skipFonts ? null : await getWebFontCSS(clonedNode, options);
+  if (cssText) {
+    const styleNode = document.createElement("style");
+    const sytleContent = document.createTextNode(cssText);
+    styleNode.appendChild(sytleContent);
+    if (clonedNode.firstChild) {
+      clonedNode.insertBefore(styleNode, clonedNode.firstChild);
+    } else {
+      clonedNode.appendChild(styleNode);
+    }
+  }
+}
+
+// node_modules/html-to-image/es/index.js
+async function toSvg(node, options = {}) {
+  const { width, height } = getImageSize(node, options);
+  const clonedNode = await cloneNode(node, options, true);
+  await embedWebFonts(clonedNode, options);
+  await embedImages(clonedNode, options);
+  applyStyle(clonedNode, options);
+  const datauri = await nodeToDataURL(clonedNode, width, height);
+  return datauri;
+}
+async function toCanvas(node, options = {}) {
+  const { width, height } = getImageSize(node, options);
+  const svg = await toSvg(node, options);
+  const img = await createImage(svg);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const ratio = options.pixelRatio || getPixelRatio();
+  const canvasWidth = options.canvasWidth || width;
+  const canvasHeight = options.canvasHeight || height;
+  canvas.width = canvasWidth * ratio;
+  canvas.height = canvasHeight * ratio;
+  if (!options.skipAutoScale) {
+    checkCanvasDimensions(canvas);
+  }
+  canvas.style.width = `${canvasWidth}`;
+  canvas.style.height = `${canvasHeight}`;
+  if (options.backgroundColor) {
+    context.fillStyle = options.backgroundColor;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  context.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+async function toPng(node, options = {}) {
+  const canvas = await toCanvas(node, options);
+  return canvas.toDataURL();
+}
+
 // src/components/DrawingCanvas.tsx
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Stage, Layer, Rect, Arrow, Circle, Text, Group } from "react-konva";
@@ -525,18 +1320,24 @@ function CaptureMode({ onSave, onCancel }) {
   useEffect3(() => {
     let cancelled = false;
     const timer = setTimeout(async () => {
+      const captureOpts = {
+        filter: (el) => el.getAttribute?.("data-buggy-bag") !== "true",
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1
+      };
       try {
-        const { default: html2canvas } = await import("html2canvas");
-        const canvas = await html2canvas(document.body, {
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          ignoreElements: (el) => el.getAttribute("data-buggy-bag") === "true"
-        });
-        if (!cancelled) {
-          setScreenshotUrl(canvas.toDataURL("image/png"));
+        let dataUrl;
+        try {
+          dataUrl = await toPng(document.body, captureOpts);
+        } catch {
+          dataUrl = await toPng(document.body, { ...captureOpts, skipFonts: true });
         }
-      } catch {
+        if (!cancelled) {
+          setScreenshotUrl(dataUrl);
+        }
+      } catch (err) {
+        console.error("[BuggyBag] screenshot failed:", err);
         if (!cancelled) {
           onCancel();
         }
@@ -875,7 +1676,7 @@ function BugCard({ bug, onStatusChange }) {
 import { useState as useState5, useEffect as useEffect5, useRef as useRef3 } from "react";
 import { Copy, Check as Check2, Loader } from "lucide-react";
 import { Fragment as Fragment3, jsx as jsx11, jsxs as jsxs9 } from "react/jsx-runtime";
-function AIReport({ isOpen, onClose, activeBugs }) {
+function AIReport({ isOpen, onClose, activeBugs, aiEndpoint }) {
   const [prompt, setPrompt] = useState5("");
   const [loading, setLoading] = useState5(false);
   const [copied, setCopied] = useState5(false);
@@ -893,7 +1694,7 @@ function AIReport({ isOpen, onClose, activeBugs }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/generate-ai-prompt", {
+      const res = await fetch(aiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1022,7 +1823,7 @@ var FILTERS = [
   { value: "fixed", label: "Fixed" },
   { value: "archived", label: "Archived" }
 ];
-function Dashboard({ isOpen, onClose, bugs, onStatusChange }) {
+function Dashboard({ isOpen, onClose, bugs, onStatusChange, aiEndpoint }) {
   const [filter, setFilter] = useState6("all");
   const [showAIReport, setShowAIReport] = useState6(false);
   const filtered = filter === "all" ? bugs : bugs.filter((b) => b.status === filter);
@@ -1073,18 +1874,21 @@ function Dashboard({ isOpen, onClose, bugs, onStatusChange }) {
       {
         isOpen: showAIReport,
         onClose: () => setShowAIReport(false),
-        activeBugs
+        activeBugs,
+        aiEndpoint
       }
     )
   ] });
 }
 
-// src/styles.css
-var styles_default = {};
+// src/styles.gen.ts
+var styles = '.container {\n    width: 100%\n}\n@media (min-width: 640px) {\n    .container {\n        max-width: 640px\n    }\n}\n@media (min-width: 768px) {\n    .container {\n        max-width: 768px\n    }\n}\n@media (min-width: 1024px) {\n    .container {\n        max-width: 1024px\n    }\n}\n@media (min-width: 1280px) {\n    .container {\n        max-width: 1280px\n    }\n}\n@media (min-width: 1536px) {\n    .container {\n        max-width: 1536px\n    }\n}\n.sr-only {\n    position: absolute;\n    width: 1px;\n    height: 1px;\n    padding: 0;\n    margin: -1px;\n    overflow: hidden;\n    clip: rect(0, 0, 0, 0);\n    white-space: nowrap;\n    border-width: 0\n}\n.pointer-events-none {\n    pointer-events: none\n}\n.visible {\n    visibility: visible\n}\n.fixed {\n    position: fixed\n}\n.absolute {\n    position: absolute\n}\n.relative {\n    position: relative\n}\n.inset-0 {\n    inset: 0px\n}\n.-right-1 {\n    right: -0.25rem\n}\n.-top-1 {\n    top: -0.25rem\n}\n.bottom-6 {\n    bottom: 1.5rem\n}\n.left-1 {\n    left: 0.25rem\n}\n.left-1\\/2 {\n    left: 50%\n}\n.left-\\[12px\\] {\n    left: 12px\n}\n.right-6 {\n    right: 1.5rem\n}\n.top-1 {\n    top: 0.25rem\n}\n.top-1\\/2 {\n    top: 50%\n}\n.top-4 {\n    top: 1rem\n}\n.z-\\[10000\\] {\n    z-index: 10000\n}\n.z-\\[10001\\] {\n    z-index: 10001\n}\n.z-\\[10002\\] {\n    z-index: 10002\n}\n.z-\\[9997\\] {\n    z-index: 9997\n}\n.z-\\[9998\\] {\n    z-index: 9998\n}\n.mx-1 {\n    margin-left: 0.25rem;\n    margin-right: 0.25rem\n}\n.mx-4 {\n    margin-left: 1rem;\n    margin-right: 1rem\n}\n.mx-auto {\n    margin-left: auto;\n    margin-right: auto\n}\n.mb-1 {\n    margin-bottom: 0.25rem\n}\n.mb-2 {\n    margin-bottom: 0.5rem\n}\n.mb-4 {\n    margin-bottom: 1rem\n}\n.mb-6 {\n    margin-bottom: 1.5rem\n}\n.ml-1 {\n    margin-left: 0.25rem\n}\n.mt-2 {\n    margin-top: 0.5rem\n}\n.mt-6 {\n    margin-top: 1.5rem\n}\n.line-clamp-2 {\n    overflow: hidden;\n    display: -webkit-box;\n    -webkit-box-orient: vertical;\n    -webkit-line-clamp: 2\n}\n.block {\n    display: block\n}\n.flex {\n    display: flex\n}\n.inline-flex {\n    display: inline-flex\n}\n.hidden {\n    display: none\n}\n.h-10 {\n    height: 2.5rem\n}\n.h-12 {\n    height: 3rem\n}\n.h-6 {\n    height: 1.5rem\n}\n.h-\\[16px\\] {\n    height: 16px\n}\n.h-\\[22px\\] {\n    height: 22px\n}\n.h-\\[28px\\] {\n    height: 28px\n}\n.h-\\[32px\\] {\n    height: 32px\n}\n.h-\\[36px\\] {\n    height: 36px\n}\n.h-\\[40px\\] {\n    height: 40px\n}\n.h-\\[44px\\] {\n    height: 44px\n}\n.h-\\[52px\\] {\n    height: 52px\n}\n.h-full {\n    height: 100%\n}\n.max-h-\\[300px\\] {\n    max-height: 300px\n}\n.max-h-\\[calc\\(100vh-200px\\)\\] {\n    max-height: calc(100vh - 200px)\n}\n.w-10 {\n    width: 2.5rem\n}\n.w-12 {\n    width: 3rem\n}\n.w-\\[16px\\] {\n    width: 16px\n}\n.w-\\[288px\\] {\n    width: 288px\n}\n.w-\\[32px\\] {\n    width: 32px\n}\n.w-\\[36px\\] {\n    width: 36px\n}\n.w-\\[80px\\] {\n    width: 80px\n}\n.w-full {\n    width: 100%\n}\n.w-px {\n    width: 1px\n}\n.min-w-0 {\n    min-width: 0px\n}\n.max-w-\\[1200px\\] {\n    max-width: 1200px\n}\n.max-w-\\[340px\\] {\n    max-width: 340px\n}\n.max-w-\\[480px\\] {\n    max-width: 480px\n}\n.max-w-\\[640px\\] {\n    max-width: 640px\n}\n.max-w-\\[900px\\] {\n    max-width: 900px\n}\n.flex-1 {\n    flex: 1 1 0%\n}\n.flex-shrink {\n    flex-shrink: 1\n}\n.shrink-0 {\n    flex-shrink: 0\n}\n.-translate-x-1 {\n    --tw-translate-x: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-x-1\\/2 {\n    --tw-translate-x: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1 {\n    --tw-translate-y: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1\\/2 {\n    --tw-translate-y: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.transform {\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n@keyframes pulse {\n    50% {\n        opacity: .5\n    }\n}\n.animate-pulse {\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\n@keyframes spin {\n    to {\n        transform: rotate(360deg)\n    }\n}\n.animate-spin {\n    animation: spin 1s linear infinite\n}\n.cursor-default {\n    cursor: default\n}\n.resize-none {\n    resize: none\n}\n.resize {\n    resize: both\n}\n.flex-col {\n    flex-direction: column\n}\n.flex-wrap {\n    flex-wrap: wrap\n}\n.items-start {\n    align-items: flex-start\n}\n.items-center {\n    align-items: center\n}\n.justify-center {\n    justify-content: center\n}\n.justify-between {\n    justify-content: space-between\n}\n.gap-1 {\n    gap: 0.25rem\n}\n.gap-2 {\n    gap: 0.5rem\n}\n.gap-3 {\n    gap: 0.75rem\n}\n.gap-4 {\n    gap: 1rem\n}\n.gap-\\[6px\\] {\n    gap: 6px\n}\n.self-start {\n    align-self: flex-start\n}\n.overflow-y-auto {\n    overflow-y: auto\n}\n.rounded-\\[10px\\] {\n    border-radius: 10px\n}\n.rounded-\\[12px\\] {\n    border-radius: 12px\n}\n.rounded-\\[16px\\] {\n    border-radius: 16px\n}\n.rounded-\\[24px\\] {\n    border-radius: 24px\n}\n.rounded-\\[8px\\] {\n    border-radius: 8px\n}\n.rounded-full {\n    border-radius: 9999px\n}\n.border {\n    border-width: 1px\n}\n.border-b {\n    border-bottom-width: 1px\n}\n.border-t {\n    border-top-width: 1px\n}\n.border-\\[\\#e9e9e9\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(233 233 233 / var(--tw-border-opacity, 1))\n}\n.border-\\[\\#f0f0f0\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\n.border-red-500 {\n    --tw-border-opacity: 1;\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\n.border-transparent {\n    border-color: transparent\n}\n.border-white {\n    --tw-border-opacity: 1;\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\n.border-white\\/10 {\n    border-color: rgb(255 255 255 / 0.1)\n}\n.bg-\\[\\#1c1c1e\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(28 28 30 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#1f1f1f\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#dcfce7\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 252 231 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#e9e9e9\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#ef4444\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f0f0f0\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f4f4f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f5f5f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#fee2e2\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 226 226 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#fef3c7\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 243 199 / var(--tw-bg-opacity, 1))\n}\n.bg-black {\n    --tw-bg-opacity: 1;\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\n.bg-black\\/40 {\n    background-color: rgb(0 0 0 / 0.4)\n}\n.bg-black\\/50 {\n    background-color: rgb(0 0 0 / 0.5)\n}\n.bg-red-50 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-transparent {\n    background-color: transparent\n}\n.bg-white {\n    --tw-bg-opacity: 1;\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\n.object-contain {\n    -o-object-fit: contain;\n       object-fit: contain\n}\n.object-cover {\n    -o-object-fit: cover;\n       object-fit: cover\n}\n.p-0 {\n    padding: 0px\n}\n.p-1 {\n    padding: 0.25rem\n}\n.p-3 {\n    padding: 0.75rem\n}\n.p-4 {\n    padding: 1rem\n}\n.p-\\[10px\\] {\n    padding: 10px\n}\n.p-\\[12px\\] {\n    padding: 12px\n}\n.p-\\[16px\\] {\n    padding: 16px\n}\n.p-\\[20px\\] {\n    padding: 20px\n}\n.p-\\[24px\\] {\n    padding: 24px\n}\n.px-3 {\n    padding-left: 0.75rem;\n    padding-right: 0.75rem\n}\n.px-6 {\n    padding-left: 1.5rem;\n    padding-right: 1.5rem\n}\n.px-\\[10px\\] {\n    padding-left: 10px;\n    padding-right: 10px\n}\n.px-\\[12px\\] {\n    padding-left: 12px;\n    padding-right: 12px\n}\n.px-\\[14px\\] {\n    padding-left: 14px;\n    padding-right: 14px\n}\n.px-\\[16px\\] {\n    padding-left: 16px;\n    padding-right: 16px\n}\n.px-\\[18px\\] {\n    padding-left: 18px;\n    padding-right: 18px\n}\n.px-\\[20px\\] {\n    padding-left: 20px;\n    padding-right: 20px\n}\n.px-\\[28px\\] {\n    padding-left: 28px;\n    padding-right: 28px\n}\n.py-12 {\n    padding-top: 3rem;\n    padding-bottom: 3rem\n}\n.py-2 {\n    padding-top: 0.5rem;\n    padding-bottom: 0.5rem\n}\n.py-5 {\n    padding-top: 1.25rem;\n    padding-bottom: 1.25rem\n}\n.py-8 {\n    padding-top: 2rem;\n    padding-bottom: 2rem\n}\n.pb-4 {\n    padding-bottom: 1rem\n}\n.pl-\\[12px\\] {\n    padding-left: 12px\n}\n.pl-\\[36px\\] {\n    padding-left: 36px\n}\n.pr-\\[12px\\] {\n    padding-right: 12px\n}\n.pt-12 {\n    padding-top: 3rem\n}\n.pt-4 {\n    padding-top: 1rem\n}\n.pt-6 {\n    padding-top: 1.5rem\n}\n.text-center {\n    text-align: center\n}\n.font-mono {\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\n.text-\\[11px\\] {\n    font-size: 11px\n}\n.text-\\[12px\\] {\n    font-size: 12px\n}\n.text-\\[13px\\] {\n    font-size: 13px\n}\n.text-\\[14px\\] {\n    font-size: 14px\n}\n.text-\\[16px\\] {\n    font-size: 16px\n}\n.text-\\[18px\\] {\n    font-size: 18px\n}\n.text-\\[32px\\] {\n    font-size: 32px\n}\n.text-\\[9px\\] {\n    font-size: 9px\n}\n.font-bold {\n    font-weight: 700\n}\n.uppercase {\n    text-transform: uppercase\n}\n.italic {\n    font-style: italic\n}\n.leading-none {\n    line-height: 1\n}\n.leading-relaxed {\n    line-height: 1.625\n}\n.leading-snug {\n    line-height: 1.375\n}\n.tracking-wider {\n    letter-spacing: 0.05em\n}\n.text-\\[\\#166534\\] {\n    --tw-text-opacity: 1;\n    color: rgb(22 101 52 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#1f1f1f\\] {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#92400e\\] {\n    --tw-text-opacity: 1;\n    color: rgb(146 64 14 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#991b1b\\] {\n    --tw-text-opacity: 1;\n    color: rgb(153 27 27 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#9a9a9a\\] {\n    --tw-text-opacity: 1;\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\n.text-white {\n    --tw-text-opacity: 1;\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\n.opacity-60 {\n    opacity: 0.6\n}\n.shadow {\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_4px_16px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.4\\)\\] {\n    --tw-shadow: 0 4px 16px rgba(0,0,0,0.4);\n    --tw-shadow-colored: 0 4px 16px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_28px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.5\\)\\2c 0_2px_6px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.3\\)\\] {\n    --tw-shadow: 0 8px 28px rgba(0,0,0,0.5),0 2px 6px rgba(0,0,0,0.3);\n    --tw-shadow-colored: 0 8px 28px var(--tw-shadow-color), 0 2px 6px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.2\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.2);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.22\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.22);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-sm {\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.outline-none {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.outline {\n    outline-style: solid\n}\n.blur {\n    --tw-blur: blur(8px);\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.filter {\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.backdrop-blur-sm {\n    --tw-backdrop-blur: blur(4px);\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.backdrop-filter {\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.transition-all {\n    transition-property: all;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-colors {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.duration-150 {\n    transition-duration: 150ms\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::-moz-placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.hover\\:scale-105:hover {\n    --tw-scale-x: 1.05;\n    --tw-scale-y: 1.05;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.hover\\:bg-\\[\\#2c2c2e\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(44 44 46 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#303030\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#dc2626\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#e9e9e9\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.focus\\:border-\\[\\#1f1f1f\\]:focus {\n    --tw-border-opacity: 1;\n    border-color: rgb(31 31 31 / var(--tw-border-opacity, 1))\n}\n.focus\\:outline-none:focus {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.active\\:scale-95:active {\n    --tw-scale-x: .95;\n    --tw-scale-y: .95;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.disabled\\:cursor-not-allowed:disabled {\n    cursor: not-allowed\n}\n.disabled\\:opacity-50:disabled {\n    opacity: 0.5\n}\n';
+var styles_gen_default = styles;
 
 // src/components/BuggyBag.tsx
 import { Fragment as Fragment5, jsx as jsx13, jsxs as jsxs11 } from "react/jsx-runtime";
-function BuggyBagInner({ apiEndpoint, projectId }) {
+function BuggyBagInner({ apiEndpoint, apiKey }) {
+  const aiEndpoint = apiEndpoint ? `${new URL(apiEndpoint).origin}/api/generate-ai-prompt` : "/api/generate-ai-prompt";
   const [mode, setMode] = useState7("idle");
   const { bugs, addBug, updateBugStatus } = useBugStore();
   const activeBugCount = bugs.filter((b) => b.status === "active").length;
@@ -1096,17 +1900,29 @@ function BuggyBagInner({ apiEndpoint, projectId }) {
       status: "active"
     });
     setMode("dashboard");
-    if (apiEndpoint) {
-      const base64Image = data.screenshotDataUrl.replace(/^data:image\/\w+;base64,/, "");
-      const annotationsArray = Object.entries(data.annotations).map(([id, text]) => ({ id, text }));
+    if (apiEndpoint && apiKey) {
+      const imgW = window.innerWidth;
+      const imgH = window.innerHeight;
+      const annotations = data.shapes.filter((s) => data.annotations[s.id]).map((s, i) => {
+        const cx = s.type === "arrow" && s.points ? (s.points[0] + s.points[2]) / 2 : s.x + (s.width ?? 0) / 2;
+        const cy = s.type === "arrow" && s.points ? (s.points[1] + s.points[3]) / 2 : s.y + (s.height ?? 0) / 2;
+        return {
+          x: Math.round(cx / imgW * 100),
+          y: Math.round(cy / imgH * 100),
+          text: data.annotations[s.id],
+          index: i + 1
+        };
+      });
+      const description = annotations.map((a, i) => `${i + 1}. ${a.text}`).join("\n") || void 0;
       try {
         await fetch(apiEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            project_id: projectId ?? "",
-            image: base64Image,
-            annotations: annotationsArray
+            api_key: apiKey,
+            base64_image: data.screenshotDataUrl,
+            annotations,
+            description
           })
         });
       } catch {
@@ -1130,12 +1946,13 @@ function BuggyBagInner({ apiEndpoint, projectId }) {
         isOpen: mode === "dashboard",
         onClose: () => setMode("idle"),
         bugs,
-        onStatusChange: updateBugStatus
+        onStatusChange: updateBugStatus,
+        aiEndpoint
       }
     )
   ] });
 }
-function BuggyBag({ apiEndpoint, projectId } = {}) {
+function BuggyBag({ apiEndpoint, apiKey } = {}) {
   useEffect6(() => {
     const host = document.createElement("div");
     host.setAttribute("data-buggy-bag", "true");
@@ -1146,17 +1963,17 @@ function BuggyBag({ apiEndpoint, projectId } = {}) {
     peStyle.textContent = "* { pointer-events: auto; }";
     shadow.appendChild(peStyle);
     const styleEl = document.createElement("style");
-    styleEl.textContent = styles_default;
+    styleEl.textContent = styles_gen_default;
     shadow.appendChild(styleEl);
     const mountPoint = document.createElement("div");
     shadow.appendChild(mountPoint);
     const root = createRoot(mountPoint);
     root.render(
-      /* @__PURE__ */ jsx13(GodModeGuard, { children: /* @__PURE__ */ jsx13(BuggyBagInner, { apiEndpoint, projectId }) })
+      /* @__PURE__ */ jsx13(GodModeGuard, { children: /* @__PURE__ */ jsx13(BuggyBagInner, { apiEndpoint, apiKey }) })
     );
     return () => {
-      root.unmount();
       host.remove();
+      setTimeout(() => root.unmount(), 0);
     };
   }, []);
   return null;

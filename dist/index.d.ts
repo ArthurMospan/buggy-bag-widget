@@ -3,9 +3,9 @@ import * as zustand from 'zustand';
 
 interface BuggyBagProps {
     apiEndpoint?: string;
-    projectId?: string;
+    apiKey?: string;
 }
-declare function BuggyBag({ apiEndpoint, projectId }?: BuggyBagProps): null;
+declare function BuggyBag({ apiEndpoint, apiKey }?: BuggyBagProps): null;
 
 type DrawTool = 'rect' | 'arrow' | 'pin';
 type BugStatus = 'active' | 'fixed' | 'archived';

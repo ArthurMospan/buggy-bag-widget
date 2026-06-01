@@ -6,16 +6,19 @@ import { FloatingButton } from './FloatingButton';
 import { CaptureMode } from './CaptureMode';
 import { Dashboard } from './Dashboard';
 import type { Bug } from '../types';
-import widgetStyles from '../styles.css';
+import widgetStyles from '../styles.gen';
 
 type Mode = 'idle' | 'capture' | 'dashboard';
 
 export interface BuggyBagProps {
   apiEndpoint?: string;
-  projectId?: string;
+  apiKey?: string;
 }
 
-function BuggyBagInner({ apiEndpoint, projectId }: BuggyBagProps) {
+function BuggyBagInner({ apiEndpoint, apiKey }: BuggyBagProps) {
+  const aiEndpoint = apiEndpoint
+    ? `${new URL(apiEndpoint).origin}/api/generate-ai-prompt`
+    : '/api/generate-ai-prompt';
   const [mode, setMode] = useState<Mode>('idle');
   const { bugs, addBug, updateBugStatus } = useBugStore();
 
@@ -30,18 +33,38 @@ function BuggyBagInner({ apiEndpoint, projectId }: BuggyBagProps) {
     });
     setMode('dashboard');
 
-    if (apiEndpoint) {
-      const base64Image = data.screenshotDataUrl.replace(/^data:image\/\w+;base64,/, '');
-      const annotationsArray = Object.entries(data.annotations).map(([id, text]) => ({ id, text }));
+    if (apiEndpoint && apiKey) {
+      // Convert pixel-based shapes to the portal's percentage-based annotation format
+      const imgW = window.innerWidth;
+      const imgH = window.innerHeight;
+      const annotations = data.shapes
+        .filter((s) => data.annotations[s.id])
+        .map((s, i) => {
+          const cx = s.type === 'arrow' && s.points
+            ? (s.points[0] + s.points[2]) / 2
+            : s.x + (s.width ?? 0) / 2;
+          const cy = s.type === 'arrow' && s.points
+            ? (s.points[1] + s.points[3]) / 2
+            : s.y + (s.height ?? 0) / 2;
+          return {
+            x: Math.round((cx / imgW) * 100),
+            y: Math.round((cy / imgH) * 100),
+            text: data.annotations[s.id],
+            index: i + 1,
+          };
+        });
+
+      const description = annotations.map((a, i) => `${i + 1}. ${a.text}`).join('\n') || undefined;
 
       try {
         await fetch(apiEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            project_id: projectId ?? '',
-            image: base64Image,
-            annotations: annotationsArray,
+            api_key: apiKey,
+            base64_image: data.screenshotDataUrl,
+            annotations,
+            description,
           }),
         });
       } catch {
@@ -68,12 +91,13 @@ function BuggyBagInner({ apiEndpoint, projectId }: BuggyBagProps) {
         onClose={() => setMode('idle')}
         bugs={bugs}
         onStatusChange={updateBugStatus}
+        aiEndpoint={aiEndpoint}
       />
     </>
   );
 }
 
-export function BuggyBag({ apiEndpoint, projectId }: BuggyBagProps = {}) {
+export function BuggyBag({ apiEndpoint, apiKey }: BuggyBagProps = {}) {
   useEffect(() => {
     // Create the shadow host directly on document.body so it sits at the top
     // of the stacking context (z-index: max) and is never buried inside a
@@ -107,13 +131,13 @@ export function BuggyBag({ apiEndpoint, projectId }: BuggyBagProps = {}) {
     const root = createRoot(mountPoint);
     root.render(
       <GodModeGuard>
-        <BuggyBagInner apiEndpoint={apiEndpoint} projectId={projectId} />
+        <BuggyBagInner apiEndpoint={apiEndpoint} apiKey={apiKey} />
       </GodModeGuard>
     );
 
     return () => {
-      root.unmount();
       host.remove();
+      setTimeout(() => root.unmount(), 0);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

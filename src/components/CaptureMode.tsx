@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
+import { toPng } from 'html-to-image';
 import type { Bug, DrawShape, DrawTool } from '../types';
 import { DrawingCanvas } from './DrawingCanvas';
 import { DrawingToolbar } from './DrawingToolbar';
@@ -24,21 +25,26 @@ export function CaptureMode({ onSave, onCancel }: CaptureModeProps) {
     let cancelled = false;
 
     const timer = setTimeout(async () => {
+      const captureOpts = {
+          filter: (el: Element) => el.getAttribute?.('data-buggy-bag') !== 'true',
+          width: window.innerWidth,
+          height: window.innerHeight,
+          pixelRatio: 1,
+        };
       try {
-        const { default: html2canvas } = await import('html2canvas');
-        const canvas = await html2canvas(document.body, {
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          ignoreElements: (el: Element) =>
-            el.getAttribute('data-buggy-bag') === 'true',
-        });
-        if (!cancelled) {
-          setScreenshotUrl(canvas.toDataURL('image/png'));
+        let dataUrl: string;
+        try {
+          // Try with fonts first (correct layout); falls back if CORS blocks stylesheets
+          dataUrl = await toPng(document.body, captureOpts);
+        } catch {
+          dataUrl = await toPng(document.body, { ...captureOpts, skipFonts: true });
         }
-      } catch {
         if (!cancelled) {
-          // Screenshot failed — close the capture mode gracefully
+          setScreenshotUrl(dataUrl);
+        }
+      } catch (err) {
+        console.error('[BuggyBag] screenshot failed:', err);
+        if (!cancelled) {
           onCancel();
         }
       }

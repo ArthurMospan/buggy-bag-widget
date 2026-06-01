@@ -5,7 +5,9 @@
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup"
@@ -15,6 +17,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
+    "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "konva": "^9.3.19",
     "lucide-react": "^0.468.0",

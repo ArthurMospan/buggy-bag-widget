@@ -11,6 +11,7 @@ interface DashboardProps {
   onClose: () => void;
   bugs: Bug[];
   onStatusChange: (id: string, status: Bug['status']) => void;
+  aiEndpoint: string;
 }
 
 const FILTERS: { value: FilterStatus; label: string }[] = [
@@ -20,7 +21,7 @@ const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'archived', label: 'Archived' },
 ];
 
-export function Dashboard({ isOpen, onClose, bugs, onStatusChange }: DashboardProps) {
+export function Dashboard({ isOpen, onClose, bugs, onStatusChange, aiEndpoint }: DashboardProps) {
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [showAIReport, setShowAIReport] = useState(false);
 
@@ -95,6 +96,7 @@ export function Dashboard({ isOpen, onClose, bugs, onStatusChange }: DashboardPr
         isOpen={showAIReport}
         onClose={() => setShowAIReport(false)}
         activeBugs={activeBugs}
+        aiEndpoint={aiEndpoint}
       />
     </>
   );
