@@ -8,9 +8,10 @@ interface AIReportProps {
   onClose: () => void;
   activeBugs: Bug[];
   aiEndpoint: string;
+  onAfterReport?: () => void;
 }
 
-export function AIReport({ isOpen, onClose, activeBugs, aiEndpoint }: AIReportProps) {
+export function AIReport({ isOpen, onClose, activeBugs, aiEndpoint, onAfterReport }: AIReportProps) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -177,6 +178,15 @@ export function AIReport({ isOpen, onClose, activeBugs, aiEndpoint }: AIReportPr
               Повторити
             </button>
           </div>
+          {onAfterReport && (
+            <button
+              type="button"
+              onClick={onAfterReport}
+              className="w-full h-[40px] rounded-[12px] text-[13px] font-bold bg-[#f4f4f5] text-[#9a9a9a] hover:bg-[#e9e9e9] hover:text-[#1f1f1f] transition-colors"
+            >
+              Архівувати вибрані баги
+            </button>
+          )}
         </div>
       )}
     </Dialog>

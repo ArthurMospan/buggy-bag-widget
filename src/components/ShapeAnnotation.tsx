@@ -84,12 +84,17 @@ export function ShapeAnnotation({
 }: ShapeAnnotationProps) {
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
   const recRef = useRef<SpeechRecognition | null>(null);
   const { x, y } = calcPosition(shape, containerWidth, containerHeight);
 
   const toggleVoice = () => {
+    setMicError(null);
     const SpeechRec = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    if (!SpeechRec) return;
+    if (!SpeechRec) {
+      setMicError('Браузер не підтримує голосовий ввід');
+      return;
+    }
 
     // If already recording, stop and return
     if (recRef.current) {
@@ -109,9 +114,16 @@ export function ShapeAnnotation({
       setText((prev) => (prev ? prev + ' ' + transcript : transcript).trim());
     };
 
-    rec.onerror = () => {
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
       recRef.current = null;
       setListening(false);
+      if (e.error === 'not-allowed') {
+        setMicError('Дозвольте доступ до мікрофона в браузері');
+      } else if (e.error === 'no-speech') {
+        setMicError('Не чутно мови — спробуйте ще раз');
+      } else if (e.error !== 'aborted') {
+        setMicError('Помилка запису голосу');
+      }
     };
 
     rec.onend = () => {
@@ -177,6 +189,10 @@ export function ShapeAnnotation({
           if (e.key === 'Escape') handleDismiss();
         }}
       />
+
+      {micError && (
+        <p className="text-[11px] text-[#ef4444] mt-1 mb-1">{micError}</p>
+      )}
 
       <div className="flex gap-2 mt-2">
         {/* Mic button */}
