@@ -1,2 +1,3 @@
-// placeholder — will be replaced in Task 12
-export {};
+export { BuggyBag } from './components/BuggyBag';
+export { useBugStore } from './store';
+export type { Bug, DrawShape, DrawTool, BugStatus } from './types';
