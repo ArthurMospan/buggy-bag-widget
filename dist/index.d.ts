@@ -1,4 +1,3 @@
-import * as react_jsx_runtime from 'react/jsx-runtime';
 import * as zustand_middleware from 'zustand/middleware';
 import * as zustand from 'zustand';
 
@@ -6,7 +5,7 @@ interface BuggyBagProps {
     apiEndpoint?: string;
     projectId?: string;
 }
-declare function BuggyBag({ apiEndpoint, projectId }?: BuggyBagProps): react_jsx_runtime.JSX.Element;
+declare function BuggyBag({ apiEndpoint, projectId }?: BuggyBagProps): null;
 
 type DrawTool = 'rect' | 'arrow' | 'pin';
 type BugStatus = 'active' | 'fixed' | 'archived';

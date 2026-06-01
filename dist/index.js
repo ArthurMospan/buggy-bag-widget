@@ -1169,31 +1169,29 @@ function BuggyBagInner({ apiEndpoint, projectId }) {
   ] });
 }
 function BuggyBag({ apiEndpoint, projectId } = {}) {
-  const hostRef = (0, import_react9.useRef)(null);
-  const rootRef = (0, import_react9.useRef)(null);
   (0, import_react9.useEffect)(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
-    while (shadow.firstChild) shadow.removeChild(shadow.firstChild);
+    const host = document.createElement("div");
+    host.setAttribute("data-buggy-bag", "true");
+    host.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;overflow:visible;";
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: "open" });
     const styleEl = document.createElement("style");
     styleEl.textContent = styles_default;
     shadow.appendChild(styleEl);
     const mountPoint = document.createElement("div");
     shadow.appendChild(mountPoint);
     const root = (0, import_client.createRoot)(mountPoint);
-    rootRef.current = root;
     root.render(
       /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(GodModeGuard, { children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(BuggyBagInner, { apiEndpoint, projectId }) })
     );
     return () => {
       setTimeout(() => {
         root.unmount();
+        host.remove();
       }, 0);
-      rootRef.current = null;
     };
   }, []);
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { "data-buggy-bag": "true", ref: hostRef });
+  return null;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

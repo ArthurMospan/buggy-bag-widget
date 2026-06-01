@@ -1,7 +1,7 @@
 "use client";
 
 // src/components/BuggyBag.tsx
-import { useState as useState7, useRef as useRef4, useEffect as useEffect6 } from "react";
+import { useState as useState7, useEffect as useEffect6 } from "react";
 import { createRoot } from "react-dom/client";
 
 // src/guard.tsx
@@ -1134,31 +1134,29 @@ function BuggyBagInner({ apiEndpoint, projectId }) {
   ] });
 }
 function BuggyBag({ apiEndpoint, projectId } = {}) {
-  const hostRef = useRef4(null);
-  const rootRef = useRef4(null);
   useEffect6(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
-    while (shadow.firstChild) shadow.removeChild(shadow.firstChild);
+    const host = document.createElement("div");
+    host.setAttribute("data-buggy-bag", "true");
+    host.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;overflow:visible;";
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: "open" });
     const styleEl = document.createElement("style");
     styleEl.textContent = styles_default;
     shadow.appendChild(styleEl);
     const mountPoint = document.createElement("div");
     shadow.appendChild(mountPoint);
     const root = createRoot(mountPoint);
-    rootRef.current = root;
     root.render(
       /* @__PURE__ */ jsx13(GodModeGuard, { children: /* @__PURE__ */ jsx13(BuggyBagInner, { apiEndpoint, projectId }) })
     );
     return () => {
       setTimeout(() => {
         root.unmount();
+        host.remove();
       }, 0);
-      rootRef.current = null;
     };
   }, []);
-  return /* @__PURE__ */ jsx13("div", { "data-buggy-bag": "true", ref: hostRef });
+  return null;
 }
 export {
   BuggyBag,

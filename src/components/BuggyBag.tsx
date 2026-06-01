@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import { GodModeGuard } from '../guard';
 import { useBugStore } from '../store';
 import { FloatingButton } from './FloatingButton';
@@ -74,31 +74,28 @@ function BuggyBagInner({ apiEndpoint, projectId }: BuggyBagProps) {
 }
 
 export function BuggyBag({ apiEndpoint, projectId }: BuggyBagProps = {}) {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const rootRef = useRef<Root | null>(null);
-
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
+    // Create the shadow host directly on document.body so it sits at the top
+    // of the stacking context (z-index: max) and is never buried inside a
+    // host-app flex/grid container. Width/height: 0 means it takes zero space.
+    const host = document.createElement('div');
+    host.setAttribute('data-buggy-bag', 'true');
+    host.style.cssText =
+      'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;overflow:visible;';
+    document.body.appendChild(host);
 
-    // React StrictMode fires effects twice (mount → cleanup → remount).
-    // Shadow roots can't be removed, so we reuse the existing one and clear
-    // its children before repopulating.
-    const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
-    while (shadow.firstChild) shadow.removeChild(shadow.firstChild);
+    const shadow = host.attachShadow({ mode: 'open' });
 
     const styleEl = document.createElement('style');
     styleEl.textContent = widgetStyles;
     shadow.appendChild(styleEl);
 
+    // React root inside the shadow DOM — keeps event delegation entirely
+    // within the shadow boundary so onClick/onChange fire correctly.
     const mountPoint = document.createElement('div');
     shadow.appendChild(mountPoint);
 
-    // A separate React root inside the shadow DOM keeps React's event
-    // delegation entirely within the shadow boundary — no event retargeting
-    // issues that would break onClick/onChange handlers.
     const root = createRoot(mountPoint);
-    rootRef.current = root;
     root.render(
       <GodModeGuard>
         <BuggyBagInner apiEndpoint={apiEndpoint} projectId={projectId} />
@@ -106,14 +103,15 @@ export function BuggyBag({ apiEndpoint, projectId }: BuggyBagProps = {}) {
     );
 
     return () => {
+      // Defer unmount one tick to avoid React StrictMode's double-invoke
+      // trying to unmount a root that's already being re-mounted.
       setTimeout(() => {
         root.unmount();
+        host.remove();
       }, 0);
-      rootRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The host div is invisible to the host app — all rendered output lives
-  // inside the shadow root. data-buggy-bag prevents html2canvas from capturing it.
-  return <div data-buggy-bag="true" ref={hostRef} />;
+  // Nothing rendered into the host React tree — all UI lives in the shadow DOM.
+  return null;
 }
