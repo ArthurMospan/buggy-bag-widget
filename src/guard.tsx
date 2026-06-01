@@ -6,6 +6,10 @@ export function isGodModeActive(): boolean {
 }
 
 export function GodModeGuard({ children }: { children: React.ReactNode }) {
-  if (!isGodModeActive()) return null;
+  const [active, setActive] = React.useState(false);
+  React.useEffect(() => {
+    setActive(isGodModeActive());
+  }, []);
+  if (!active) return null;
   return <>{children}</>;
 }

@@ -8,7 +8,7 @@ export interface DrawShape {
   y: number;
   width?: number;
   height?: number;
-  points?: number[];   // arrow: [x1, y1, x2, y2]
+  points?: [number, number, number, number]; // arrow: [x1, y1, x2, y2]
   pinNumber?: number;  // pin label
 }
 

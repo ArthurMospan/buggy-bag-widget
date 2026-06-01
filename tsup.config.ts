@@ -8,7 +8,9 @@ export default defineConfig({
   clean: true,
   injectStyle: true,
   external: ['react', 'react-dom'],
-  esbuildOptions(options) {
-    options.banner = { js: '"use client";' };
+  esbuildOptions(options, context) {
+    if (context.format === 'esm') {
+      options.banner = { js: '"use client";' };
+    }
   },
 });
