@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Check } from 'lucide-react';
 import type { DrawShape } from '../types';
 
@@ -91,14 +91,16 @@ export function ShapeAnnotation({
     const SpeechRec = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!SpeechRec) return;
 
-    if (listening) {
-      recRef.current?.stop();
+    // If already recording, stop and return
+    if (recRef.current) {
+      recRef.current.stop();
+      recRef.current = null;
       setListening(false);
       return;
     }
 
     const rec = new SpeechRec();
-    rec.lang = 'uk-UA';           // REQUIRED: Ukrainian locale
+    rec.lang = 'uk-UA';
     rec.interimResults = false;
     rec.maxAlternatives = 1;
 
@@ -107,13 +109,31 @@ export function ShapeAnnotation({
       setText((prev) => (prev ? prev + ' ' + transcript : transcript).trim());
     };
 
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    rec.onerror = () => {
+      recRef.current = null;
+      setListening(false);
+    };
 
-    rec.start();
+    rec.onend = () => {
+      recRef.current = null;
+      setListening(false);
+    };
+
+    // Set ref BEFORE start() to prevent race on rapid clicks
     recRef.current = rec;
     setListening(true);
+    rec.start();
   };
+
+  // Stop microphone if component unmounts while recording
+  useEffect(() => {
+    return () => {
+      if (recRef.current) {
+        recRef.current.stop();
+        recRef.current = null;
+      }
+    };
+  }, []);
 
   const handleConfirm = () => {
     recRef.current?.stop();
@@ -136,11 +156,15 @@ export function ShapeAnnotation({
       onClick={stopProp}
       onMouseDown={stopProp}
     >
-      <p className="text-[11px] font-bold text-[#9a9a9a] uppercase tracking-wider mb-2">
+      <label
+        htmlFor="buggy-annotation-text"
+        className="block text-[11px] font-bold text-[#9a9a9a] uppercase tracking-wider mb-2 cursor-default"
+      >
         Вкажіть причину...
-      </p>
+      </label>
 
       <textarea
+        id="buggy-annotation-text"
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Опишіть проблему..."
@@ -148,9 +172,7 @@ export function ShapeAnnotation({
         autoFocus
         className="w-full bg-[#f4f4f5] rounded-[10px] text-[13px] text-[#1f1f1f] placeholder:text-[#a3a3a3] resize-none outline-none border border-transparent focus:border-[#1f1f1f] p-[10px] transition-colors leading-relaxed"
         onKeyDown={(e) => {
-          // Cmd/Ctrl+Enter confirms
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleConfirm();
-          // Escape dismisses
           if (e.key === 'Escape') handleDismiss();
         }}
       />
