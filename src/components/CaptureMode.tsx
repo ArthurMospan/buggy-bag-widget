@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+﻿import React, { useEffect, useState, useCallback } from 'react';
 import type { Bug, DrawShape, DrawTool } from '../types';
 import { DrawingCanvas } from './DrawingCanvas';
 import { DrawingToolbar } from './DrawingToolbar';
@@ -21,22 +21,34 @@ export function CaptureMode({ onSave, onCancel }: CaptureModeProps) {
   const h = typeof window !== 'undefined' ? window.innerHeight : 800;
 
   useEffect(() => {
-    // Small delay so the CaptureMode overlay is not included in the screenshot
+    let cancelled = false;
+
     const timer = setTimeout(async () => {
-      const { default: html2canvas } = await import('html2canvas');
-      const canvas = await html2canvas(document.body, {
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        // Skip our own overlay elements during capture
-        ignoreElements: (el: Element) =>
-          el.getAttribute('data-buggy-bag') === 'true',
-      });
-      setScreenshotUrl(canvas.toDataURL('image/png'));
+      try {
+        const { default: html2canvas } = await import('html2canvas');
+        const canvas = await html2canvas(document.body, {
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          ignoreElements: (el: Element) =>
+            el.getAttribute('data-buggy-bag') === 'true',
+        });
+        if (!cancelled) {
+          setScreenshotUrl(canvas.toDataURL('image/png'));
+        }
+      } catch {
+        if (!cancelled) {
+          // Screenshot failed — close the capture mode gracefully
+          onCancel();
+        }
+      }
     }, 80);
 
-    return () => clearTimeout(timer);
-  }, []);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [onCancel]);
 
   const handleShapeComplete = useCallback((shape: DrawShape) => {
     setShapes((prev) => [...prev, shape]);
@@ -82,7 +94,11 @@ export function CaptureMode({ onSave, onCancel }: CaptureModeProps) {
         />
       ) : (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <span className="text-white text-[16px] font-bold animate-pulse">
+          <span
+          role="status"
+          aria-live="polite"
+          className="text-white text-[16px] font-bold animate-pulse"
+        >
             Знімок екрану...
           </span>
         </div>

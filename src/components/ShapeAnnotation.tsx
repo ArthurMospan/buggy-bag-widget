@@ -170,6 +170,7 @@ export function ShapeAnnotation({
         placeholder="Опишіть проблему..."
         rows={3}
         autoFocus
+        style={{ userSelect: 'text' }}
         className="w-full bg-[#f4f4f5] rounded-[10px] text-[13px] text-[#1f1f1f] placeholder:text-[#a3a3a3] resize-none outline-none border border-transparent focus:border-[#1f1f1f] p-[10px] transition-colors leading-relaxed"
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleConfirm();
