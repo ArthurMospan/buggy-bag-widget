@@ -80,11 +80,20 @@ export function BuggyBag({ apiEndpoint, projectId }: BuggyBagProps = {}) {
     // host-app flex/grid container. Width/height: 0 means it takes zero space.
     const host = document.createElement('div');
     host.setAttribute('data-buggy-bag', 'true');
+    // Full-viewport cover so fixed children are within the hit-test region.
+    // pointer-events:none lets host-app clicks pass through everywhere the
+    // widget UI isn't rendered; elements inside the shadow DOM override this.
     host.style.cssText =
-      'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;overflow:visible;';
+      'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
     document.body.appendChild(host);
 
     const shadow = host.attachShadow({ mode: 'open' });
+
+    // Re-enable pointer events for all shadow DOM children — the host div is
+    // pointer-events:none (inherited by shadow tree), so we must reset it here.
+    const peStyle = document.createElement('style');
+    peStyle.textContent = '* { pointer-events: auto; }';
+    shadow.appendChild(peStyle);
 
     const styleEl = document.createElement('style');
     styleEl.textContent = widgetStyles;

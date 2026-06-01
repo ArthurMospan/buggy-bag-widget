@@ -96,10 +96,11 @@ function FloatingButton({
             type: "button",
             onClick: onDashboard,
             "aria-label": "Open Bug Dashboard",
-            className: "relative w-10 h-10 rounded-full flex items-center justify-center bg-white/15 backdrop-blur-md border border-white/25 text-white shadow-[0_4px_20px_rgba(0,0,0,0.35)] hover:bg-white/25 hover:scale-110 active:scale-95 transition-all duration-150",
+            className: "relative w-10 h-10 rounded-full flex items-center justify-center bg-[#1c1c1e] text-white border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.4)] hover:bg-[#2c2c2e] hover:scale-105 active:scale-95 transition-all duration-150",
+            style: { opacity: 0.88 },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_lucide_react.List, { size: 16, strokeWidth: 1.75 }),
-              activeBugCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "absolute -top-1 -right-1 w-[17px] h-[17px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none shadow-sm", children: activeBugCount > 9 ? "9+" : activeBugCount })
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_lucide_react.List, { size: 15, strokeWidth: 1.75 }),
+              activeBugCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "absolute -top-1 -right-1 w-[16px] h-[16px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none", children: activeBugCount > 9 ? "9+" : activeBugCount })
             ]
           }
         ),
@@ -109,7 +110,8 @@ function FloatingButton({
             type: "button",
             onClick: onCapture,
             "aria-label": "Capture Bug Screenshot",
-            className: "w-12 h-12 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md border border-white/20 text-white shadow-[0_8px_32px_rgba(0,0,0,0.45)] hover:bg-black/65 hover:scale-110 active:scale-95 transition-all duration-150",
+            className: "w-12 h-12 rounded-full flex items-center justify-center bg-[#1c1c1e] text-white border border-white/10 shadow-[0_8px_28px_rgba(0,0,0,0.5),0_2px_6px_rgba(0,0,0,0.3)] hover:bg-[#2c2c2e] hover:scale-105 active:scale-95 transition-all duration-150",
+            style: { opacity: 0.85 },
             children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_lucide_react.Bug, { size: 20, strokeWidth: 1.75 })
           }
         )
@@ -1172,9 +1174,12 @@ function BuggyBag({ apiEndpoint, projectId } = {}) {
   (0, import_react9.useEffect)(() => {
     const host = document.createElement("div");
     host.setAttribute("data-buggy-bag", "true");
-    host.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;overflow:visible;";
+    host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;";
     document.body.appendChild(host);
     const shadow = host.attachShadow({ mode: "open" });
+    const peStyle = document.createElement("style");
+    peStyle.textContent = "* { pointer-events: auto; }";
+    shadow.appendChild(peStyle);
     const styleEl = document.createElement("style");
     styleEl.textContent = styles_default;
     shadow.appendChild(styleEl);
