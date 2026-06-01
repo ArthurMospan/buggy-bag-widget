@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Copy, Check, Loader } from 'lucide-react';
 import { Dialog } from './ui/Dialog';
 import type { Bug } from '../types';
@@ -14,16 +14,19 @@ export function AIReport({ isOpen, onClose, activeBugs }: AIReportProps) {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset internal state when dialog closes
   const handleClose = () => {
     setPrompt('');
     setError(null);
     setCopied(false);
+    setLoading(false);
     onClose();
   };
 
   const generate = async () => {
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
@@ -66,12 +69,20 @@ export function AIReport({ isOpen, onClose, activeBugs }: AIReportProps) {
     try {
       await navigator.clipboard.writeText(prompt);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API may be blocked in some contexts
       setError('Не вдалося скопіювати в буфер обміну');
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current !== null) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <Dialog isOpen={isOpen} onClose={handleClose} title="AI Баг-репорт" size="lg">
