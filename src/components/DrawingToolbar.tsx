@@ -7,6 +7,7 @@ interface DrawingToolbarProps {
   onToolChange: (tool: DrawTool) => void;
   onSave: () => void;
   onCancel: () => void;
+  saveLabel?: string;
 }
 
 const TOOLS: { tool: DrawTool; label: string; Icon: React.ElementType }[] = [
@@ -20,6 +21,7 @@ export function DrawingToolbar({
   onToolChange,
   onSave,
   onCancel,
+  saveLabel = 'Далі →',
 }: DrawingToolbarProps) {
   return (
     <div
@@ -51,7 +53,7 @@ export function DrawingToolbar({
         onClick={onSave}
         className="h-[36px] px-[18px] rounded-[10px] text-[13px] font-bold bg-[#1f1f1f] text-white hover:bg-[#303030] transition-colors"
       >
-        Зберегти баг
+        {saveLabel}
       </button>
       <button
         type="button"

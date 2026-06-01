@@ -31,12 +31,15 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   BuggyBag: () => BuggyBag,
-  useBugStore: () => useBugStore
+  activateFromUrl: () => activateFromUrl,
+  collectTechContext: () => collectTechContext,
+  initCollector: () => initCollector,
+  isActive: () => isActive
 });
 module.exports = __toCommonJS(index_exports);
 
 // src/components/BuggyBag.tsx
-var import_react9 = require("react");
+var import_react5 = require("react");
 var import_client = require("react-dom/client");
 
 // src/guard.tsx
@@ -55,61 +58,24 @@ function GodModeGuard({ children }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children });
 }
 
-// src/store.ts
-var import_zustand = require("zustand");
-var import_middleware = require("zustand/middleware");
-var useBugStore = (0, import_zustand.create)()(
-  (0, import_middleware.persist)(
-    (set) => ({
-      bugs: [],
-      addBug: (bug) => set((state) => ({ bugs: [bug, ...state.bugs] })),
-      updateBugStatus: (id, status) => set((state) => ({
-        bugs: state.bugs.map((b) => b.id === id ? { ...b, status } : b)
-      })),
-      removeBug: (id) => set((state) => ({ bugs: state.bugs.filter((b) => b.id !== id) }))
-    }),
-    {
-      name: "buggy-bag-storage",
-      partialize: (state) => ({ bugs: state.bugs })
-    }
-  )
-);
-
 // src/components/FloatingButton.tsx
 var import_lucide_react = require("lucide-react");
 var import_jsx_runtime2 = require("react/jsx-runtime");
-function FloatingButton({
-  onCapture,
-  onDashboard,
-  activeBugCount,
-  showDashboardButton
-}) {
+function FloatingButton({ onCapture }) {
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
     "div",
     {
       "data-buggy-bag": "true",
-      className: "fixed bottom-6 right-6 z-[9997] flex items-center gap-2",
+      className: "fixed bottom-6 right-6 z-[9997] flex flex-col items-end gap-1",
       children: [
-        showDashboardButton && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-          "button",
-          {
-            type: "button",
-            onClick: onDashboard,
-            "aria-label": "Open Bug Dashboard",
-            className: "relative w-10 h-10 rounded-full flex items-center justify-center bg-[#1c1c1e] text-white border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.4)] hover:bg-[#2c2c2e] hover:scale-105 active:scale-95 transition-all duration-150",
-            style: { opacity: 0.88 },
-            children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_lucide_react.List, { size: 15, strokeWidth: 1.75 }),
-              activeBugCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "absolute -top-1 -right-1 w-[16px] h-[16px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none", children: activeBugCount > 9 ? "9+" : activeBugCount })
-            ]
-          }
-        ),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "text-[10px] font-mono text-white/40 select-none pr-[2px]", children: "Alt+B" }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           "button",
           {
             type: "button",
             onClick: onCapture,
-            "aria-label": "Capture Bug Screenshot",
+            "aria-label": "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
+            title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
             className: "w-12 h-12 rounded-full flex items-center justify-center bg-[#1c1c1e] text-white border border-white/10 shadow-[0_8px_28px_rgba(0,0,0,0.5),0_2px_6px_rgba(0,0,0,0.3)] hover:bg-[#2c2c2e] hover:scale-105 active:scale-95 transition-all duration-150",
             style: { opacity: 0.85 },
             children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_lucide_react.Bug, { size: 20, strokeWidth: 1.75 })
@@ -1126,7 +1092,8 @@ function DrawingToolbar({
   activeTool,
   onToolChange,
   onSave,
-  onCancel
+  onCancel,
+  saveLabel = "\u0414\u0430\u043B\u0456 \u2192"
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
     "div",
@@ -1156,7 +1123,7 @@ function DrawingToolbar({
             type: "button",
             onClick: onSave,
             className: "h-[36px] px-[18px] rounded-[10px] text-[13px] font-bold bg-[#1f1f1f] text-white hover:bg-[#303030] transition-colors",
-            children: "\u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438 \u0431\u0430\u0433"
+            children: saveLabel
           }
         ),
         /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
@@ -1225,7 +1192,8 @@ function ShapeAnnotation({
   const { x, y } = calcPosition(shape, containerWidth, containerHeight);
   const toggleVoice = () => {
     setMicError(null);
-    const SpeechRec = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    const w = window;
+    const SpeechRec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!SpeechRec) {
       setMicError("\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0454 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u0438\u0439 \u0432\u0432\u0456\u0434");
       return;
@@ -1244,14 +1212,14 @@ function ShapeAnnotation({
       const transcript = e.results[0][0].transcript;
       setText((prev) => (prev ? prev + " " + transcript : transcript).trim());
     };
-    rec.onerror = (e) => {
+    rec.onerror = (err) => {
       recRef.current = null;
       setListening(false);
-      if (e.error === "not-allowed") {
+      if (err.error === "not-allowed") {
         setMicError("\u0414\u043E\u0437\u0432\u043E\u043B\u044C\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u0434\u043E \u043C\u0456\u043A\u0440\u043E\u0444\u043E\u043D\u0430 \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0456");
-      } else if (e.error === "no-speech") {
+      } else if (err.error === "no-speech") {
         setMicError("\u041D\u0435 \u0447\u0443\u0442\u043D\u043E \u043C\u043E\u0432\u0438 \u2014 \u0441\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437");
-      } else if (e.error !== "aborted") {
+      } else if (err.error !== "aborted") {
         setMicError("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u043F\u0438\u0441\u0443 \u0433\u043E\u043B\u043E\u0441\u0443");
       }
     };
@@ -1355,25 +1323,286 @@ function ShapeAnnotation({
   );
 }
 
+// src/lib/collector.ts
+var MAX_NETWORK = 20;
+var MAX_CONSOLE = 10;
+var MAX_EVENTS = 50;
+var EVENT_WINDOW_MS = 3e4;
+var networkLog = [];
+var consoleLog = [];
+var eventLog = [];
+function pushCapped(arr, item, max) {
+  arr.push(item);
+  if (arr.length > max) arr.shift();
+}
+function recentEvents() {
+  const cutoff = Date.now() - EVENT_WINDOW_MS;
+  return eventLog.filter((e) => e.timestamp >= cutoff);
+}
+var fetchPatched = false;
+function patchFetch() {
+  if (fetchPatched || typeof window === "undefined") return;
+  fetchPatched = true;
+  const original = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const method = init?.method ?? "GET";
+    const start = Date.now();
+    try {
+      const res = await original(input, init);
+      const duration = Date.now() - start;
+      const isError = res.status >= 400;
+      const entry = {
+        url: url.length > 120 ? url.slice(0, 120) + "\u2026" : url,
+        method: method.toUpperCase(),
+        status: res.status,
+        durationMs: duration,
+        isError
+      };
+      pushCapped(networkLog, entry, MAX_NETWORK);
+      if (isError) {
+        pushCapped(eventLog, {
+          type: "network_error",
+          description: `${method.toUpperCase()} ${shortUrl(url)} \u2192 ${res.status}`,
+          timestamp: Date.now()
+        }, MAX_EVENTS);
+      }
+      return res;
+    } catch (err) {
+      const duration = Date.now() - start;
+      const entry = {
+        url: url.length > 120 ? url.slice(0, 120) + "\u2026" : url,
+        method: method.toUpperCase(),
+        status: 0,
+        durationMs: duration,
+        isError: true
+      };
+      pushCapped(networkLog, entry, MAX_NETWORK);
+      pushCapped(eventLog, {
+        type: "network_error",
+        description: `${method.toUpperCase()} ${shortUrl(url)} \u2192 network error`,
+        timestamp: Date.now()
+      }, MAX_EVENTS);
+      throw err;
+    }
+  };
+}
+function shortUrl(url) {
+  try {
+    const u = new URL(url, window.location.href);
+    return u.pathname + (u.search || "");
+  } catch {
+    return url.slice(0, 60);
+  }
+}
+var consolePaetched = false;
+function patchConsole() {
+  if (consolePaetched || typeof window === "undefined") return;
+  consolePaetched = true;
+  const levels = ["error", "warn"];
+  levels.forEach((level) => {
+    const original = console[level].bind(console);
+    console[level] = (...args) => {
+      original(...args);
+      const message = args.map((a) => {
+        if (typeof a === "string") return a;
+        if (a instanceof Error) return `${a.message}`;
+        try {
+          return JSON.stringify(a);
+        } catch {
+          return String(a);
+        }
+      }).join(" ").slice(0, 200);
+      const entry = { level, message };
+      const stack = new Error().stack ?? "";
+      const match = stack.split("\n").find((l) => !l.includes("collector") && l.includes(".tsx"));
+      if (match) {
+        const fileMatch = match.match(/([^/\\]+\.tsx?:\d+)/);
+        if (fileMatch) entry.source = fileMatch[1];
+      }
+      pushCapped(consoleLog, entry, MAX_CONSOLE);
+      if (level === "error") {
+        pushCapped(eventLog, {
+          type: "console_error",
+          description: message.slice(0, 100),
+          timestamp: Date.now()
+        }, MAX_EVENTS);
+      }
+    };
+  });
+}
+var domPatched = false;
+function patchDom() {
+  if (domPatched || typeof window === "undefined") return;
+  domPatched = true;
+  const pushState = history.pushState.bind(history);
+  history.pushState = function(...args) {
+    pushState(...args);
+    pushCapped(eventLog, {
+      type: "navigation",
+      description: `Navigated to ${window.location.pathname}`,
+      timestamp: Date.now()
+    }, MAX_EVENTS);
+  };
+  window.addEventListener("popstate", () => {
+    pushCapped(eventLog, {
+      type: "navigation",
+      description: `Back/forward to ${window.location.pathname}`,
+      timestamp: Date.now()
+    }, MAX_EVENTS);
+  });
+  document.addEventListener("click", (e) => {
+    const target = e.target;
+    if (!target) return;
+    const el = target.closest('button, a, [role="button"]');
+    if (!el) return;
+    if (el.closest("[data-buggy-bag]")) return;
+    const label = el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 40) || el.tagName.toLowerCase();
+    pushCapped(eventLog, {
+      type: "click",
+      description: `Clicked "${label}"`,
+      timestamp: Date.now()
+    }, MAX_EVENTS);
+  }, { capture: true, passive: true });
+}
+function findReactComponent(element) {
+  if (!element) return null;
+  let el = element;
+  while (el) {
+    const fiberKey = Object.keys(el).find(
+      (k) => k.startsWith("__reactFiber") || k.startsWith("__reactInternalInstance")
+    );
+    if (fiberKey) {
+      let fiber = el[fiberKey];
+      while (fiber) {
+        const name = fiber.type?.displayName || fiber.type?.name || fiber.elementType?.displayName || fiber.elementType?.name;
+        if (name && name !== "div" && !name.startsWith("_") && name.length > 1) {
+          const rawProps = fiber.memoizedProps ?? {};
+          const props = {};
+          for (const [k, v] of Object.entries(rawProps)) {
+            if (k === "children" || typeof v === "function") continue;
+            if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+              props[k] = v;
+            }
+          }
+          return { name, props: Object.keys(props).length ? props : void 0 };
+        }
+        fiber = fiber.return;
+      }
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+function readStoreSnapshot() {
+  if (typeof window === "undefined") return null;
+  const w = window;
+  const candidates = ["__store", "__zustandStore", "store", "__appStore"];
+  for (const key of candidates) {
+    if (w[key] && typeof w[key].getState === "function") {
+      try {
+        const state = w[key].getState();
+        return sanitizeSnapshot(state);
+      } catch {
+      }
+    }
+  }
+  if (w.__REDUX_DEVTOOLS_EXTENSION__) {
+    try {
+      const store = w.__REDUX_STORE__;
+      if (store?.getState) return sanitizeSnapshot(store.getState());
+    } catch {
+    }
+  }
+  return null;
+}
+function sanitizeSnapshot(state, depth = 0) {
+  if (depth > 2 || typeof state !== "object" || state === null) return {};
+  const result = {};
+  for (const [k, v] of Object.entries(state)) {
+    if (typeof v === "function") continue;
+    if (/password|token|secret|key|auth|credential/i.test(k)) {
+      result[k] = "***";
+      continue;
+    }
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean" || v === null) {
+      result[k] = v;
+    } else if (typeof v === "object") {
+      const nested = sanitizeSnapshot(v, depth + 1);
+      if (Object.keys(nested).length) result[k] = nested;
+    }
+  }
+  return result;
+}
+function calcAutoSeverity(network, console_) {
+  const has5xx = network.some((r) => r.status >= 500);
+  const has4xx = network.some((r) => r.status >= 400 && r.status < 500);
+  const hasConsoleError = console_.some((c) => c.level === "error");
+  if (has5xx) return "critical";
+  if (has4xx && hasConsoleError) return "high";
+  if (has4xx || hasConsoleError) return "medium";
+  return "low";
+}
+function initCollector() {
+  patchFetch();
+  patchConsole();
+  patchDom();
+  pushCapped(eventLog, {
+    type: "navigation",
+    description: `Opened ${window.location.pathname}`,
+    timestamp: Date.now()
+  }, MAX_EVENTS);
+}
+function collectTechContext(clickedElement) {
+  const network = [...networkLog];
+  const console_ = [...consoleLog];
+  const events = recentEvents();
+  const component = findReactComponent(clickedElement ?? null);
+  const storeSnapshot = readStoreSnapshot();
+  return {
+    route: window.location.pathname + window.location.search,
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    userAgent: navigator.userAgent,
+    component,
+    storeSnapshot,
+    networkRequests: network,
+    consoleErrors: console_,
+    eventLog: events,
+    autoSeverity: calcAutoSeverity(network, console_)
+  };
+}
+
 // src/components/CaptureMode.tsx
+var import_lucide_react4 = require("lucide-react");
 var import_jsx_runtime6 = require("react/jsx-runtime");
-function CaptureMode({ onSave, onCancel }) {
+function CaptureMode({ apiKey, onSend, onCancel }) {
   const [screenshotUrl, setScreenshotUrl] = (0, import_react4.useState)(null);
   const [tool, setTool] = (0, import_react4.useState)("rect");
   const [shapes, setShapes] = (0, import_react4.useState)([]);
   const [annotations, setAnnotations] = (0, import_react4.useState)({});
   const [pendingShape, setPendingShape] = (0, import_react4.useState)(null);
+  const [showPanel, setShowPanel] = (0, import_react4.useState)(false);
+  const [descMode, setDescMode] = (0, import_react4.useState)("text");
+  const [description, setDescription] = (0, import_react4.useState)("");
+  const [listening, setListening] = (0, import_react4.useState)(false);
+  const recRef = (0, import_react4.useRef)(null);
+  const [steps, setSteps] = (0, import_react4.useState)([]);
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
   const h = typeof window !== "undefined" ? window.innerHeight : 800;
+  const techContextRef = (0, import_react4.useRef)(collectTechContext());
+  (0, import_react4.useEffect)(() => {
+    const events = techContextRef.current.eventLog;
+    setSteps(events.map((e) => e.description));
+  }, []);
   (0, import_react4.useEffect)(() => {
     let cancelled = false;
+    const captureOpts = {
+      filter: (el) => el.getAttribute?.("data-buggy-bag") !== "true",
+      width: window.innerWidth,
+      height: window.innerHeight,
+      pixelRatio: 1
+    };
     const timer = setTimeout(async () => {
-      const captureOpts = {
-        filter: (el) => el.getAttribute?.("data-buggy-bag") !== "true",
-        width: window.innerWidth,
-        height: window.innerHeight,
-        pixelRatio: 1
-      };
       try {
         let dataUrl;
         try {
@@ -1381,14 +1610,10 @@ function CaptureMode({ onSave, onCancel }) {
         } catch {
           dataUrl = await toPng(document.body, { ...captureOpts, skipFonts: true });
         }
-        if (!cancelled) {
-          setScreenshotUrl(dataUrl);
-        }
+        if (!cancelled) setScreenshotUrl(dataUrl);
       } catch (err) {
         console.error("[BuggyBag] screenshot failed:", err);
-        if (!cancelled) {
-          onCancel();
-        }
+        if (!cancelled) onCancel();
       }
     }, 80);
     return () => {
@@ -1400,25 +1625,53 @@ function CaptureMode({ onSave, onCancel }) {
     setShapes((prev) => [...prev, shape]);
     setPendingShape(shape);
   }, []);
-  const handleAnnotationConfirm = (0, import_react4.useCallback)(
-    (shapeId, text) => {
-      setAnnotations((prev) => ({ ...prev, [shapeId]: text }));
-      setPendingShape(null);
-    },
-    []
-  );
+  const handleAnnotationConfirm = (0, import_react4.useCallback)((shapeId, text) => {
+    setAnnotations((prev) => ({ ...prev, [shapeId]: text }));
+    setPendingShape(null);
+    setShowPanel(true);
+  }, []);
   const handleAnnotationDismiss = (0, import_react4.useCallback)(() => {
     setPendingShape((pending) => {
-      if (pending) {
-        setShapes((prev) => prev.filter((s) => s.id !== pending.id));
-      }
+      if (pending) setShapes((prev) => prev.filter((s) => s.id !== pending.id));
       return null;
     });
   }, []);
-  const handleSave = (0, import_react4.useCallback)(() => {
+  const toggleVoice = (0, import_react4.useCallback)(() => {
+    const w2 = window;
+    const SR = w2.SpeechRecognition ?? w2.webkitSpeechRecognition;
+    if (!SR) return;
+    if (listening) {
+      recRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new SR();
+    rec.lang = "uk-UA";
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const transcript = Array.from(e.results).slice(e.resultIndex).map((r) => r[0].transcript).join(" ");
+      setDescription((prev) => (prev + " " + transcript).trim());
+    };
+    rec.onend = () => setListening(false);
+    rec.start();
+    recRef.current = rec;
+    setListening(true);
+  }, [listening]);
+  const handleSend = (0, import_react4.useCallback)(() => {
     if (!screenshotUrl) return;
-    onSave({ screenshotDataUrl: screenshotUrl, shapes, annotations });
-  }, [screenshotUrl, shapes, annotations, onSave]);
+    recRef.current?.stop();
+    const techContext = techContextRef.current;
+    const payload = {
+      api_key: apiKey,
+      base64_image: screenshotUrl,
+      shapes,
+      annotations,
+      description: description.trim() || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443",
+      tech_context: techContext
+    };
+    onSend(payload);
+  }, [screenshotUrl, shapes, annotations, description, apiKey, onSend]);
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
     "div",
     {
@@ -1434,16 +1687,11 @@ function CaptureMode({ onSave, onCancel }) {
             className: "absolute inset-0 w-full h-full object-cover pointer-events-none",
             draggable: false
           }
-        ) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "absolute inset-0 bg-black/50 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-          "span",
-          {
-            role: "status",
-            "aria-live": "polite",
-            className: "text-white text-[16px] font-bold animate-pulse",
-            children: "\u0417\u043D\u0456\u043C\u043E\u043A \u0435\u043A\u0440\u0430\u043D\u0443..."
-          }
-        ) }),
-        screenshotUrl && !pendingShape && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        ) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-white/90 text-[15px] font-semibold animate-pulse", children: "\u23F8 \u0417\u0430\u043C\u043E\u0440\u043E\u0436\u0443\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443..." }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-white/40 text-[12px]", children: "\u0417\u0431\u0438\u0440\u0430\u044E \u0442\u0435\u0445\u043D\u0456\u0447\u043D\u0438\u0439 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442" })
+        ] }),
+        screenshotUrl && !pendingShape && !showPanel && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
           DrawingCanvas,
           {
             width: w,
@@ -1463,606 +1711,248 @@ function CaptureMode({ onSave, onCancel }) {
             onDismiss: handleAnnotationDismiss
           }
         ),
-        screenshotUrl && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        screenshotUrl && !showPanel && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
           DrawingToolbar,
           {
             activeTool: tool,
             onToolChange: setTool,
-            onSave: handleSave,
-            onCancel
+            onSave: () => setShowPanel(true),
+            onCancel,
+            saveLabel: "\u0414\u0430\u043B\u0456 \u2192"
+          }
+        ),
+        screenshotUrl && showPanel && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          "div",
+          {
+            className: "absolute inset-0 flex items-end justify-center pb-6",
+            style: { background: "rgba(0,0,0,0.55)" },
+            onClick: () => {
+            },
+            children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+              "div",
+              {
+                className: "w-full max-w-[520px] mx-4 rounded-[20px] overflow-hidden",
+                style: { background: "#1c1c1e", border: "1px solid rgba(255,255,255,0.1)" },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-4 py-3 border-b border-white/[0.07] flex items-center gap-2 flex-wrap", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] font-mono text-white/30", children: techContextRef.current.route }),
+                    techContextRef.current.component && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] bg-indigo-500/20 text-indigo-300 rounded px-2 py-0.5 font-mono", children: techContextRef.current.component.name }),
+                    techContextRef.current.networkRequests.filter((r) => r.isError).map((r, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-[10px] bg-red-500/20 text-red-300 rounded px-2 py-0.5 font-mono", children: [
+                      r.status,
+                      " ",
+                      r.url.split("/").slice(-2).join("/")
+                    ] }, i)),
+                    techContextRef.current.consoleErrors.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-[10px] bg-amber-500/20 text-amber-300 rounded px-2 py-0.5", children: [
+                      techContextRef.current.consoleErrors.length,
+                      " console error",
+                      techContextRef.current.consoleErrors.length > 1 ? "s" : ""
+                    ] })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex border-b border-white/[0.07]", children: ["text", "voice"].map((m) => {
+                    const Icon = m === "text" ? import_lucide_react4.AlignLeft : import_lucide_react4.Mic;
+                    const label = m === "text" ? "\u0422\u0435\u043A\u0441\u0442" : "\u0413\u043E\u043B\u043E\u0441";
+                    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+                      "button",
+                      {
+                        type: "button",
+                        onClick: () => setDescMode(m),
+                        className: "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold transition-colors",
+                        style: {
+                          color: descMode === m ? "#fff" : "rgba(255,255,255,0.35)",
+                          borderBottom: descMode === m ? "2px solid #818cf8" : "2px solid transparent"
+                        },
+                        children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Icon, { size: 13 }),
+                          label
+                        ]
+                      },
+                      m
+                    );
+                  }) }),
+                  descMode === "text" && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "px-4 pt-3 pb-2", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                    "textarea",
+                    {
+                      value: description,
+                      onChange: (e) => setDescription(e.target.value),
+                      placeholder: "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u0449\u043E \u043D\u0435 \u0442\u0430\u043A...",
+                      autoFocus: true,
+                      rows: 3,
+                      className: "w-full bg-white/5 rounded-[10px] text-[13px] text-white placeholder:text-white/25 resize-none outline-none border border-white/[0.08] focus:border-white/20 p-3 transition-colors"
+                    }
+                  ) }),
+                  descMode === "voice" && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "px-4 pt-3 pb-2", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-start gap-3", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                      "button",
+                      {
+                        type: "button",
+                        onClick: toggleVoice,
+                        className: "w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors mt-0.5",
+                        style: { background: listening ? "#ef4444" : "rgba(255,255,255,0.08)" },
+                        title: listening ? "\u0417\u0443\u043F\u0438\u043D\u0438\u0442\u0438" : "\u0417\u0430\u043F\u0438\u0441\u0430\u0442\u0438 \u0433\u043E\u043B\u043E\u0441",
+                        children: listening ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_lucide_react4.MicOff, { size: 16, className: "text-white" }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_lucide_react4.Mic, { size: 16, className: "text-white/70" })
+                      }
+                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-[11px] text-white/40 mb-1", children: listening ? "\u0421\u043B\u0443\u0445\u0430\u044E..." : "\u041D\u0430\u0442\u0438\u0441\u043D\u0438 \u0449\u043E\u0431 \u0437\u0430\u043F\u0438\u0441\u0430\u0442\u0438" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-[13px] text-white min-h-[40px]", children: description || /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-white/25", children: "\u0422\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0446\u0456\u044F \u0437'\u044F\u0432\u0438\u0442\u044C\u0441\u044F \u0442\u0443\u0442..." }) })
+                    ] })
+                  ] }) }),
+                  steps.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-4 pb-3", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-1.5 mb-1.5", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_lucide_react4.List, { size: 11, className: "text-white/30" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] text-white/30 uppercase tracking-wider font-semibold", children: "\u041A\u0440\u043E\u043A\u0438 \u0432\u0456\u0434\u0442\u0432\u043E\u0440\u0435\u043D\u043D\u044F (\u0430\u0432\u0442\u043E)" })
+                    ] }),
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "bg-white/[0.04] rounded-[8px] px-3 py-2 max-h-[80px] overflow-y-auto", children: steps.slice(-5).map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("p", { className: "text-[11px] text-white/50 font-mono leading-relaxed", children: [
+                      i + 1,
+                      ". ",
+                      step
+                    ] }, i)) })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex gap-2 px-4 pb-4", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                      "button",
+                      {
+                        type: "button",
+                        onClick: () => setShowPanel(false),
+                        className: "px-4 py-2 rounded-[10px] text-[12px] font-semibold text-white/50 transition-colors",
+                        style: { background: "rgba(255,255,255,0.06)" },
+                        children: "\u2190 \u041D\u0430\u0437\u0430\u0434"
+                      }
+                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                      "button",
+                      {
+                        type: "button",
+                        onClick: onCancel,
+                        className: "px-4 py-2 rounded-[10px] text-[12px] font-semibold text-white/50 transition-colors",
+                        style: { background: "rgba(255,255,255,0.06)" },
+                        children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438"
+                      }
+                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                      "button",
+                      {
+                        type: "button",
+                        onClick: handleSend,
+                        disabled: !screenshotUrl,
+                        className: "flex-1 py-2 rounded-[10px] text-[13px] font-bold text-white transition-colors disabled:opacity-40",
+                        style: { background: "#4f46e5" },
+                        children: "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u043D\u0430 \u043F\u043E\u0440\u0442\u0430\u043B \u2192"
+                      }
+                    )
+                  ] })
+                ]
+              }
+            )
           }
         )
       ]
     }
   );
-}
-
-// src/components/Dashboard.tsx
-var import_react8 = require("react");
-
-// src/components/ui/Dialog.tsx
-var import_react5 = require("react");
-var import_lucide_react4 = require("lucide-react");
-var import_jsx_runtime7 = require("react/jsx-runtime");
-var SIZE_MAP = {
-  sm: "max-w-[480px]",
-  md: "max-w-[640px]",
-  lg: "max-w-[900px]",
-  xl: "max-w-[1200px]"
-};
-function Dialog({ isOpen, onClose, title, children, size = "md" }) {
-  (0, import_react5.useEffect)(() => {
-    if (!isOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [isOpen]);
-  if (!isOpen) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-    "div",
-    {
-      className: "fixed inset-0 z-[9998] flex items-start justify-center bg-black/40 backdrop-blur-sm pt-12 overflow-y-auto",
-      onClick: onClose,
-      children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
-        "div",
-        {
-          className: `bg-white rounded-[24px] shadow-[0_25px_50px_rgba(0,0,0,0.15)] w-full mx-4 ${SIZE_MAP[size]}`,
-          onClick: (e) => e.stopPropagation(),
-          children: [
-            title && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#f0f0f0]", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h2", { className: "text-[18px] font-bold text-[#1f1f1f]", children: title }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-                "button",
-                {
-                  onClick: onClose,
-                  "aria-label": "Close",
-                  className: "p-1 text-[#9a9a9a] hover:text-[#1f1f1f] hover:bg-[#f4f4f5] rounded-[8px] transition-colors",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_lucide_react4.X, { size: 20 })
-                }
-              )
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-6 py-5 overflow-y-auto max-h-[calc(100vh-200px)]", children })
-          ]
-        }
-      )
-    }
-  );
-}
-
-// src/components/BugCard.tsx
-var import_react6 = require("react");
-var import_lucide_react5 = require("lucide-react");
-
-// src/components/ui/Surface.tsx
-var import_jsx_runtime8 = require("react/jsx-runtime");
-var VARIANTS = {
-  panel: "bg-[#f4f4f5] rounded-[16px]",
-  card: "bg-white rounded-[16px]",
-  inset: "bg-[#f0f0f0] rounded-[16px]"
-};
-var PADDING = {
-  none: "",
-  sm: "p-[12px]",
-  md: "p-[16px]",
-  lg: "p-[20px]",
-  xl: "p-[24px]"
-};
-function Surface({
-  variant = "panel",
-  padding = "md",
-  className = "",
-  children
-}) {
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: `${VARIANTS[variant]} ${PADDING[padding]} ${className}`, children });
-}
-
-// src/components/ui/Button.tsx
-var import_jsx_runtime9 = require("react/jsx-runtime");
-var SIZES = {
-  sm: "h-[28px] px-[12px] text-[12px] rounded-[10px]",
-  md: "h-[32px] px-[16px] text-[13px] rounded-[10px]",
-  lg: "h-[36px] px-[18px] text-[13px] rounded-[10px]",
-  icon: "w-[32px] h-[32px] rounded-[10px] p-0"
-};
-var VARIANTS2 = {
-  primary: "bg-[#1f1f1f] text-white hover:bg-[#303030]",
-  secondary: "bg-[#f5f5f5] text-[#1f1f1f] hover:bg-[#ebebeb]",
-  ghost: "bg-transparent text-[#9a9a9a] hover:text-[#1f1f1f] hover:bg-[#f0f0f0]",
-  danger: "bg-[#ef4444] text-white hover:bg-[#dc2626]"
-};
-function Button({
-  children,
-  variant = "primary",
-  size = "lg",
-  icon: Icon,
-  className = "",
-  ...props
-}) {
-  const iconSize = size === "lg" ? 16 : size === "sm" ? 12 : 14;
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
-    "button",
-    {
-      type: "button",
-      className: `inline-flex items-center justify-center gap-[6px] font-bold leading-none transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${SIZES[size]} ${VARIANTS2[variant]} ${className}`,
-      ...props,
-      children: [
-        Icon && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Icon, { size: iconSize }),
-        children && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: size === "icon" ? "sr-only" : "", children })
-      ]
-    }
-  );
-}
-
-// src/components/BugCard.tsx
-var import_jsx_runtime10 = require("react/jsx-runtime");
-function pluralizeShapes(n) {
-  const abs = Math.abs(n);
-  if (abs % 100 >= 11 && abs % 100 <= 14) return "\u0444\u0456\u0433\u0443\u0440";
-  switch (abs % 10) {
-    case 1:
-      return "\u0444\u0456\u0433\u0443\u0440\u0430";
-    case 2:
-    case 3:
-    case 4:
-      return "\u0444\u0456\u0433\u0443\u0440\u0438";
-    default:
-      return "\u0444\u0456\u0433\u0443\u0440";
-  }
-}
-var STATUS_LABEL = {
-  active: "\u0410\u043A\u0442\u0438\u0432\u043D\u0438\u0439",
-  fixed: "\u0412\u0438\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0439",
-  archived: "\u0410\u0440\u0445\u0456\u0432"
-};
-var STATUS_COLOR = {
-  active: "bg-[#fef3c7] text-[#92400e]",
-  fixed: "bg-[#dcfce7] text-[#166534]",
-  archived: "bg-[#f4f4f5] text-[#9a9a9a]"
-};
-function BugCard({ bug, onStatusChange }) {
-  const [expanded, setExpanded] = (0, import_react6.useState)(false);
-  const notes = Object.entries(bug.annotations).filter(([, v]) => v.trim());
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(Surface, { variant: "panel", padding: "md", className: "flex flex-col gap-3", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-start gap-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-        "img",
-        {
-          src: bug.screenshotDataUrl,
-          alt: "Bug screenshot thumbnail",
-          className: "w-[80px] h-[52px] rounded-[10px] object-cover shrink-0 border border-[#e9e9e9]"
-        }
-      ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex-1 min-w-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex items-center gap-2 mb-1 flex-wrap", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-            "span",
-            {
-              className: `inline-flex items-center h-[22px] px-[10px] rounded-full text-[11px] font-bold ${STATUS_COLOR[bug.status]}`,
-              children: STATUS_LABEL[bug.status]
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-[11px] text-[#9a9a9a]", children: new Date(bug.createdAt).toLocaleDateString("uk-UA", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-          }) })
-        ] }),
-        notes[0] && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-[13px] text-[#1f1f1f] line-clamp-2 leading-snug", children: notes[0][1] }),
-        notes.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-[13px] text-[#9a9a9a] italic", children: "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-        "button",
-        {
-          type: "button",
-          onClick: () => setExpanded((v) => !v),
-          "aria-label": expanded ? "Collapse bug details" : "Expand bug details",
-          "aria-expanded": expanded,
-          className: "p-1 text-[#9a9a9a] hover:text-[#1f1f1f] hover:bg-[#f0f0f0] rounded-[8px] transition-colors shrink-0",
-          children: expanded ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react5.ChevronUp, { size: 16 }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_lucide_react5.ChevronDown, { size: 16 })
-        }
-      )
-    ] }),
-    expanded && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-col gap-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-        "img",
-        {
-          src: bug.screenshotDataUrl,
-          alt: "Full bug screenshot",
-          className: "w-full rounded-[10px] border border-[#e9e9e9] max-h-[300px] object-contain bg-[#f4f4f5]"
-        }
-      ),
-      notes.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex flex-col gap-1", children: notes.map(([id, text]) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Surface, { variant: "inset", padding: "sm", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-[12px] text-[#1f1f1f] leading-relaxed", children: text }) }, id)) }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("p", { className: "text-[11px] text-[#9a9a9a]", children: [
-        bug.shapes.length,
-        " ",
-        pluralizeShapes(bug.shapes.length),
-        " \u043D\u0430\u043C\u0430\u043B\u044C\u043E\u0432\u0430\u043D\u043E"
-      ] })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex gap-2 flex-wrap", children: [
-      bug.status === "active" && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-          Button,
-          {
-            variant: "secondary",
-            size: "sm",
-            icon: import_lucide_react5.CheckCircle,
-            onClick: () => onStatusChange(bug.id, "fixed"),
-            children: "\u0412\u0438\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0439"
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-          Button,
-          {
-            variant: "ghost",
-            size: "sm",
-            icon: import_lucide_react5.Archive,
-            onClick: () => onStatusChange(bug.id, "archived"),
-            children: "\u0410\u0440\u0445\u0456\u0432"
-          }
-        )
-      ] }),
-      (bug.status === "fixed" || bug.status === "archived") && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-        Button,
-        {
-          variant: "ghost",
-          size: "sm",
-          icon: import_lucide_react5.RotateCcw,
-          onClick: () => onStatusChange(bug.id, "active"),
-          children: "\u041F\u043E\u0432\u0435\u0440\u043D\u0443\u0442\u0438 \u0432 Active"
-        }
-      )
-    ] })
-  ] });
-}
-
-// src/components/AIReport.tsx
-var import_react7 = require("react");
-var import_lucide_react6 = require("lucide-react");
-var import_jsx_runtime11 = require("react/jsx-runtime");
-function AIReport({ isOpen, onClose, activeBugs, aiEndpoint, onAfterReport }) {
-  const [prompt, setPrompt] = (0, import_react7.useState)("");
-  const [loading, setLoading] = (0, import_react7.useState)(false);
-  const [copied, setCopied] = (0, import_react7.useState)(false);
-  const [error, setError] = (0, import_react7.useState)(null);
-  const copyTimeoutRef = (0, import_react7.useRef)(null);
-  const handleClose = () => {
-    setPrompt("");
-    setError(null);
-    setCopied(false);
-    setLoading(false);
-    onClose();
-  };
-  const generate = async () => {
-    if (loading) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(aiEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bugs: activeBugs.map((b) => ({
-            id: b.id,
-            screenshotDataUrl: b.screenshotDataUrl,
-            annotations: b.annotations,
-            shapes: b.shapes,
-            createdAt: b.createdAt
-          }))
-        })
-      });
-      if (!res.ok) {
-        throw new Error(`Server responded with ${res.status}`);
-      }
-      const data = await res.json();
-      const promptText = data !== null && typeof data === "object" && "prompt" in data && typeof data.prompt === "string" ? data.prompt : JSON.stringify(data, null, 2);
-      setPrompt(promptText);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "\u041D\u0435\u0432\u0456\u0434\u043E\u043C\u0430 \u043F\u043E\u043C\u0438\u043B\u043A\u0430");
-    } finally {
-      setLoading(false);
-    }
-  };
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2e3);
-    } catch {
-      setError("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0441\u043A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438 \u0432 \u0431\u0443\u0444\u0435\u0440 \u043E\u0431\u043C\u0456\u043D\u0443");
-    }
-  };
-  (0, import_react7.useEffect)(() => {
-    return () => {
-      if (copyTimeoutRef.current !== null) {
-        clearTimeout(copyTimeoutRef.current);
-      }
-    };
-  }, []);
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(Dialog, { isOpen, onClose: handleClose, title: "AI \u0411\u0430\u0433-\u0440\u0435\u043F\u043E\u0440\u0442", size: "lg", children: [
-    !prompt && !loading && !error && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "py-8 text-center", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[14px] text-[#9a9a9a] mb-1", children: "\u0410\u043A\u0442\u0438\u0432\u043D\u0438\u0445 \u0431\u0430\u0433\u0456\u0432 \u0434\u043B\u044F \u0430\u043D\u0430\u043B\u0456\u0437\u0443:" }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[32px] font-bold text-[#1f1f1f] mb-6 leading-none", children: activeBugs.length }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[13px] text-[#9a9a9a] mb-6 max-w-[340px] mx-auto", children: "\u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \xAB\u0413\u0435\u043D\u0435\u0440\u0443\u0432\u0430\u0442\u0438\xBB, \u0449\u043E\u0431 \u043D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u0441\u043A\u0440\u0456\u043D\u0448\u043E\u0442\u0438 \u0442\u0430 \u043E\u043F\u0438\u0441 \u0431\u0430\u0433\u0456\u0432 \u0430\u0433\u0435\u043D\u0442\u0443 Antigravity \u0456 \u043E\u0442\u0440\u0438\u043C\u0430\u0442\u0438 \u0433\u043E\u0442\u043E\u0432\u0438\u0439 \u043F\u0440\u043E\u043C\u043F\u0442." }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-        "button",
-        {
-          type: "button",
-          onClick: generate,
-          className: "h-[44px] px-[28px] rounded-[12px] text-[14px] font-bold bg-[#1f1f1f] text-white hover:bg-[#303030] transition-colors",
-          children: "\u0413\u0435\u043D\u0435\u0440\u0443\u0432\u0430\u0442\u0438"
-        }
-      )
-    ] }),
-    loading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
-      "div",
-      {
-        role: "status",
-        "aria-live": "polite",
-        className: "flex items-center justify-center gap-3 py-12 text-[#9a9a9a]",
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_lucide_react6.Loader, { size: 20, className: "animate-spin", "aria-hidden": "true" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[14px]", children: "\u0413\u0435\u043D\u0435\u0440\u0443\u0454\u0442\u044C\u0441\u044F \u043F\u0440\u043E\u043C\u043F\u0442..." })
-        ]
-      }
-    ),
-    error && !loading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col gap-4", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "rounded-[12px] bg-[#fee2e2] p-4 text-[13px] text-[#991b1b]", children: error }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-        "button",
-        {
-          type: "button",
-          onClick: generate,
-          className: "h-[40px] px-[20px] rounded-[10px] text-[13px] font-bold bg-[#f5f5f5] text-[#1f1f1f] hover:bg-[#ebebeb] transition-colors self-start",
-          children: "\u0421\u043F\u0440\u043E\u0431\u0443\u0432\u0430\u0442\u0438 \u0449\u0435 \u0440\u0430\u0437"
-        }
-      )
-    ] }),
-    prompt && !loading && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col gap-4", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "relative", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-        "textarea",
-        {
-          readOnly: true,
-          value: prompt,
-          rows: 16,
-          "aria-label": "Generated AI prompt",
-          className: "w-full resize-none rounded-[12px] bg-[#f4f4f5] p-4 font-mono text-[12px] text-[#1f1f1f] outline-none leading-relaxed"
-        }
-      ) }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-3", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-          "button",
-          {
-            type: "button",
-            onClick: copyToClipboard,
-            className: "flex flex-1 h-[44px] items-center justify-center gap-2 rounded-[12px] bg-[#1f1f1f] text-[14px] font-bold text-white transition-colors hover:bg-[#303030]",
-            children: copied ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_lucide_react6.Check, { size: 16, "aria-hidden": "true" }),
-              "\u0421\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E!"
-            ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_lucide_react6.Copy, { size: 16, "aria-hidden": "true" }),
-              "\u0421\u043A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438 \u0434\u043B\u044F Antigravity"
-            ] })
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-          "button",
-          {
-            type: "button",
-            onClick: generate,
-            className: "h-[44px] px-[20px] rounded-[12px] text-[13px] font-bold bg-[#f5f5f5] text-[#1f1f1f] hover:bg-[#ebebeb] transition-colors",
-            children: "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0438"
-          }
-        )
-      ] }),
-      onAfterReport && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-        "button",
-        {
-          type: "button",
-          onClick: onAfterReport,
-          className: "w-full h-[40px] rounded-[12px] text-[13px] font-bold bg-[#f4f4f5] text-[#9a9a9a] hover:bg-[#e9e9e9] hover:text-[#1f1f1f] transition-colors",
-          children: "\u0410\u0440\u0445\u0456\u0432\u0443\u0432\u0430\u0442\u0438 \u0432\u0438\u0431\u0440\u0430\u043D\u0456 \u0431\u0430\u0433\u0438"
-        }
-      )
-    ] })
-  ] });
-}
-
-// src/components/Dashboard.tsx
-var import_jsx_runtime12 = require("react/jsx-runtime");
-var FILTERS = [
-  { value: "all", label: "\u0423\u0441\u0456" },
-  { value: "active", label: "Active" },
-  { value: "fixed", label: "Fixed" },
-  { value: "archived", label: "Archived" }
-];
-function Dashboard({ isOpen, onClose, bugs, onStatusChange, aiEndpoint }) {
-  const [filter, setFilter] = (0, import_react8.useState)("all");
-  const [showAIReport, setShowAIReport] = (0, import_react8.useState)(false);
-  const [selectedIds, setSelectedIds] = (0, import_react8.useState)(/* @__PURE__ */ new Set());
-  const filtered = filter === "all" ? bugs : bugs.filter((b) => b.status === filter);
-  const activeBugs = bugs.filter((b) => b.status === "active");
-  const countFor = (status) => bugs.filter((b) => b.status === status).length;
-  const toggleSelect = (id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-  const toggleAll = () => {
-    const activeIds = activeBugs.map((b) => b.id);
-    if (selectedIds.size === activeIds.length) {
-      setSelectedIds(/* @__PURE__ */ new Set());
-    } else {
-      setSelectedIds(new Set(activeIds));
-    }
-  };
-  const selectedBugs = activeBugs.filter((b) => selectedIds.has(b.id));
-  const handleGenerateReport = () => {
-    if (selectedIds.size === 0) {
-      setSelectedIds(new Set(activeBugs.map((b) => b.id)));
-    }
-    setShowAIReport(true);
-  };
-  const handleAfterReport = () => {
-    for (const id of selectedIds) {
-      onStatusChange(id, "archived");
-    }
-    setSelectedIds(/* @__PURE__ */ new Set());
-    setShowAIReport(false);
-  };
-  const handleClose = () => {
-    setFilter("all");
-    setShowAIReport(false);
-    setSelectedIds(/* @__PURE__ */ new Set());
-    onClose();
-  };
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_jsx_runtime12.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(Dialog, { isOpen, onClose: handleClose, title: "Bug Inbox", size: "lg", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex gap-1 mb-4 bg-[#f4f4f5] rounded-[12px] p-1", children: FILTERS.map(({ value, label }) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
-        "button",
-        {
-          type: "button",
-          onClick: () => setFilter(value),
-          "aria-pressed": filter === value,
-          className: `flex-1 h-[32px] rounded-[10px] text-[13px] font-bold transition-colors ${filter === value ? "bg-white text-[#1f1f1f] shadow-sm" : "text-[#9a9a9a] hover:text-[#1f1f1f]"}`,
-          children: [
-            label,
-            value !== "all" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "ml-1 text-[11px] opacity-60", children: [
-              "(",
-              countFor(value),
-              ")"
-            ] })
-          ]
-        },
-        value
-      )) }),
-      activeBugs.length > 0 && (filter === "all" || filter === "active") && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex items-center gap-2 mb-3 px-1", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
-        "button",
-        {
-          type: "button",
-          onClick: toggleAll,
-          className: "flex items-center gap-2 text-[12px] text-[#9a9a9a] hover:text-[#1f1f1f] transition-colors",
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: `w-[16px] h-[16px] rounded-[4px] border-2 flex items-center justify-center shrink-0 transition-colors ${selectedIds.size === activeBugs.length && activeBugs.length > 0 ? "bg-[#1f1f1f] border-[#1f1f1f]" : "border-[#d4d4d4]"}`, children: selectedIds.size === activeBugs.length && activeBugs.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("svg", { width: "9", height: "7", viewBox: "0 0 9 7", fill: "none", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M1 3L3.5 5.5L8 1", stroke: "white", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }) }) }),
-            selectedIds.size > 0 ? `\u0412\u0438\u0431\u0440\u0430\u043D\u043E ${selectedIds.size}` : "\u0412\u0438\u0431\u0440\u0430\u0442\u0438 \u0432\u0441\u0456 \u0430\u043A\u0442\u0438\u0432\u043D\u0456"
-          ]
-        }
-      ) }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex flex-col gap-3", children: filtered.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "py-12 text-center text-[14px] text-[#9a9a9a]", children: "\u041D\u0435\u043C\u0430\u0454 \u0431\u0430\u0433\u0456\u0432 \u0443 \u0446\u044C\u043E\u043C\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0456" }) : filtered.map((bug) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex items-start gap-2", children: [
-        bug.status === "active" && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-          "button",
-          {
-            type: "button",
-            onClick: () => toggleSelect(bug.id),
-            className: "mt-[14px] shrink-0",
-            "aria-label": selectedIds.has(bug.id) ? "Deselect bug" : "Select bug",
-            children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: `w-[16px] h-[16px] rounded-[4px] border-2 flex items-center justify-center transition-colors ${selectedIds.has(bug.id) ? "bg-[#1f1f1f] border-[#1f1f1f]" : "border-[#d4d4d4]"}`, children: selectedIds.has(bug.id) && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("svg", { width: "9", height: "7", viewBox: "0 0 9 7", fill: "none", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M1 3L3.5 5.5L8 1", stroke: "white", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }) }) })
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: bug.status === "active" ? "flex-1 min-w-0" : "flex-1 min-w-0 pl-[24px]", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(BugCard, { bug, onStatusChange }) })
-      ] }, bug.id)) }),
-      activeBugs.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "mt-6 pt-4 border-t border-[#f0f0f0]", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        "button",
-        {
-          type: "button",
-          onClick: handleGenerateReport,
-          className: "w-full h-[44px] rounded-[12px] text-[14px] font-bold bg-[#1f1f1f] text-white hover:bg-[#303030] transition-colors",
-          children: selectedIds.size > 0 ? `\u0411\u0430\u0433-\u0440\u0435\u043F\u043E\u0440\u0442 \u0434\u043B\u044F \u0432\u0438\u0431\u0440\u0430\u043D\u0438\u0445 (${selectedIds.size})` : `\u0411\u0430\u0433-\u0440\u0435\u043F\u043E\u0440\u0442 \u0434\u043B\u044F \u0432\u0441\u0456\u0445 (${activeBugs.length})`
-        }
-      ) })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-      AIReport,
-      {
-        isOpen: showAIReport,
-        onClose: () => setShowAIReport(false),
-        activeBugs: selectedBugs.length > 0 ? selectedBugs : activeBugs,
-        aiEndpoint,
-        onAfterReport: handleAfterReport
-      }
-    )
-  ] });
 }
 
 // src/styles.gen.ts
-var styles = '.container {\n    width: 100%\n}\n@media (min-width: 640px) {\n    .container {\n        max-width: 640px\n    }\n}\n@media (min-width: 768px) {\n    .container {\n        max-width: 768px\n    }\n}\n@media (min-width: 1024px) {\n    .container {\n        max-width: 1024px\n    }\n}\n@media (min-width: 1280px) {\n    .container {\n        max-width: 1280px\n    }\n}\n@media (min-width: 1536px) {\n    .container {\n        max-width: 1536px\n    }\n}\n.sr-only {\n    position: absolute;\n    width: 1px;\n    height: 1px;\n    padding: 0;\n    margin: -1px;\n    overflow: hidden;\n    clip: rect(0, 0, 0, 0);\n    white-space: nowrap;\n    border-width: 0\n}\n.pointer-events-none {\n    pointer-events: none\n}\n.visible {\n    visibility: visible\n}\n.fixed {\n    position: fixed\n}\n.absolute {\n    position: absolute\n}\n.relative {\n    position: relative\n}\n.inset-0 {\n    inset: 0px\n}\n.-right-1 {\n    right: -0.25rem\n}\n.-top-1 {\n    top: -0.25rem\n}\n.bottom-6 {\n    bottom: 1.5rem\n}\n.left-1 {\n    left: 0.25rem\n}\n.left-1\\/2 {\n    left: 50%\n}\n.left-\\[12px\\] {\n    left: 12px\n}\n.right-6 {\n    right: 1.5rem\n}\n.top-1 {\n    top: 0.25rem\n}\n.top-1\\/2 {\n    top: 50%\n}\n.top-4 {\n    top: 1rem\n}\n.z-\\[10000\\] {\n    z-index: 10000\n}\n.z-\\[10001\\] {\n    z-index: 10001\n}\n.z-\\[10002\\] {\n    z-index: 10002\n}\n.z-\\[9997\\] {\n    z-index: 9997\n}\n.z-\\[9998\\] {\n    z-index: 9998\n}\n.mx-1 {\n    margin-left: 0.25rem;\n    margin-right: 0.25rem\n}\n.mx-4 {\n    margin-left: 1rem;\n    margin-right: 1rem\n}\n.mx-auto {\n    margin-left: auto;\n    margin-right: auto\n}\n.mb-1 {\n    margin-bottom: 0.25rem\n}\n.mb-2 {\n    margin-bottom: 0.5rem\n}\n.mb-3 {\n    margin-bottom: 0.75rem\n}\n.mb-4 {\n    margin-bottom: 1rem\n}\n.mb-6 {\n    margin-bottom: 1.5rem\n}\n.ml-1 {\n    margin-left: 0.25rem\n}\n.mt-1 {\n    margin-top: 0.25rem\n}\n.mt-2 {\n    margin-top: 0.5rem\n}\n.mt-6 {\n    margin-top: 1.5rem\n}\n.mt-\\[14px\\] {\n    margin-top: 14px\n}\n.line-clamp-2 {\n    overflow: hidden;\n    display: -webkit-box;\n    -webkit-box-orient: vertical;\n    -webkit-line-clamp: 2\n}\n.block {\n    display: block\n}\n.flex {\n    display: flex\n}\n.inline-flex {\n    display: inline-flex\n}\n.hidden {\n    display: none\n}\n.h-10 {\n    height: 2.5rem\n}\n.h-12 {\n    height: 3rem\n}\n.h-6 {\n    height: 1.5rem\n}\n.h-\\[16px\\] {\n    height: 16px\n}\n.h-\\[22px\\] {\n    height: 22px\n}\n.h-\\[28px\\] {\n    height: 28px\n}\n.h-\\[32px\\] {\n    height: 32px\n}\n.h-\\[36px\\] {\n    height: 36px\n}\n.h-\\[40px\\] {\n    height: 40px\n}\n.h-\\[44px\\] {\n    height: 44px\n}\n.h-\\[52px\\] {\n    height: 52px\n}\n.h-full {\n    height: 100%\n}\n.max-h-\\[300px\\] {\n    max-height: 300px\n}\n.max-h-\\[calc\\(100vh-200px\\)\\] {\n    max-height: calc(100vh - 200px)\n}\n.w-10 {\n    width: 2.5rem\n}\n.w-12 {\n    width: 3rem\n}\n.w-\\[16px\\] {\n    width: 16px\n}\n.w-\\[288px\\] {\n    width: 288px\n}\n.w-\\[32px\\] {\n    width: 32px\n}\n.w-\\[36px\\] {\n    width: 36px\n}\n.w-\\[80px\\] {\n    width: 80px\n}\n.w-full {\n    width: 100%\n}\n.w-px {\n    width: 1px\n}\n.min-w-0 {\n    min-width: 0px\n}\n.max-w-\\[1200px\\] {\n    max-width: 1200px\n}\n.max-w-\\[340px\\] {\n    max-width: 340px\n}\n.max-w-\\[480px\\] {\n    max-width: 480px\n}\n.max-w-\\[640px\\] {\n    max-width: 640px\n}\n.max-w-\\[900px\\] {\n    max-width: 900px\n}\n.flex-1 {\n    flex: 1 1 0%\n}\n.flex-shrink {\n    flex-shrink: 1\n}\n.shrink-0 {\n    flex-shrink: 0\n}\n.-translate-x-1 {\n    --tw-translate-x: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-x-1\\/2 {\n    --tw-translate-x: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1 {\n    --tw-translate-y: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1\\/2 {\n    --tw-translate-y: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.transform {\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n@keyframes pulse {\n    50% {\n        opacity: .5\n    }\n}\n.animate-pulse {\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\n@keyframes spin {\n    to {\n        transform: rotate(360deg)\n    }\n}\n.animate-spin {\n    animation: spin 1s linear infinite\n}\n.cursor-default {\n    cursor: default\n}\n.resize-none {\n    resize: none\n}\n.resize {\n    resize: both\n}\n.flex-col {\n    flex-direction: column\n}\n.flex-wrap {\n    flex-wrap: wrap\n}\n.items-start {\n    align-items: flex-start\n}\n.items-center {\n    align-items: center\n}\n.justify-center {\n    justify-content: center\n}\n.justify-between {\n    justify-content: space-between\n}\n.gap-1 {\n    gap: 0.25rem\n}\n.gap-2 {\n    gap: 0.5rem\n}\n.gap-3 {\n    gap: 0.75rem\n}\n.gap-4 {\n    gap: 1rem\n}\n.gap-\\[6px\\] {\n    gap: 6px\n}\n.self-start {\n    align-self: flex-start\n}\n.overflow-y-auto {\n    overflow-y: auto\n}\n.rounded-\\[10px\\] {\n    border-radius: 10px\n}\n.rounded-\\[12px\\] {\n    border-radius: 12px\n}\n.rounded-\\[16px\\] {\n    border-radius: 16px\n}\n.rounded-\\[24px\\] {\n    border-radius: 24px\n}\n.rounded-\\[4px\\] {\n    border-radius: 4px\n}\n.rounded-\\[8px\\] {\n    border-radius: 8px\n}\n.rounded-full {\n    border-radius: 9999px\n}\n.border {\n    border-width: 1px\n}\n.border-2 {\n    border-width: 2px\n}\n.border-b {\n    border-bottom-width: 1px\n}\n.border-t {\n    border-top-width: 1px\n}\n.border-\\[\\#1f1f1f\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(31 31 31 / var(--tw-border-opacity, 1))\n}\n.border-\\[\\#d4d4d4\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(212 212 212 / var(--tw-border-opacity, 1))\n}\n.border-\\[\\#e9e9e9\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(233 233 233 / var(--tw-border-opacity, 1))\n}\n.border-\\[\\#f0f0f0\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\n.border-red-500 {\n    --tw-border-opacity: 1;\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\n.border-transparent {\n    border-color: transparent\n}\n.border-white {\n    --tw-border-opacity: 1;\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\n.border-white\\/10 {\n    border-color: rgb(255 255 255 / 0.1)\n}\n.bg-\\[\\#1c1c1e\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(28 28 30 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#1f1f1f\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#dcfce7\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 252 231 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#e9e9e9\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#ef4444\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f0f0f0\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f4f4f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f5f5f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#fee2e2\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 226 226 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#fef3c7\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 243 199 / var(--tw-bg-opacity, 1))\n}\n.bg-black {\n    --tw-bg-opacity: 1;\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\n.bg-black\\/40 {\n    background-color: rgb(0 0 0 / 0.4)\n}\n.bg-black\\/50 {\n    background-color: rgb(0 0 0 / 0.5)\n}\n.bg-red-50 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-transparent {\n    background-color: transparent\n}\n.bg-white {\n    --tw-bg-opacity: 1;\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\n.object-contain {\n    -o-object-fit: contain;\n       object-fit: contain\n}\n.object-cover {\n    -o-object-fit: cover;\n       object-fit: cover\n}\n.p-0 {\n    padding: 0px\n}\n.p-1 {\n    padding: 0.25rem\n}\n.p-3 {\n    padding: 0.75rem\n}\n.p-4 {\n    padding: 1rem\n}\n.p-\\[10px\\] {\n    padding: 10px\n}\n.p-\\[12px\\] {\n    padding: 12px\n}\n.p-\\[16px\\] {\n    padding: 16px\n}\n.p-\\[20px\\] {\n    padding: 20px\n}\n.p-\\[24px\\] {\n    padding: 24px\n}\n.px-1 {\n    padding-left: 0.25rem;\n    padding-right: 0.25rem\n}\n.px-3 {\n    padding-left: 0.75rem;\n    padding-right: 0.75rem\n}\n.px-6 {\n    padding-left: 1.5rem;\n    padding-right: 1.5rem\n}\n.px-\\[10px\\] {\n    padding-left: 10px;\n    padding-right: 10px\n}\n.px-\\[12px\\] {\n    padding-left: 12px;\n    padding-right: 12px\n}\n.px-\\[14px\\] {\n    padding-left: 14px;\n    padding-right: 14px\n}\n.px-\\[16px\\] {\n    padding-left: 16px;\n    padding-right: 16px\n}\n.px-\\[18px\\] {\n    padding-left: 18px;\n    padding-right: 18px\n}\n.px-\\[20px\\] {\n    padding-left: 20px;\n    padding-right: 20px\n}\n.px-\\[28px\\] {\n    padding-left: 28px;\n    padding-right: 28px\n}\n.py-12 {\n    padding-top: 3rem;\n    padding-bottom: 3rem\n}\n.py-2 {\n    padding-top: 0.5rem;\n    padding-bottom: 0.5rem\n}\n.py-5 {\n    padding-top: 1.25rem;\n    padding-bottom: 1.25rem\n}\n.py-8 {\n    padding-top: 2rem;\n    padding-bottom: 2rem\n}\n.pb-4 {\n    padding-bottom: 1rem\n}\n.pl-\\[12px\\] {\n    padding-left: 12px\n}\n.pl-\\[24px\\] {\n    padding-left: 24px\n}\n.pl-\\[36px\\] {\n    padding-left: 36px\n}\n.pr-\\[12px\\] {\n    padding-right: 12px\n}\n.pt-12 {\n    padding-top: 3rem\n}\n.pt-4 {\n    padding-top: 1rem\n}\n.pt-6 {\n    padding-top: 1.5rem\n}\n.text-center {\n    text-align: center\n}\n.font-mono {\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\n.text-\\[11px\\] {\n    font-size: 11px\n}\n.text-\\[12px\\] {\n    font-size: 12px\n}\n.text-\\[13px\\] {\n    font-size: 13px\n}\n.text-\\[14px\\] {\n    font-size: 14px\n}\n.text-\\[16px\\] {\n    font-size: 16px\n}\n.text-\\[18px\\] {\n    font-size: 18px\n}\n.text-\\[32px\\] {\n    font-size: 32px\n}\n.text-\\[9px\\] {\n    font-size: 9px\n}\n.font-bold {\n    font-weight: 700\n}\n.uppercase {\n    text-transform: uppercase\n}\n.italic {\n    font-style: italic\n}\n.leading-none {\n    line-height: 1\n}\n.leading-relaxed {\n    line-height: 1.625\n}\n.leading-snug {\n    line-height: 1.375\n}\n.tracking-wider {\n    letter-spacing: 0.05em\n}\n.text-\\[\\#166534\\] {\n    --tw-text-opacity: 1;\n    color: rgb(22 101 52 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#1f1f1f\\] {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#92400e\\] {\n    --tw-text-opacity: 1;\n    color: rgb(146 64 14 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#991b1b\\] {\n    --tw-text-opacity: 1;\n    color: rgb(153 27 27 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#9a9a9a\\] {\n    --tw-text-opacity: 1;\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#ef4444\\] {\n    --tw-text-opacity: 1;\n    color: rgb(239 68 68 / var(--tw-text-opacity, 1))\n}\n.text-white {\n    --tw-text-opacity: 1;\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\n.opacity-60 {\n    opacity: 0.6\n}\n.shadow {\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_4px_16px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.4\\)\\] {\n    --tw-shadow: 0 4px 16px rgba(0,0,0,0.4);\n    --tw-shadow-colored: 0 4px 16px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_28px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.5\\)\\2c 0_2px_6px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.3\\)\\] {\n    --tw-shadow: 0 8px 28px rgba(0,0,0,0.5),0 2px 6px rgba(0,0,0,0.3);\n    --tw-shadow-colored: 0 8px 28px var(--tw-shadow-color), 0 2px 6px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.2\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.2);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.22\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.22);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-sm {\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.outline-none {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.outline {\n    outline-style: solid\n}\n.blur {\n    --tw-blur: blur(8px);\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.filter {\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.backdrop-blur-sm {\n    --tw-backdrop-blur: blur(4px);\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.backdrop-filter {\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.transition-all {\n    transition-property: all;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-colors {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.duration-150 {\n    transition-duration: 150ms\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::-moz-placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.hover\\:scale-105:hover {\n    --tw-scale-x: 1.05;\n    --tw-scale-y: 1.05;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.hover\\:bg-\\[\\#2c2c2e\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(44 44 46 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#303030\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#dc2626\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#e9e9e9\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.focus\\:border-\\[\\#1f1f1f\\]:focus {\n    --tw-border-opacity: 1;\n    border-color: rgb(31 31 31 / var(--tw-border-opacity, 1))\n}\n.focus\\:outline-none:focus {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.active\\:scale-95:active {\n    --tw-scale-x: .95;\n    --tw-scale-y: .95;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.disabled\\:cursor-not-allowed:disabled {\n    cursor: not-allowed\n}\n.disabled\\:opacity-50:disabled {\n    opacity: 0.5\n}\n';
+var styles = '.container {\n    width: 100%\n}\n@media (min-width: 640px) {\n    .container {\n        max-width: 640px\n    }\n}\n@media (min-width: 768px) {\n    .container {\n        max-width: 768px\n    }\n}\n@media (min-width: 1024px) {\n    .container {\n        max-width: 1024px\n    }\n}\n@media (min-width: 1280px) {\n    .container {\n        max-width: 1280px\n    }\n}\n@media (min-width: 1536px) {\n    .container {\n        max-width: 1536px\n    }\n}\n.sr-only {\n    position: absolute;\n    width: 1px;\n    height: 1px;\n    padding: 0;\n    margin: -1px;\n    overflow: hidden;\n    clip: rect(0, 0, 0, 0);\n    white-space: nowrap;\n    border-width: 0\n}\n.pointer-events-none {\n    pointer-events: none\n}\n.visible {\n    visibility: visible\n}\n.fixed {\n    position: fixed\n}\n.absolute {\n    position: absolute\n}\n.relative {\n    position: relative\n}\n.inset-0 {\n    inset: 0px\n}\n.-right-1 {\n    right: -0.25rem\n}\n.-top-1 {\n    top: -0.25rem\n}\n.bottom-24 {\n    bottom: 6rem\n}\n.bottom-6 {\n    bottom: 1.5rem\n}\n.left-1 {\n    left: 0.25rem\n}\n.left-1\\/2 {\n    left: 50%\n}\n.left-\\[12px\\] {\n    left: 12px\n}\n.right-6 {\n    right: 1.5rem\n}\n.top-1 {\n    top: 0.25rem\n}\n.top-1\\/2 {\n    top: 50%\n}\n.top-4 {\n    top: 1rem\n}\n.z-\\[10000\\] {\n    z-index: 10000\n}\n.z-\\[10001\\] {\n    z-index: 10001\n}\n.z-\\[10002\\] {\n    z-index: 10002\n}\n.z-\\[9997\\] {\n    z-index: 9997\n}\n.z-\\[9998\\] {\n    z-index: 9998\n}\n.z-\\[9999\\] {\n    z-index: 9999\n}\n.mx-1 {\n    margin-left: 0.25rem;\n    margin-right: 0.25rem\n}\n.mx-4 {\n    margin-left: 1rem;\n    margin-right: 1rem\n}\n.mx-auto {\n    margin-left: auto;\n    margin-right: auto\n}\n.mb-1 {\n    margin-bottom: 0.25rem\n}\n.mb-1\\.5 {\n    margin-bottom: 0.375rem\n}\n.mb-2 {\n    margin-bottom: 0.5rem\n}\n.mb-3 {\n    margin-bottom: 0.75rem\n}\n.mb-4 {\n    margin-bottom: 1rem\n}\n.mb-6 {\n    margin-bottom: 1.5rem\n}\n.ml-1 {\n    margin-left: 0.25rem\n}\n.mt-0 {\n    margin-top: 0px\n}\n.mt-0\\.5 {\n    margin-top: 0.125rem\n}\n.mt-1 {\n    margin-top: 0.25rem\n}\n.mt-2 {\n    margin-top: 0.5rem\n}\n.mt-6 {\n    margin-top: 1.5rem\n}\n.line-clamp-2 {\n    overflow: hidden;\n    display: -webkit-box;\n    -webkit-box-orient: vertical;\n    -webkit-line-clamp: 2\n}\n.block {\n    display: block\n}\n.flex {\n    display: flex\n}\n.inline-flex {\n    display: inline-flex\n}\n.hidden {\n    display: none\n}\n.h-10 {\n    height: 2.5rem\n}\n.h-12 {\n    height: 3rem\n}\n.h-6 {\n    height: 1.5rem\n}\n.h-\\[28px\\] {\n    height: 28px\n}\n.h-\\[32px\\] {\n    height: 32px\n}\n.h-\\[36px\\] {\n    height: 36px\n}\n.h-full {\n    height: 100%\n}\n.max-h-\\[80px\\] {\n    max-height: 80px\n}\n.max-h-\\[calc\\(100vh-200px\\)\\] {\n    max-height: calc(100vh - 200px)\n}\n.min-h-\\[40px\\] {\n    min-height: 40px\n}\n.w-10 {\n    width: 2.5rem\n}\n.w-12 {\n    width: 3rem\n}\n.w-\\[288px\\] {\n    width: 288px\n}\n.w-\\[32px\\] {\n    width: 32px\n}\n.w-\\[36px\\] {\n    width: 36px\n}\n.w-full {\n    width: 100%\n}\n.w-px {\n    width: 1px\n}\n.min-w-0 {\n    min-width: 0px\n}\n.max-w-\\[1200px\\] {\n    max-width: 1200px\n}\n.max-w-\\[480px\\] {\n    max-width: 480px\n}\n.max-w-\\[520px\\] {\n    max-width: 520px\n}\n.max-w-\\[640px\\] {\n    max-width: 640px\n}\n.max-w-\\[900px\\] {\n    max-width: 900px\n}\n.flex-1 {\n    flex: 1 1 0%\n}\n.flex-shrink {\n    flex-shrink: 1\n}\n.shrink-0 {\n    flex-shrink: 0\n}\n.-translate-x-1 {\n    --tw-translate-x: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-x-1\\/2 {\n    --tw-translate-x: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1 {\n    --tw-translate-y: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1\\/2 {\n    --tw-translate-y: -50%;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.transform {\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n@keyframes pulse {\n    50% {\n        opacity: .5\n    }\n}\n.animate-pulse {\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\n@keyframes spin {\n    to {\n        transform: rotate(360deg)\n    }\n}\n.animate-spin {\n    animation: spin 1s linear infinite\n}\n.cursor-default {\n    cursor: default\n}\n.select-none {\n    -webkit-user-select: none;\n       -moz-user-select: none;\n            user-select: none\n}\n.resize-none {\n    resize: none\n}\n.resize {\n    resize: both\n}\n.flex-col {\n    flex-direction: column\n}\n.flex-wrap {\n    flex-wrap: wrap\n}\n.items-start {\n    align-items: flex-start\n}\n.items-end {\n    align-items: flex-end\n}\n.items-center {\n    align-items: center\n}\n.justify-center {\n    justify-content: center\n}\n.justify-between {\n    justify-content: space-between\n}\n.gap-1 {\n    gap: 0.25rem\n}\n.gap-1\\.5 {\n    gap: 0.375rem\n}\n.gap-2 {\n    gap: 0.5rem\n}\n.gap-3 {\n    gap: 0.75rem\n}\n.gap-4 {\n    gap: 1rem\n}\n.gap-\\[6px\\] {\n    gap: 6px\n}\n.self-start {\n    align-self: flex-start\n}\n.overflow-hidden {\n    overflow: hidden\n}\n.overflow-y-auto {\n    overflow-y: auto\n}\n.rounded {\n    border-radius: 0.25rem\n}\n.rounded-\\[10px\\] {\n    border-radius: 10px\n}\n.rounded-\\[12px\\] {\n    border-radius: 12px\n}\n.rounded-\\[16px\\] {\n    border-radius: 16px\n}\n.rounded-\\[20px\\] {\n    border-radius: 20px\n}\n.rounded-\\[24px\\] {\n    border-radius: 24px\n}\n.rounded-\\[8px\\] {\n    border-radius: 8px\n}\n.rounded-full {\n    border-radius: 9999px\n}\n.border {\n    border-width: 1px\n}\n.border-2 {\n    border-width: 2px\n}\n.border-b {\n    border-bottom-width: 1px\n}\n.border-t {\n    border-top-width: 1px\n}\n.border-\\[\\#f0f0f0\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\n.border-red-500 {\n    --tw-border-opacity: 1;\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\n.border-transparent {\n    border-color: transparent\n}\n.border-white {\n    --tw-border-opacity: 1;\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\n.border-white\\/10 {\n    border-color: rgb(255 255 255 / 0.1)\n}\n.border-white\\/\\[0\\.07\\] {\n    border-color: rgb(255 255 255 / 0.07)\n}\n.border-white\\/\\[0\\.08\\] {\n    border-color: rgb(255 255 255 / 0.08)\n}\n.bg-\\[\\#1c1c1e\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(28 28 30 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#1f1f1f\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#e9e9e9\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#ef4444\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f0f0f0\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f4f4f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f5f5f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\n.bg-amber-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1))\n}\n.bg-amber-500\\/20 {\n    background-color: rgb(245 158 11 / 0.2)\n}\n.bg-black {\n    --tw-bg-opacity: 1;\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\n.bg-black\\/40 {\n    background-color: rgb(0 0 0 / 0.4)\n}\n.bg-black\\/60 {\n    background-color: rgb(0 0 0 / 0.6)\n}\n.bg-indigo-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(99 102 241 / var(--tw-bg-opacity, 1))\n}\n.bg-indigo-500\\/20 {\n    background-color: rgb(99 102 241 / 0.2)\n}\n.bg-red-50 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500\\/20 {\n    background-color: rgb(239 68 68 / 0.2)\n}\n.bg-transparent {\n    background-color: transparent\n}\n.bg-white {\n    --tw-bg-opacity: 1;\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\n.bg-white\\/5 {\n    background-color: rgb(255 255 255 / 0.05)\n}\n.bg-white\\/\\[0\\.04\\] {\n    background-color: rgb(255 255 255 / 0.04)\n}\n.object-contain {\n    -o-object-fit: contain;\n       object-fit: contain\n}\n.object-cover {\n    -o-object-fit: cover;\n       object-fit: cover\n}\n.p-0 {\n    padding: 0px\n}\n.p-1 {\n    padding: 0.25rem\n}\n.p-3 {\n    padding: 0.75rem\n}\n.p-4 {\n    padding: 1rem\n}\n.p-\\[10px\\] {\n    padding: 10px\n}\n.p-\\[12px\\] {\n    padding: 12px\n}\n.p-\\[16px\\] {\n    padding: 16px\n}\n.p-\\[20px\\] {\n    padding: 20px\n}\n.p-\\[24px\\] {\n    padding: 24px\n}\n.px-1 {\n    padding-left: 0.25rem;\n    padding-right: 0.25rem\n}\n.px-2 {\n    padding-left: 0.5rem;\n    padding-right: 0.5rem\n}\n.px-3 {\n    padding-left: 0.75rem;\n    padding-right: 0.75rem\n}\n.px-4 {\n    padding-left: 1rem;\n    padding-right: 1rem\n}\n.px-6 {\n    padding-left: 1.5rem;\n    padding-right: 1.5rem\n}\n.px-\\[12px\\] {\n    padding-left: 12px;\n    padding-right: 12px\n}\n.px-\\[14px\\] {\n    padding-left: 14px;\n    padding-right: 14px\n}\n.px-\\[16px\\] {\n    padding-left: 16px;\n    padding-right: 16px\n}\n.px-\\[18px\\] {\n    padding-left: 18px;\n    padding-right: 18px\n}\n.py-0 {\n    padding-top: 0px;\n    padding-bottom: 0px\n}\n.py-0\\.5 {\n    padding-top: 0.125rem;\n    padding-bottom: 0.125rem\n}\n.py-12 {\n    padding-top: 3rem;\n    padding-bottom: 3rem\n}\n.py-2 {\n    padding-top: 0.5rem;\n    padding-bottom: 0.5rem\n}\n.py-2\\.5 {\n    padding-top: 0.625rem;\n    padding-bottom: 0.625rem\n}\n.py-3 {\n    padding-top: 0.75rem;\n    padding-bottom: 0.75rem\n}\n.py-5 {\n    padding-top: 1.25rem;\n    padding-bottom: 1.25rem\n}\n.py-8 {\n    padding-top: 2rem;\n    padding-bottom: 2rem\n}\n.pb-2 {\n    padding-bottom: 0.5rem\n}\n.pb-3 {\n    padding-bottom: 0.75rem\n}\n.pb-4 {\n    padding-bottom: 1rem\n}\n.pb-6 {\n    padding-bottom: 1.5rem\n}\n.pl-\\[12px\\] {\n    padding-left: 12px\n}\n.pl-\\[36px\\] {\n    padding-left: 36px\n}\n.pr-\\[12px\\] {\n    padding-right: 12px\n}\n.pr-\\[2px\\] {\n    padding-right: 2px\n}\n.pt-12 {\n    padding-top: 3rem\n}\n.pt-3 {\n    padding-top: 0.75rem\n}\n.pt-4 {\n    padding-top: 1rem\n}\n.pt-6 {\n    padding-top: 1.5rem\n}\n.text-center {\n    text-align: center\n}\n.font-mono {\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\n.text-\\[10px\\] {\n    font-size: 10px\n}\n.text-\\[11px\\] {\n    font-size: 11px\n}\n.text-\\[12px\\] {\n    font-size: 12px\n}\n.text-\\[13px\\] {\n    font-size: 13px\n}\n.text-\\[15px\\] {\n    font-size: 15px\n}\n.text-\\[18px\\] {\n    font-size: 18px\n}\n.font-bold {\n    font-weight: 700\n}\n.font-semibold {\n    font-weight: 600\n}\n.uppercase {\n    text-transform: uppercase\n}\n.italic {\n    font-style: italic\n}\n.leading-none {\n    line-height: 1\n}\n.leading-relaxed {\n    line-height: 1.625\n}\n.leading-snug {\n    line-height: 1.375\n}\n.tracking-wider {\n    letter-spacing: 0.05em\n}\n.text-\\[\\#1f1f1f\\] {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#9a9a9a\\] {\n    --tw-text-opacity: 1;\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#ef4444\\] {\n    --tw-text-opacity: 1;\n    color: rgb(239 68 68 / var(--tw-text-opacity, 1))\n}\n.text-amber-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 211 77 / var(--tw-text-opacity, 1))\n}\n.text-indigo-300 {\n    --tw-text-opacity: 1;\n    color: rgb(165 180 252 / var(--tw-text-opacity, 1))\n}\n.text-red-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 165 165 / var(--tw-text-opacity, 1))\n}\n.text-white {\n    --tw-text-opacity: 1;\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\n.text-white\\/25 {\n    color: rgb(255 255 255 / 0.25)\n}\n.text-white\\/30 {\n    color: rgb(255 255 255 / 0.3)\n}\n.text-white\\/40 {\n    color: rgb(255 255 255 / 0.4)\n}\n.text-white\\/50 {\n    color: rgb(255 255 255 / 0.5)\n}\n.text-white\\/70 {\n    color: rgb(255 255 255 / 0.7)\n}\n.text-white\\/90 {\n    color: rgb(255 255 255 / 0.9)\n}\n.opacity-60 {\n    opacity: 0.6\n}\n.shadow {\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_28px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.5\\)\\2c 0_2px_6px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.3\\)\\] {\n    --tw-shadow: 0 8px 28px rgba(0,0,0,0.5),0 2px 6px rgba(0,0,0,0.3);\n    --tw-shadow-colored: 0 8px 28px var(--tw-shadow-color), 0 2px 6px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.2\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.2);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_8px_32px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.22\\)\\] {\n    --tw-shadow: 0 8px 32px rgba(0,0,0,0.22);\n    --tw-shadow-colored: 0 8px 32px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-lg {\n    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-sm {\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.outline-none {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.outline {\n    outline-style: solid\n}\n.blur {\n    --tw-blur: blur(8px);\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.filter {\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.backdrop-blur-sm {\n    --tw-backdrop-blur: blur(4px);\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.backdrop-filter {\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.transition-all {\n    transition-property: all;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-colors {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.duration-150 {\n    transition-duration: 150ms\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::-moz-placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.placeholder\\:text-\\[\\#a3a3a3\\]::placeholder {\n    --tw-text-opacity: 1;\n    color: rgb(163 163 163 / var(--tw-text-opacity, 1))\n}\n.placeholder\\:text-white\\/25::-moz-placeholder {\n    color: rgb(255 255 255 / 0.25)\n}\n.placeholder\\:text-white\\/25::placeholder {\n    color: rgb(255 255 255 / 0.25)\n}\n.hover\\:scale-105:hover {\n    --tw-scale-x: 1.05;\n    --tw-scale-y: 1.05;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.hover\\:bg-\\[\\#2c2c2e\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(44 44 46 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#303030\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#dc2626\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#e9e9e9\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(233 233 233 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.focus\\:border-\\[\\#1f1f1f\\]:focus {\n    --tw-border-opacity: 1;\n    border-color: rgb(31 31 31 / var(--tw-border-opacity, 1))\n}\n.focus\\:border-white\\/20:focus {\n    border-color: rgb(255 255 255 / 0.2)\n}\n.focus\\:outline-none:focus {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.active\\:scale-95:active {\n    --tw-scale-x: .95;\n    --tw-scale-y: .95;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.disabled\\:cursor-not-allowed:disabled {\n    cursor: not-allowed\n}\n.disabled\\:opacity-40:disabled {\n    opacity: 0.4\n}\n.disabled\\:opacity-50:disabled {\n    opacity: 0.5\n}\n';
 var styles_gen_default = styles;
 
 // src/components/BuggyBag.tsx
-var import_jsx_runtime13 = require("react/jsx-runtime");
-function BuggyBagInner({ apiEndpoint, apiKey }) {
-  const aiEndpoint = apiEndpoint ? `${new URL(apiEndpoint).origin}/api/generate-ai-prompt` : "/api/generate-ai-prompt";
-  const [mode, setMode] = (0, import_react9.useState)("idle");
-  const { bugs, addBug, updateBugStatus } = useBugStore();
-  const activeBugCount = bugs.filter((b) => b.status === "active").length;
-  const handleSaveBug = async (data) => {
-    addBug({
-      ...data,
-      id: Math.random().toString(36).slice(2, 11),
-      createdAt: Date.now(),
-      status: "active"
-    });
-    setMode("dashboard");
-    if (apiEndpoint && apiKey) {
-      const imgW = window.innerWidth;
-      const imgH = window.innerHeight;
-      const annotations = data.shapes.filter((s) => data.annotations[s.id]).map((s, i) => {
-        const cx = s.type === "arrow" && s.points ? (s.points[0] + s.points[2]) / 2 : s.x + (s.width ?? 0) / 2;
-        const cy = s.type === "arrow" && s.points ? (s.points[1] + s.points[3]) / 2 : s.y + (s.height ?? 0) / 2;
-        return {
-          x: Math.round(cx / imgW * 100),
-          y: Math.round(cy / imgH * 100),
-          text: data.annotations[s.id],
-          index: i + 1
-        };
+var import_jsx_runtime7 = require("react/jsx-runtime");
+function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
+  const [capturing, setCapturing] = (0, import_react5.useState)(false);
+  const [toastVisible, setToastVisible] = (0, import_react5.useState)(false);
+  const [toastError, setToastError] = (0, import_react5.useState)(false);
+  (0, import_react5.useEffect)(() => {
+    initCollector();
+  }, []);
+  const handleKeyDown = (0, import_react5.useCallback)((e) => {
+    if (e.altKey && e.key.toLowerCase() === "b") {
+      e.preventDefault();
+      setCapturing((v) => !v);
+    }
+    if (e.key === "Escape" && capturing) {
+      setCapturing(false);
+    }
+  }, [capturing]);
+  (0, import_react5.useEffect)(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+  const handleSend = async (payload) => {
+    setCapturing(false);
+    if (!apiEndpoint || !apiKey) {
+      showToast(false);
+      return;
+    }
+    try {
+      const res = await fetch(apiEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, api_key: apiKey })
       });
-      const description = annotations.map((a, i) => `${i + 1}. ${a.text}`).join("\n") || void 0;
-      try {
-        await fetch(apiEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: apiKey,
-            base64_image: data.screenshotDataUrl,
-            annotations,
-            description
-          })
-        });
-      } catch {
-      }
+      showToast(!res.ok);
+    } catch {
+      showToast(true);
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-      FloatingButton,
+  const showToast = (isError) => {
+    setToastError(isError);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 4e3);
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+    !capturing && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(FloatingButton, { onCapture: () => setCapturing(true) }),
+    capturing && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      CaptureMode,
       {
-        onCapture: () => setMode("capture"),
-        onDashboard: () => setMode((m) => m === "dashboard" ? "idle" : "dashboard"),
-        activeBugCount,
-        showDashboardButton: bugs.length > 0 && mode !== "capture"
+        apiKey: apiKey ?? "",
+        onSend: handleSend,
+        onCancel: () => setCapturing(false)
       }
     ),
-    mode === "capture" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(CaptureMode, { onSave: handleSaveBug, onCancel: () => setMode("idle") }),
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-      Dashboard,
+    toastVisible && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+      "div",
       {
-        isOpen: mode === "dashboard",
-        onClose: () => setMode("idle"),
-        bugs,
-        onStatusChange: updateBugStatus,
-        aiEndpoint
+        "data-buggy-bag": "true",
+        className: "fixed bottom-24 right-6 z-[9999] flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-[12px] font-semibold shadow-lg",
+        style: {
+          background: toastError ? "#3f1c1c" : "#1c1c1e",
+          color: toastError ? "#fca5a5" : "#ffffff",
+          border: `1px solid ${toastError ? "#7f1d1d" : "rgba(255,255,255,0.1)"}`
+        },
+        children: [
+          toastError ? "\u26A0 \u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u0456\u0434\u043F\u0440\u0430\u0432\u0438\u0442\u0438" : "\u2713 \u0412\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u043D\u0430 \u043F\u043E\u0440\u0442\u0430\u043B",
+          !toastError && portalUrl && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+            "a",
+            {
+              href: portalUrl,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              style: { color: "#818cf8", marginLeft: 4 },
+              children: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u2192"
+            }
+          )
+        ]
       }
     )
   ] });
 }
-function BuggyBag({ apiEndpoint, apiKey } = {}) {
-  (0, import_react9.useEffect)(() => {
+function isActive() {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("BUGGY_BAG_ACCESS") === "active";
+}
+function activateFromUrl() {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("bb") === "on") {
+    localStorage.setItem("BUGGY_BAG_ACCESS", "active");
+    params.delete("bb");
+    const newUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "") + window.location.hash;
+    window.history.replaceState({}, "", newUrl);
+  }
+}
+function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
+  (0, import_react5.useEffect)(() => {
+    activateFromUrl();
     const host = document.createElement("div");
     host.setAttribute("data-buggy-bag", "true");
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;";
@@ -2078,7 +1968,7 @@ function BuggyBag({ apiEndpoint, apiKey } = {}) {
     shadow.appendChild(mountPoint);
     const root = (0, import_client.createRoot)(mountPoint);
     root.render(
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(GodModeGuard, { children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(BuggyBagInner, { apiEndpoint, apiKey }) })
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(GodModeGuard, { children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(BuggyBagInner, { apiEndpoint, apiKey, portalUrl }) })
     );
     return () => {
       host.remove();
@@ -2090,6 +1980,9 @@ function BuggyBag({ apiEndpoint, apiKey } = {}) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BuggyBag,
-  useBugStore
+  activateFromUrl,
+  collectTechContext,
+  initCollector,
+  isActive
 });
 //# sourceMappingURL=index.js.map

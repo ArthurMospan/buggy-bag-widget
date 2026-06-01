@@ -1,120 +1,149 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GodModeGuard } from '../guard';
-import { useBugStore } from '../store';
 import { FloatingButton } from './FloatingButton';
 import { CaptureMode } from './CaptureMode';
-import { Dashboard } from './Dashboard';
-import type { Bug } from '../types';
+import { initCollector } from '../lib/collector';
+import type { SubmitBugPayload } from '../types';
 import widgetStyles from '../styles.gen';
 
-type Mode = 'idle' | 'capture' | 'dashboard';
-
 export interface BuggyBagProps {
+  /** Portal API endpoint, e.g. "https://portal.example.com/api/bugs/submit" */
   apiEndpoint?: string;
   apiKey?: string;
+  /** URL of the portal for the "Open portal" toast link */
+  portalUrl?: string;
 }
 
-function BuggyBagInner({ apiEndpoint, apiKey }: BuggyBagProps) {
-  const aiEndpoint = apiEndpoint
-    ? `${new URL(apiEndpoint).origin}/api/generate-ai-prompt`
-    : '/api/generate-ai-prompt';
-  const [mode, setMode] = useState<Mode>('idle');
-  const { bugs, addBug, updateBugStatus } = useBugStore();
+function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
+  const [capturing, setCapturing] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastError, setToastError] = useState(false);
 
-  const activeBugCount = bugs.filter((b) => b.status === 'active').length;
+  // Init collector once
+  useEffect(() => {
+    initCollector();
+  }, []);
 
-  const handleSaveBug = async (data: Omit<Bug, 'id' | 'createdAt' | 'status'>) => {
-    addBug({
-      ...data,
-      id: Math.random().toString(36).slice(2, 11),
-      createdAt: Date.now(),
-      status: 'active',
-    });
-    setMode('dashboard');
-
-    if (apiEndpoint && apiKey) {
-      // Convert pixel-based shapes to the portal's percentage-based annotation format
-      const imgW = window.innerWidth;
-      const imgH = window.innerHeight;
-      const annotations = data.shapes
-        .filter((s) => data.annotations[s.id])
-        .map((s, i) => {
-          const cx = s.type === 'arrow' && s.points
-            ? (s.points[0] + s.points[2]) / 2
-            : s.x + (s.width ?? 0) / 2;
-          const cy = s.type === 'arrow' && s.points
-            ? (s.points[1] + s.points[3]) / 2
-            : s.y + (s.height ?? 0) / 2;
-          return {
-            x: Math.round((cx / imgW) * 100),
-            y: Math.round((cy / imgH) * 100),
-            text: data.annotations[s.id],
-            index: i + 1,
-          };
-        });
-
-      const description = annotations.map((a, i) => `${i + 1}. ${a.text}`).join('\n') || undefined;
-
-      try {
-        await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: apiKey,
-            base64_image: data.screenshotDataUrl,
-            annotations,
-            description,
-          }),
-        });
-      } catch {
-        // Portal unreachable — bug is already saved locally
-      }
+  // Keyboard shortcut: Alt+B
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.altKey && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      setCapturing(v => !v);
     }
+    if (e.key === 'Escape' && capturing) {
+      setCapturing(false);
+    }
+  }, [capturing]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  const handleSend = async (payload: SubmitBugPayload) => {
+    setCapturing(false);
+
+    if (!apiEndpoint || !apiKey) {
+      // No portal configured — just show a notice
+      showToast(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, api_key: apiKey }),
+      });
+      showToast(!res.ok);
+    } catch {
+      showToast(true);
+    }
+  };
+
+  const showToast = (isError: boolean) => {
+    setToastError(isError);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 4000);
   };
 
   return (
     <>
-      <FloatingButton
-        onCapture={() => setMode('capture')}
-        onDashboard={() => setMode((m) => (m === 'dashboard' ? 'idle' : 'dashboard'))}
-        activeBugCount={activeBugCount}
-        showDashboardButton={bugs.length > 0 && mode !== 'capture'}
-      />
+      {!capturing && <FloatingButton onCapture={() => setCapturing(true)} />}
 
-      {mode === 'capture' && (
-        <CaptureMode onSave={handleSaveBug} onCancel={() => setMode('idle')} />
+      {capturing && (
+        <CaptureMode
+          apiKey={apiKey ?? ''}
+          onSend={handleSend}
+          onCancel={() => setCapturing(false)}
+        />
       )}
 
-      <Dashboard
-        isOpen={mode === 'dashboard'}
-        onClose={() => setMode('idle')}
-        bugs={bugs}
-        onStatusChange={updateBugStatus}
-        aiEndpoint={aiEndpoint}
-      />
+      {/* Toast */}
+      {toastVisible && (
+        <div
+          data-buggy-bag="true"
+          className="fixed bottom-24 right-6 z-[9999] flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-[12px] font-semibold shadow-lg"
+          style={{
+            background: toastError ? '#3f1c1c' : '#1c1c1e',
+            color: toastError ? '#fca5a5' : '#ffffff',
+            border: `1px solid ${toastError ? '#7f1d1d' : 'rgba(255,255,255,0.1)'}`,
+          }}
+        >
+          {toastError ? '⚠ Не вдалось відправити' : '✓ Відправлено на портал'}
+          {!toastError && portalUrl && (
+            <a
+              href={portalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#818cf8', marginLeft: 4 }}
+            >
+              Відкрити →
+            </a>
+          )}
+        </div>
+      )}
     </>
   );
 }
 
-export function BuggyBag({ apiEndpoint, apiKey }: BuggyBagProps = {}) {
+// ── Activation helpers (exported for use in host app) ──────────────────────
+
+/** Returns true if buggy-bag is currently active */
+export function isActive(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('BUGGY_BAG_ACCESS') === 'active';
+}
+
+/** Activate via URL param ?bb=on (call in your app's root) */
+export function activateFromUrl(): void {
+  if (typeof window === 'undefined') return;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('bb') === 'on') {
+    localStorage.setItem('BUGGY_BAG_ACCESS', 'active');
+    // Clean the param from URL without reload
+    params.delete('bb');
+    const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+    window.history.replaceState({}, '', newUrl);
+  }
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+
+export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {}) {
   useEffect(() => {
-    // Create the shadow host directly on document.body so it sits at the top
-    // of the stacking context (z-index: max) and is never buried inside a
-    // host-app flex/grid container. Width/height: 0 means it takes zero space.
+    // Check URL param activation before mounting
+    activateFromUrl();
+
     const host = document.createElement('div');
     host.setAttribute('data-buggy-bag', 'true');
-    // Full-viewport cover so fixed children are within the hit-test region.
-    // pointer-events:none lets host-app clicks pass through everywhere the
-    // widget UI isn't rendered; elements inside the shadow DOM override this.
     host.style.cssText =
       'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
     document.body.appendChild(host);
 
     const shadow = host.attachShadow({ mode: 'open' });
 
-    // Re-enable pointer events for all shadow DOM children — the host div is
-    // pointer-events:none (inherited by shadow tree), so we must reset it here.
     const peStyle = document.createElement('style');
     peStyle.textContent = '* { pointer-events: auto; }';
     shadow.appendChild(peStyle);
@@ -123,15 +152,13 @@ export function BuggyBag({ apiEndpoint, apiKey }: BuggyBagProps = {}) {
     styleEl.textContent = widgetStyles;
     shadow.appendChild(styleEl);
 
-    // React root inside the shadow DOM — keeps event delegation entirely
-    // within the shadow boundary so onClick/onChange fire correctly.
     const mountPoint = document.createElement('div');
     shadow.appendChild(mountPoint);
 
     const root = createRoot(mountPoint);
     root.render(
       <GodModeGuard>
-        <BuggyBagInner apiEndpoint={apiEndpoint} apiKey={apiKey} />
+        <BuggyBagInner apiEndpoint={apiEndpoint} apiKey={apiKey} portalUrl={portalUrl} />
       </GodModeGuard>
     );
 
@@ -141,6 +168,5 @@ export function BuggyBag({ apiEndpoint, apiKey }: BuggyBagProps = {}) {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Nothing rendered into the host React tree — all UI lives in the shadow DOM.
   return null;
 }

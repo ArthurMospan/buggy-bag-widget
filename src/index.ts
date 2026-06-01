@@ -1,4 +1,14 @@
-export { BuggyBag } from './components/BuggyBag';
+export { BuggyBag, isActive, activateFromUrl } from './components/BuggyBag';
 export type { BuggyBagProps } from './components/BuggyBag';
-export { useBugStore } from './store';
-export type { Bug, DrawShape, DrawTool, BugStatus } from './types';
+export { initCollector, collectTechContext } from './lib/collector';
+export type {
+  DrawShape,
+  DrawTool,
+  TechContext,
+  SubmitBugPayload,
+  NetworkRequest,
+  ConsoleEntry,
+  EventLogEntry,
+  ComponentInfo,
+  BugSeverity,
+} from './types';

@@ -1,14 +1,18 @@
-import * as zustand_middleware from 'zustand/middleware';
-import * as zustand from 'zustand';
-
 interface BuggyBagProps {
+    /** Portal API endpoint, e.g. "https://portal.example.com/api/bugs/submit" */
     apiEndpoint?: string;
     apiKey?: string;
+    /** URL of the portal for the "Open portal" toast link */
+    portalUrl?: string;
 }
-declare function BuggyBag({ apiEndpoint, apiKey }?: BuggyBagProps): null;
+/** Returns true if buggy-bag is currently active */
+declare function isActive(): boolean;
+/** Activate via URL param ?bb=on (call in your app's root) */
+declare function activateFromUrl(): void;
+declare function BuggyBag({ apiEndpoint, apiKey, portalUrl }?: BuggyBagProps): null;
 
 type DrawTool = 'rect' | 'arrow' | 'pin';
-type BugStatus = 'active' | 'fixed' | 'archived';
+type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
 interface DrawShape {
     id: string;
     type: DrawTool;
@@ -19,35 +23,57 @@ interface DrawShape {
     points?: [number, number, number, number];
     pinNumber?: number;
 }
-interface Bug {
-    id: string;
-    screenshotDataUrl: string;
+interface NetworkRequest {
+    url: string;
+    method: string;
+    status: number;
+    durationMs: number;
+    isError: boolean;
+}
+interface ConsoleEntry {
+    level: 'error' | 'warn';
+    message: string;
+    source?: string;
+}
+interface EventLogEntry {
+    type: 'navigation' | 'click' | 'network_error' | 'console_error' | 'store_change';
+    description: string;
+    timestamp: number;
+}
+interface ComponentInfo {
+    name: string;
+    props?: Record<string, unknown>;
+    filePath?: string;
+}
+interface TechContext {
+    route: string;
+    viewport: string;
+    userAgent: string;
+    component: ComponentInfo | null;
+    storeSnapshot: Record<string, unknown> | null;
+    networkRequests: NetworkRequest[];
+    consoleErrors: ConsoleEntry[];
+    eventLog: EventLogEntry[];
+    autoSeverity: BugSeverity;
+}
+interface SubmitBugPayload {
+    api_key: string;
+    base64_image: string;
     shapes: DrawShape[];
     annotations: Record<string, string>;
-    status: BugStatus;
-    createdAt: number;
+    description: string;
+    tech_context: TechContext;
 }
 
-interface BugStore {
-    bugs: Bug[];
-    addBug: (bug: Bug) => void;
-    updateBugStatus: (id: string, status: BugStatus) => void;
-    removeBug: (id: string) => void;
-}
-declare const useBugStore: zustand.UseBoundStore<Omit<zustand.StoreApi<BugStore>, "persist"> & {
-    persist: {
-        setOptions: (options: Partial<zustand_middleware.PersistOptions<BugStore, {
-            bugs: Bug[];
-        }>>) => void;
-        clearStorage: () => void;
-        rehydrate: () => Promise<void> | void;
-        hasHydrated: () => boolean;
-        onHydrate: (fn: (state: BugStore) => void) => () => void;
-        onFinishHydration: (fn: (state: BugStore) => void) => () => void;
-        getOptions: () => Partial<zustand_middleware.PersistOptions<BugStore, {
-            bugs: Bug[];
-        }>>;
-    };
-}>;
+/**
+ * collector.ts
+ * Automatically collects technical context when a bug is reported.
+ * Intercepts fetch/XHR, console errors, and tracks user interactions.
+ */
 
-export { type Bug, type BugStatus, BuggyBag, type BuggyBagProps, type DrawShape, type DrawTool, useBugStore };
+/** Call once when the widget mounts */
+declare function initCollector(): void;
+/** Collect full tech context at the moment of capture */
+declare function collectTechContext(clickedElement?: HTMLElement | null): TechContext;
+
+export { type BugSeverity, BuggyBag, type BuggyBagProps, type ComponentInfo, type ConsoleEntry, type DrawShape, type DrawTool, type EventLogEntry, type NetworkRequest, type SubmitBugPayload, type TechContext, activateFromUrl, collectTechContext, initCollector, isActive };

@@ -67,13 +67,7 @@ function calcPosition(
   return { x, y };
 }
 
-// Extend global Window type for webkit prefix
-declare global {
-  interface Window {
-    SpeechRecognition?: typeof SpeechRecognition;
-    webkitSpeechRecognition?: typeof SpeechRecognition;
-  }
-}
+// Speech Recognition types are declared in src/declarations.d.ts
 
 export function ShapeAnnotation({
   shape,
@@ -85,12 +79,15 @@ export function ShapeAnnotation({
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
-  const recRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recRef = useRef<any>(null);
   const { x, y } = calcPosition(shape, containerWidth, containerHeight);
 
   const toggleVoice = () => {
     setMicError(null);
-    const SpeechRec = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SpeechRec = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!SpeechRec) {
       setMicError('Браузер не підтримує голосовий ввід');
       return;
@@ -104,24 +101,25 @@ export function ShapeAnnotation({
       return;
     }
 
-    const rec = new SpeechRec();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec = new SpeechRec() as any;
     rec.lang = 'uk-UA';
     rec.interimResults = false;
     rec.maxAlternatives = 1;
 
-    rec.onresult = (e: SpeechRecognitionEvent) => {
+    rec.onresult = (e: any) => {
       const transcript = e.results[0][0].transcript;
       setText((prev) => (prev ? prev + ' ' + transcript : transcript).trim());
     };
 
-    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+    rec.onerror = (err: any) => {
       recRef.current = null;
       setListening(false);
-      if (e.error === 'not-allowed') {
+      if (err.error === 'not-allowed') {
         setMicError('Дозвольте доступ до мікрофона в браузері');
-      } else if (e.error === 'no-speech') {
+      } else if (err.error === 'no-speech') {
         setMicError('Не чутно мови — спробуйте ще раз');
-      } else if (e.error !== 'aborted') {
+      } else if (err.error !== 'aborted') {
         setMicError('Помилка запису голосу');
       }
     };
