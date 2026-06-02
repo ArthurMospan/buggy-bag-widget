@@ -1084,6 +1084,7 @@ function calcPos(shape, cw, ch) {
   };
 }
 var hasSpeechRecognition = typeof window !== "undefined" && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+var hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
 function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }) {
   const measureDefault = shape.type === "measure" && shape.points ? (() => {
     const [x1, y1, x2, y2] = shape.points;
@@ -1095,7 +1096,19 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
   const [text, setText] = (0, import_react3.useState)(measureDefault);
   const [interim, setInterim] = (0, import_react3.useState)("");
   const [listening, setListening] = (0, import_react3.useState)(false);
+  const [hidden, setHidden] = (0, import_react3.useState)(false);
   const { x, y } = calcPos(shape, containerWidth, containerHeight);
+  const pickColor = async () => {
+    if (!hasEyeDropper) return;
+    try {
+      const dropper = new window.EyeDropper();
+      const result = await dropper.open();
+      const hex = result.sRGBHex.toUpperCase();
+      setText((prev) => prev ? `${prev}
+\u041A\u043E\u043B\u0456\u0440: ${hex}` : `\u041A\u043E\u043B\u0456\u0440: ${hex}`);
+    } catch {
+    }
+  };
   (0, import_react3.useEffect)(() => {
     const onTranscript = (e) => {
       const { text: t, isFinal } = e.detail;
@@ -1148,7 +1161,10 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
         border: "1px solid rgba(255,255,255,0.12)",
         boxShadow: "0 12px 40px rgba(0,0,0,0.4)",
         padding: "12px",
-        fontFamily: "system-ui, -apple-system, sans-serif"
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        opacity: hidden ? 0 : 1,
+        pointerEvents: hidden ? "none" : "auto",
+        transition: "opacity 0.15s"
       },
       onClick: (e) => e.stopPropagation(),
       children: [
@@ -1181,6 +1197,22 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
             }
           }
         ),
+        hasEyeDropper && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { display: "flex", gap: "4px", marginTop: "6px" }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+          "button",
+          {
+            type: "button",
+            onClick: pickColor,
+            title: "\u0412\u0438\u0431\u0440\u0430\u0442\u0438 \u043A\u043E\u043B\u0456\u0440 \u0437 \u0435\u043A\u0440\u0430\u043D\u0430",
+            style: { display: "flex", alignItems: "center", gap: "4px", padding: "3px 8px", borderRadius: "6px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer", color: "rgba(255,255,255,0.6)", fontSize: "10px", fontWeight: "600" },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3z" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "m19 11-8 8-1.5 1.5a1.5 1.5 0 0 1-2.1 0l-2.9-2.9a1.5 1.5 0 0 1 0-2.1L6 14l8-8" })
+              ] }),
+              "\u041A\u043E\u043B\u0456\u0440"
+            ]
+          }
+        ) }),
         /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { display: "flex", gap: "6px", marginTop: "8px" }, children: [
           hasSpeechRecognition ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
             "button",
@@ -1751,15 +1783,7 @@ function BugIcon() {
     /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M17.2 17c2.1.1 3.8 1.9 3.8 4" })
   ] });
 }
-var hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
-function EyeDropperIcon() {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "m19 11-8 8-1.5 1.5a1.5 1.5 0 0 1-2.1 0l-2.9-2.9a1.5 1.5 0 0 1 0-2.1L6 14l8-8" }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "m17 9 2-2 2 2-2 2z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M4 20 2 22" })
-  ] });
-}
+var hasEyeDropper2 = typeof window !== "undefined" && "EyeDropper" in window;
 function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const [expanded, setExpanded] = (0, import_react5.useState)(false);
   const [activeTool, setActiveTool] = (0, import_react5.useState)(null);
@@ -1858,22 +1882,6 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
           },
           tool
         )),
-        hasEyeDropper && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-            "button",
-            {
-              type: "button",
-              onClick: handleEyeDropper,
-              title: "\u041F\u0456\u043F\u0435\u0442\u043A\u0430 \u043A\u043E\u043B\u044C\u043E\u0440\u0443",
-              style: { width: "34px", height: "34px", borderRadius: "8px", background: "transparent", border: "none", cursor: "pointer", color: "#9a9a9a", display: "flex", alignItems: "center", justifyContent: "center" },
-              onMouseEnter: (e) => (e.currentTarget.style.background = "rgba(255,255,255,0.1)", e.currentTarget.style.color = "white"),
-              onMouseLeave: (e) => (e.currentTarget.style.background = "transparent", e.currentTarget.style.color = "#9a9a9a"),
-              children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(EyeDropperIcon, {})
-            },
-            "eyedropper"
-          )
-        ] }),
         /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } }),
         /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
           "button",
@@ -1974,9 +1982,7 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent("buggy-bag:toggle"));
       }
-      if (e.key === "Escape") {
-        window.dispatchEvent(new CustomEvent("buggy-bag:escape"));
-      }
+      if (e.key === "Escape") window.dispatchEvent(new CustomEvent("buggy-bag:escape"));
     };
     document.addEventListener("keydown", handleKeyDown);
     const host = document.createElement("div");

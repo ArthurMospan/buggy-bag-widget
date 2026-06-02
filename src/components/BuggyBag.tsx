@@ -122,18 +122,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
                   {icon}
                 </button>
               ))}
-              {hasEyeDropper && (
-                <>
-                  <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.12)', margin: '0 2px' }} />
-                  <button key="eyedropper" type="button" onClick={handleEyeDropper} title="Піпетка кольору"
-                    style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#9a9a9a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)', e.currentTarget.style.color = 'white')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = '#9a9a9a')}
-                  >
-                    <EyeDropperIcon />
-                  </button>
-                </>
-              )}
+              {/* eyedropper moved into annotation popup */}
               <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.12)', margin: '0 2px' }} />
               <button type="button" onClick={() => setExpanded(false)} title="Закрити"
                 style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
@@ -242,37 +231,22 @@ export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {})
       }
     };
 
-    const startVoice = () => {
-      _active = true;
-      createRec();
-    };
-
-    const stopVoice = () => {
-      _active = false;
-      // no need to call rec.stop() — onend will fire and see _active=false
-    };
+    const startVoice = () => { _active = true; createRec(); };
+    const stopVoice  = () => { _active = false; };
 
     window.addEventListener('buggy-bag:start-voice', startVoice);
     window.addEventListener('buggy-bag:stop-voice', stopVoice);
 
-    // ── Keyboard shortcut in main document context ──
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.altKey && e.code === 'KeyB') {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent('buggy-bag:toggle'));
-      }
-      if (e.key === 'Escape') {
-        window.dispatchEvent(new CustomEvent('buggy-bag:escape'));
-      }
+      if (e.altKey && e.code === 'KeyB') { e.preventDefault(); window.dispatchEvent(new CustomEvent('buggy-bag:toggle')); }
+      if (e.key === 'Escape') window.dispatchEvent(new CustomEvent('buggy-bag:escape'));
     };
     document.addEventListener('keydown', handleKeyDown);
 
-    // ── Shadow DOM mount ──
     const host = document.createElement('div');
     host.setAttribute('data-buggy-bag', 'true');
     host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
     document.body.appendChild(host);
-
     const shadow = host.attachShadow({ mode: 'open' });
     const peStyle = document.createElement('style');
     peStyle.textContent = '* { pointer-events: auto; }';
@@ -282,7 +256,6 @@ export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {})
     shadow.appendChild(styleEl);
     const mountPoint = document.createElement('div');
     shadow.appendChild(mountPoint);
-
     const root = createRoot(mountPoint);
     root.render(
       <GodModeGuard>
@@ -294,21 +267,6 @@ export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {})
       _active = false;
       document.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('buggy-bag:start-voice', startVoice);
-      window.removeEventListener('buggy-bag:stop-voice', stopVoice);
-      host.remove();
-      setTimeout(() => root.unmount(), 0);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return null;
-}
-
-export function isActive(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem('BUGGY_BAG_ACCESS') === 'active';
-}
-export function activateFromUrl(): void {}
-rtVoice);
       window.removeEventListener('buggy-bag:stop-voice', stopVoice);
       host.remove();
       setTimeout(() => root.unmount(), 0);

@@ -36,6 +36,8 @@ function calcPos(shape: DrawShape, cw: number, ch: number): { x: number; y: numb
 const hasSpeechRecognition = typeof window !== 'undefined' &&
   !!(( window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
 
+const hasEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in window;
+
 export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }: ShapeAnnotationProps) {
   const measureDefault = shape.type === 'measure' && shape.points
     ? (() => {
@@ -49,7 +51,18 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
   const [text, setText] = useState(measureDefault);
   const [interim, setInterim] = useState('');
   const [listening, setListening] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const { x, y } = calcPos(shape, containerWidth, containerHeight);
+
+  const pickColor = async () => {
+    if (!hasEyeDropper) return;
+    try {
+      const dropper = new (window as any).EyeDropper();
+      const result = await dropper.open();
+      const hex = result.sRGBHex.toUpperCase();
+      setText(prev => prev ? `${prev}\nКолір: ${hex}` : `Колір: ${hex}`);
+    } catch { /* cancelled */ }
+  };
 
   useEffect(() => {
     const onTranscript = (e: Event) => {
@@ -101,6 +114,9 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
         boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
         padding: '12px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
+        opacity: hidden ? 0 : 1,
+        pointerEvents: hidden ? 'none' : 'auto',
+        transition: 'opacity 0.15s',
       }}
       onClick={e => e.stopPropagation()}
     >
@@ -123,6 +139,24 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
           caretColor: 'white',
         }}
       />
+
+      {/* Quick-insert buttons */}
+      {hasEyeDropper && (
+        <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+          <button
+            type="button"
+            onClick={pickColor}
+            title="Вибрати колір з екрана"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: '10px', fontWeight: '600' }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3z"/>
+              <path d="m19 11-8 8-1.5 1.5a1.5 1.5 0 0 1-2.1 0l-2.9-2.9a1.5 1.5 0 0 1 0-2.1L6 14l8-8"/>
+            </svg>
+            Колір
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
         {/* Voice button — only shown when SpeechRecognition is available */}
@@ -174,6 +208,44 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
           type="button"
           onClick={handleConfirm}
           style={{ flex: 1, height: '32px', borderRadius: '8px', background: '#4f46e5', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '700', color: 'white' }}
+        >
+          OK ✓
+        </button>
+      </div>
+    </div>
+  );
+}
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
+              </svg>
+            )}
+          </button>
+        ) : (
+          <div title="Голосовий ввід доступний тільки в Chrome" style={{
+            width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
+            background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'not-allowed',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+          </div>
+        )}
+
+        <button type="button" onClick={handleDismiss}
+          style={{ flex: 1, height: '32px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>
+          Скасувати
+        </button>
+
+        <button type="button" onClick={handleConfirm}
+          style={{ flex: 1, height: '32px', borderRadius: '8px', background: '#4f46e5', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '700', color: 'white' }}>
+          OK ✓
+        </button>
+      </div>
+    </div>
+  );
+}
+or: 'white' }}
         >
           OK ✓
         </button>
