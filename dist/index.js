@@ -1075,6 +1075,7 @@ function calcPos(shape, cw, ch) {
     y: Math.max(8, Math.min(cy, ch - H - 8))
   };
 }
+var hasSpeechRecognition = typeof window !== "undefined" && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
 function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }) {
   const [text, setText] = (0, import_react3.useState)("");
   const [interim, setInterim] = (0, import_react3.useState)("");
@@ -1166,7 +1167,7 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
           }
         ),
         /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { display: "flex", gap: "6px", marginTop: "8px" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          hasSpeechRecognition ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
             "button",
             {
               type: "button",
@@ -1191,7 +1192,21 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
                 /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "12", y1: "19", x2: "12", y2: "22" })
               ] })
             }
-          ),
+          ) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { title: "\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u0438\u0439 \u0432\u0432\u0456\u0434 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u0442\u0456\u043B\u044C\u043A\u0438 \u0432 Chrome", style: {
+            width: "32px",
+            height: "32px",
+            borderRadius: "8px",
+            flexShrink: 0,
+            background: "rgba(255,255,255,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "not-allowed"
+          }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "rgba(255,255,255,0.2)", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("line", { x1: "12", y1: "19", x2: "12", y2: "22" })
+          ] }) }),
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
             "button",
             {
@@ -1685,6 +1700,15 @@ function BugIcon() {
     /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M17.2 17c2.1.1 3.8 1.9 3.8 4" })
   ] });
 }
+var hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
+function EyeDropperIcon() {
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "m19 11-8 8-1.5 1.5a1.5 1.5 0 0 1-2.1 0l-2.9-2.9a1.5 1.5 0 0 1 0-2.1L6 14l8-8" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "m17 9 2-2 2 2-2 2z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M4 20 2 22" })
+  ] });
+}
 function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const [expanded, setExpanded] = (0, import_react5.useState)(false);
   const [activeTool, setActiveTool] = (0, import_react5.useState)(null);
@@ -1711,6 +1735,19 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const handleToolSelect = (tool) => {
     setExpanded(false);
     setActiveTool(tool);
+  };
+  const handleEyeDropper = async () => {
+    setExpanded(false);
+    try {
+      const dropper = new window.EyeDropper();
+      const result = await dropper.open();
+      const hex = result.sRGBHex.toUpperCase();
+      await navigator.clipboard.writeText(hex).catch(() => {
+      });
+      setToast({ msg: hex, ok: true, color: hex });
+      setTimeout(() => setToast(null), 5e3);
+    } catch {
+    }
   };
   const handleSend = async (payload) => {
     setActiveTool(null);
@@ -1739,35 +1776,86 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
     { tool: "pin", icon: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(PinIcon, {}), title: "\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u043F\u0456\u043D" }
   ];
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
-    !activeTool && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "24px", right: "24px", zIndex: 9997, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }, children: [
-      expanded && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }, children: tools.map(({ tool, icon, title }) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-        "button",
-        {
-          type: "button",
-          onClick: () => handleToolSelect(tool),
-          title,
-          style: { width: "40px", height: "40px", borderRadius: "50%", background: "white", border: "1px solid rgba(0,0,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#1f1f1f", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" },
-          children: icon
-        },
-        tool
-      )) }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: { fontSize: "10px", fontFamily: "monospace", background: "rgba(0,0,0,0.35)", color: "rgba(255,255,255,0.6)", padding: "2px 6px", borderRadius: "4px", userSelect: "none" }, children: "Alt+B" }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-        "button",
-        {
-          type: "button",
-          onClick: () => setExpanded((v) => !v),
-          title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
-          style: { width: "48px", height: "48px", borderRadius: "50%", background: expanded ? "rgba(79,70,229,0.85)" : "rgba(28,28,30,0.65)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "rgba(255,255,255,0.85)", boxShadow: "0 4px 16px rgba(0,0,0,0.25)", transition: "all 0.15s", backdropFilter: "blur(8px)" },
-          children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(BugIcon, {})
-        }
-      )
-    ] }),
+    !activeTool && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "24px", right: "24px", zIndex: 9997 }, children: expanded ? (
+      // Same dark pill style as CaptureMode toolbar
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: {
+        background: "rgba(31,31,31,0.95)",
+        backdropFilter: "blur(10px)",
+        borderRadius: "14px",
+        border: "1px solid rgba(255,255,255,0.1)",
+        padding: "8px",
+        display: "flex",
+        alignItems: "center",
+        gap: "4px"
+      }, children: [
+        tools.map(({ tool, icon, title }) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "button",
+          {
+            type: "button",
+            onClick: () => handleToolSelect(tool),
+            title,
+            style: { width: "34px", height: "34px", borderRadius: "8px", background: "transparent", border: "none", cursor: "pointer", color: "#9a9a9a", display: "flex", alignItems: "center", justifyContent: "center" },
+            onMouseEnter: (e) => (e.currentTarget.style.background = "rgba(255,255,255,0.1)", e.currentTarget.style.color = "white"),
+            onMouseLeave: (e) => (e.currentTarget.style.background = "transparent", e.currentTarget.style.color = "#9a9a9a"),
+            children: icon
+          },
+          tool
+        )),
+        hasEyeDropper && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+            "button",
+            {
+              type: "button",
+              onClick: handleEyeDropper,
+              title: "\u041F\u0456\u043F\u0435\u0442\u043A\u0430 \u043A\u043E\u043B\u044C\u043E\u0440\u0443",
+              style: { width: "34px", height: "34px", borderRadius: "8px", background: "transparent", border: "none", cursor: "pointer", color: "#9a9a9a", display: "flex", alignItems: "center", justifyContent: "center" },
+              onMouseEnter: (e) => (e.currentTarget.style.background = "rgba(255,255,255,0.1)", e.currentTarget.style.color = "white"),
+              onMouseLeave: (e) => (e.currentTarget.style.background = "transparent", e.currentTarget.style.color = "#9a9a9a"),
+              children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(EyeDropperIcon, {})
+            },
+            "eyedropper"
+          )
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "button",
+          {
+            type: "button",
+            onClick: () => setExpanded(false),
+            title: "\u0417\u0430\u043A\u0440\u0438\u0442\u0438",
+            style: { width: "34px", height: "34px", borderRadius: "8px", background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" },
+            children: "\u2715"
+          }
+        )
+      ] })
+    ) : (
+      // Collapsed — just the bug button
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: { fontSize: "10px", fontFamily: "monospace", background: "rgba(0,0,0,0.35)", color: "rgba(255,255,255,0.6)", padding: "2px 6px", borderRadius: "4px", userSelect: "none" }, children: "Alt+B" }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "button",
+          {
+            type: "button",
+            onClick: () => setExpanded(true),
+            title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
+            style: { width: "48px", height: "48px", borderRadius: "50%", background: "rgba(28,28,30,0.65)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "rgba(255,255,255,0.85)", transition: "all 0.15s", backdropFilter: "blur(8px)" },
+            children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(BugIcon, {})
+          }
+        )
+      ] })
+    ) }),
     activeTool && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(CaptureMode, { initialTool: activeTool, apiKey: apiKey ?? "", onSend: handleSend, onCancel: () => setActiveTool(null) }),
-    toast && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "90px", right: "24px", zIndex: 9999, display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderRadius: "12px", background: toast.ok ? "#1c1c1e" : "#3f1c1c", color: toast.ok ? "white" : "#fca5a5", border: `1px solid ${toast.ok ? "rgba(255,255,255,0.1)" : "#7f1d1d"}`, fontSize: "13px", fontWeight: "600" }, children: [
+    toast && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "90px", right: "24px", zIndex: 9999, display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px", borderRadius: "12px", background: toast.ok ? "#1c1c1e" : "#3f1c1c", color: toast.ok ? "white" : "#fca5a5", border: `1px solid ${toast.ok ? "rgba(255,255,255,0.1)" : "#7f1d1d"}`, fontSize: "13px", fontWeight: "600" }, children: toast.color ? /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { width: "22px", height: "22px", borderRadius: "6px", background: toast.color, border: "2px solid rgba(255,255,255,0.2)", flexShrink: 0 } }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { fontSize: "14px", fontWeight: "700", fontFamily: "monospace" }, children: toast.color }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { fontSize: "10px", color: "rgba(255,255,255,0.4)", fontWeight: "500", marginTop: "1px" }, children: "\u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E" })
+      ] })
+    ] }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
       toast.msg,
       toast.ok && portalUrl && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("a", { href: portalUrl, target: "_blank", rel: "noopener noreferrer", style: { color: "#818cf8", marginLeft: "4px", fontSize: "12px" }, children: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u2192" })
-    ] })
+    ] }) })
   ] });
 }
 function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
@@ -1778,16 +1866,17 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
       params.delete("bb");
       window.history.replaceState({}, "", window.location.pathname + (params.toString() ? "?" + params.toString() : ""));
     }
-    let _rec = null;
-    const startVoice = () => {
+    let _active = false;
+    const dispatchTranscript = (text, isFinal) => window.dispatchEvent(new CustomEvent("buggy-bag:transcript", { detail: { text, isFinal } }));
+    const createRec = () => {
       const w = window;
       const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-      if (!SR) return;
-      _rec = new SR();
-      _rec.lang = "uk-UA";
-      _rec.continuous = true;
-      _rec.interimResults = true;
-      _rec.onresult = (e) => {
+      if (!SR || !_active) return;
+      const rec = new SR();
+      rec.lang = "uk-UA";
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.onresult = (e) => {
         let finalText = "";
         let interimText = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -1795,33 +1884,34 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
           if (e.results[i].isFinal) finalText += t + " ";
           else interimText += t;
         }
-        if (finalText) {
-          window.dispatchEvent(new CustomEvent("buggy-bag:transcript", { detail: { text: finalText.trim(), isFinal: true } }));
-        }
-        if (interimText) {
-          window.dispatchEvent(new CustomEvent("buggy-bag:transcript", { detail: { text: interimText, isFinal: false } }));
-        }
+        if (finalText) dispatchTranscript(finalText.trim(), true);
+        if (interimText) dispatchTranscript(interimText, false);
       };
-      _rec.onend = () => {
-        if (_rec) {
-          try {
-            _rec.start();
-          } catch {
-            window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
-          }
-        } else window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
-      };
-      _rec.onerror = (ev) => {
-        if (ev.error === "no-speech") return;
+      rec.onerror = (ev) => {
+        if (ev.error === "no-speech" || ev.error === "aborted") return;
+        _active = false;
         window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
       };
-      _rec.start();
+      rec.onend = () => {
+        if (_active) setTimeout(createRec, 150);
+        else window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
+      };
+      try {
+        rec.start();
+      } catch {
+        _active = false;
+        window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
+      }
+    };
+    const startVoice = () => {
+      _active = true;
+      createRec();
+    };
+    const stopVoice = () => {
+      _active = false;
     };
     window.addEventListener("buggy-bag:start-voice", startVoice);
-    window.addEventListener("buggy-bag:stop-voice", () => {
-      _rec?.stop();
-      _rec = null;
-    });
+    window.addEventListener("buggy-bag:stop-voice", stopVoice);
     const handleKeyDown = (e) => {
       if (e.altKey && e.code === "KeyB") {
         e.preventDefault();
@@ -1850,7 +1940,10 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(GodModeGuard, { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(BuggyBagInner, { apiEndpoint, apiKey, portalUrl }) })
     );
     return () => {
+      _active = false;
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("buggy-bag:start-voice", startVoice);
+      window.removeEventListener("buggy-bag:stop-voice", stopVoice);
       host.remove();
       setTimeout(() => root.unmount(), 0);
     };

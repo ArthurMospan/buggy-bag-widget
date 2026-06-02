@@ -33,6 +33,9 @@ function calcPos(shape: DrawShape, cw: number, ch: number): { x: number; y: numb
   };
 }
 
+const hasSpeechRecognition = typeof window !== 'undefined' &&
+  !!(( window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
+
 export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }: ShapeAnnotationProps) {
   const [text, setText] = useState('');
   const [interim, setInterim] = useState('');
@@ -113,27 +116,40 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
       />
 
       <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-        {/* Voice button */}
-        <button
-          type="button"
-          onClick={toggleVoice}
-          title={listening ? 'Зупинити' : 'Записати голосом'}
-          style={{
+        {/* Voice button — only shown when SpeechRecognition is available */}
+        {hasSpeechRecognition ? (
+          <button
+            type="button"
+            onClick={toggleVoice}
+            title={listening ? 'Зупинити' : 'Записати голосом'}
+            style={{
+              width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
+              background: listening ? '#ef4444' : 'rgba(255,255,255,0.08)',
+              border: 'none', cursor: 'pointer', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {listening ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
+              </svg>
+            )}
+          </button>
+        ) : (
+          <div title="Голосовий ввід доступний тільки в Chrome" style={{
             width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
-            background: listening ? '#ef4444' : 'rgba(255,255,255,0.08)',
-            border: 'none', cursor: 'pointer', color: 'white',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          {listening ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'not-allowed',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
             </svg>
-          )}
-        </button>
+          </div>
+        )}
 
         {/* Cancel */}
         <button
