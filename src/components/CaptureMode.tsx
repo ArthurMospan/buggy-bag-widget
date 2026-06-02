@@ -249,37 +249,3 @@ export function CaptureMode({ initialTool, apiKey, onSend, onCancel }: CaptureMo
     </div>
   );
 }
-                ← Назад
-              </button>
-              <button type="button" onClick={handleSend} disabled={sending} style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', background: sending ? 'rgba(79,70,229,0.5)' : '#4f46e5', color: 'white', border: 'none', cursor: sending ? 'default' : 'pointer' }}>
-                {sending ? 'Надсилаю...' : 'Надіслати на портал →'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-== 'console_error' || e.type === 'network_error' ? '#fca5a5' : 'rgba(255,255,255,0.35)', lineHeight: '1.6' }}>
-                      {i + 1}. {e.description}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="button" onClick={() => setShowSendPanel(false)} disabled={sending} style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)' }}>
-                ← Назад
-              </button>
-              <button type="button" onClick={handleSend} disabled={sending} style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', background: sending ? 'rgba(79,70,229,0.5)' : '#4f46e5', color: 'white', border: 'none', cursor: sending ? 'default' : 'pointer' }}>
-                {sending ? 'Надсилаю...' : 'Надіслати на портал →'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

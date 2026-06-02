@@ -280,4 +280,3 @@ export function isActive(): boolean {
   if (typeof window === 'undefined') return false;
   return localStorage.getItem('BUGGY_BAG_ACCESS') === 'active';
 }
-export function activateFromUrl(): void {}

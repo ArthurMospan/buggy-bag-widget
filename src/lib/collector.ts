@@ -145,6 +145,55 @@ function patchConsole() {
   });
 }
 
+// ── Global error / unhandled rejection ─────────────────────────────────────
+
+let errorPatched = false;
+
+function patchGlobalErrors() {
+  if (errorPatched || typeof window === 'undefined') return;
+  errorPatched = true;
+
+  // Unhandled JS exceptions
+  window.addEventListener('error', (e) => {
+    const message = e.message || 'Unknown error';
+    const source = e.filename
+      ? `${e.filename.split('/').slice(-1)[0]}:${e.lineno}`
+      : undefined;
+
+    pushCapped(consoleLog, { level: 'error', message: message.slice(0, 200), source }, MAX_CONSOLE);
+    pushCapped(eventLog, {
+      type: 'console_error',
+      description: `Uncaught: ${message.slice(0, 100)}${source ? ` [${source}]` : ''}`,
+      timestamp: Date.now(),
+    }, MAX_EVENTS);
+  });
+
+  // Unhandled promise rejections
+  window.addEventListener('unhandledrejection', (e) => {
+    const reason = e.reason;
+    const message = reason instanceof Error
+      ? reason.message
+      : typeof reason === 'string' ? reason : JSON.stringify(reason) ?? 'Unhandled rejection';
+
+    // Try to get file:line from stack
+    let source: string | undefined;
+    if (reason instanceof Error && reason.stack) {
+      const match = reason.stack.split('\n').find(l => l.includes('.tsx') || l.includes('.js'));
+      if (match) {
+        const fm = match.match(/([^/\\]+\.[jt]sx?:\d+)/);
+        if (fm) source = fm[1];
+      }
+    }
+
+    pushCapped(consoleLog, { level: 'error', message: message.slice(0, 200), source }, MAX_CONSOLE);
+    pushCapped(eventLog, {
+      type: 'console_error',
+      description: `Unhandled rejection: ${message.slice(0, 100)}${source ? ` [${source}]` : ''}`,
+      timestamp: Date.now(),
+    }, MAX_EVENTS);
+  });
+}
+
 // ── DOM event tracking ──────────────────────────────────────────────────────
 
 let domPatched = false;
@@ -312,6 +361,7 @@ function calcAutoSeverity(
 export function initCollector() {
   patchFetch();
   patchConsole();
+  patchGlobalErrors();
   patchDom();
 
   // Record initial navigation
