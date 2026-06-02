@@ -1,4 +1,4 @@
-export type DrawTool = 'rect' | 'arrow' | 'pin';
+export type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure';
 export type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export interface DrawShape {

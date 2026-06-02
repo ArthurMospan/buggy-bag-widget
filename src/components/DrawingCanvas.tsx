@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { Stage, Layer, Rect, Arrow, Circle, Text, Group } from 'react-konva';
+import { Stage, Layer, Rect, Arrow, Circle, Text, Group, Line } from 'react-konva';
 import type Konva from 'konva';
 import type { DrawShape, DrawTool } from '../types';
 
@@ -7,8 +7,9 @@ interface DrawingCanvasProps {
   width: number;
   height: number;
   tool: DrawTool;
-  shapes: DrawShape[];           // committed shapes (passed in from parent)
-  onShapeComplete: (shape: DrawShape) => void;  // called when user finishes a shape
+  shapes: DrawShape[];
+  onShapeComplete: (shape: DrawShape) => void;
+  onMouseMove?: (x: number, y: number) => void;
 }
 
 // Module-level counter so pin numbers are unique across re-renders
@@ -29,6 +30,7 @@ export function DrawingCanvas({
   tool,
   shapes,
   onShapeComplete,
+  onMouseMove,
 }: DrawingCanvasProps) {
   // useRef for values that change on every mouse event but must NOT trigger re-renders
   const isDrawing = useRef(false);
@@ -60,7 +62,7 @@ export function DrawingCanvas({
         return;
       }
 
-      // Start a rect or arrow draft
+      // Start a rect, arrow, or measure draft
       const newDraft: DrawShape = {
         id: uid(),
         type: tool,
@@ -78,26 +80,19 @@ export function DrawingCanvas({
 
   const handleMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (!isDrawing.current || !draftRef.current) return;
       const { x, y } = getStagePos(e);
+      onMouseMove?.(Math.round(x), Math.round(y));
+
+      if (!isDrawing.current || !draftRef.current) return;
 
       let updated: DrawShape | null = null;
 
       if (tool === 'rect') {
+        updated = { ...draftRef.current, width: x - origin.current.x, height: y - origin.current.y };
+      } else if (tool === 'arrow' || tool === 'measure') {
         updated = {
           ...draftRef.current,
-          width: x - origin.current.x,
-          height: y - origin.current.y,
-        };
-      } else if (tool === 'arrow') {
-        updated = {
-          ...draftRef.current,
-          points: [
-            origin.current.x,
-            origin.current.y,
-            x,
-            y,
-          ] as [number, number, number, number],
+          points: [origin.current.x, origin.current.y, x, y] as [number, number, number, number],
         };
       }
 
@@ -106,7 +101,7 @@ export function DrawingCanvas({
         setDraft(updated);
       }
     },
-    [tool]  // draftRef and origin are refs — not needed in deps
+    [tool, onMouseMove]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -246,6 +241,27 @@ function renderShape(s: DrawShape): React.ReactElement | null {
           width={28}
           height={16}
         />
+      </Group>
+    );
+  }
+
+  if (s.type === 'measure' && s.points) {
+    const [x1, y1, x2, y2] = s.points;
+    const dist = Math.round(Math.hypot(x2 - x1, y2 - y1));
+    const dx = Math.abs(Math.round(x2 - x1));
+    const dy = Math.abs(Math.round(y2 - y1));
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const label = `${dist}px  (${dx} × ${dy})`;
+    return (
+      <Group key={s.id} listening={false}>
+        <Line points={[x1, y1, x2, y2]} stroke="#f59e0b" strokeWidth={2} dash={[6, 3]} />
+        {/* end caps */}
+        <Line points={[x1 - 5, y1, x1 + 5, y1]} stroke="#f59e0b" strokeWidth={2} rotation={Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI} offsetX={0} />
+        <Line points={[x2 - 5, y2, x2 + 5, y2]} stroke="#f59e0b" strokeWidth={2} />
+        {/* label background */}
+        <Rect x={mx - 52} y={my - 11} width={104} height={22} fill="rgba(0,0,0,0.7)" cornerRadius={6} />
+        <Text text={label} x={mx - 50} y={my - 8} fontSize={11} fontStyle="bold" fill="#f59e0b" fontFamily="monospace" align="center" width={100} />
       </Group>
     );
   }

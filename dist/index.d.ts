@@ -7,7 +7,7 @@ declare function BuggyBag({ apiEndpoint, apiKey, portalUrl }?: BuggyBagProps): n
 declare function isActive(): boolean;
 declare function activateFromUrl(): void;
 
-type DrawTool = 'rect' | 'arrow' | 'pin';
+type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure';
 type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
 interface DrawShape {
     id: string;

@@ -27,6 +27,7 @@ export function CaptureMode({ initialTool, apiKey, onSend, onCancel }: CaptureMo
   const [pendingShape, setPendingShape] = useState<DrawShape | null>(null);
   const [showSendPanel, setShowSendPanel] = useState(false);
   const [sending, setSending]   = useState(false);
+  const [cursor, setCursor]     = useState<{ x: number; y: number } | null>(null);
   const techContextRef = useRef(collectTechContext());
   const hostRef = useRef<HTMLDivElement>(null);
   const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
@@ -115,7 +116,24 @@ export function CaptureMode({ initialTool, apiKey, onSend, onCancel }: CaptureMo
 
       {/* Drawing canvas */}
       {!pendingShape && !showSendPanel && (
-        <DrawingCanvas width={w} height={h} tool={tool} shapes={shapes} onShapeComplete={handleShapeComplete} />
+        <DrawingCanvas
+          width={w} height={h} tool={tool} shapes={shapes}
+          onShapeComplete={handleShapeComplete}
+          onMouseMove={(x, y) => setCursor({ x, y })}
+        />
+      )}
+
+      {/* Cursor coordinates */}
+      {!pendingShape && !showSendPanel && cursor && (
+        <div style={{
+          position: 'fixed', left: cursor.x + 14, top: cursor.y + 14,
+          background: 'rgba(0,0,0,0.75)', color: 'rgba(255,255,255,0.85)',
+          fontSize: '10px', fontFamily: 'monospace', fontWeight: '600',
+          padding: '3px 7px', borderRadius: '5px', pointerEvents: 'none',
+          zIndex: 10003, letterSpacing: '0.03em',
+        }}>
+          {cursor.x}, {cursor.y}
+        </div>
       )}
 
       {/* Annotation popup */}
@@ -147,6 +165,9 @@ export function CaptureMode({ initialTool, apiKey, onSend, onCancel }: CaptureMo
           </ToolBtn>
           <ToolBtn active={tool === 'pin'} onClick={() => setTool('pin')} title="Пін">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          </ToolBtn>
+          <ToolBtn active={tool === 'measure'} onClick={() => setTool('measure')} title="Лінійка">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.55 6.45L17.55 2.45a1 1 0 0 0-1.41 0L2.45 16.14a1 1 0 0 0 0 1.41l4 4a1 1 0 0 0 1.41 0L21.55 7.86a1 1 0 0 0 0-1.41z"/><path d="M8 8l1.5 1.5"/><path d="M11.5 11.5l1.5 1.5"/><path d="M15 15l1.5 1.5"/></svg>
           </ToolBtn>
           {shapes.length > 0 && (
             <>
@@ -228,6 +249,28 @@ export function CaptureMode({ initialTool, apiKey, onSend, onCancel }: CaptureMo
     </div>
   );
 }
+                ← Назад
+              </button>
+              <button type="button" onClick={handleSend} disabled={sending} style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', background: sending ? 'rgba(79,70,229,0.5)' : '#4f46e5', color: 'white', border: 'none', cursor: sending ? 'default' : 'pointer' }}>
+                {sending ? 'Надсилаю...' : 'Надіслати на портал →'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+== 'console_error' || e.type === 'network_error' ? '#fca5a5' : 'rgba(255,255,255,0.35)', lineHeight: '1.6' }}>
+                      {i + 1}. {e.description}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="button" onClick={() => setShowSendPanel(false)} disabled={sending} style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)' }}>
                 ← Назад
               </button>
               <button type="button" onClick={handleSend} disabled={sending} style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', background: sending ? 'rgba(79,70,229,0.5)' : '#4f46e5', color: 'white', border: 'none', cursor: sending ? 'default' : 'pointer' }}>

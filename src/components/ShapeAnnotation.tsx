@@ -19,9 +19,9 @@ function calcPos(shape: DrawShape, cw: number, ch: number): { x: number; y: numb
   if (shape.type === 'rect') {
     cx = shape.x + (shape.width ?? 0) / 2;
     cy = shape.y + Math.abs(shape.height ?? 0) + 14;
-  } else if (shape.type === 'arrow' && shape.points) {
-    cx = shape.points[2];
-    cy = shape.points[3] + 14;
+  } else if ((shape.type === 'arrow' || shape.type === 'measure') && shape.points) {
+    cx = (shape.points[0] + shape.points[2]) / 2;
+    cy = (shape.points[1] + shape.points[3]) / 2 + 20;
   } else if (shape.type === 'pin') {
     cx = shape.x;
     cy = shape.y + 28;
@@ -37,7 +37,16 @@ const hasSpeechRecognition = typeof window !== 'undefined' &&
   !!(( window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
 
 export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }: ShapeAnnotationProps) {
-  const [text, setText] = useState('');
+  const measureDefault = shape.type === 'measure' && shape.points
+    ? (() => {
+        const [x1, y1, x2, y2] = shape.points;
+        const dist = Math.round(Math.hypot(x2 - x1, y2 - y1));
+        const dx = Math.abs(Math.round(x2 - x1));
+        const dy = Math.abs(Math.round(y2 - y1));
+        return `Відстань: ${dist}px (${dx} × ${dy})`;
+      })()
+    : '';
+  const [text, setText] = useState(measureDefault);
   const [interim, setInterim] = useState('');
   const [listening, setListening] = useState(false);
   const { x, y } = calcPos(shape, containerWidth, containerHeight);

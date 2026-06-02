@@ -96,9 +96,10 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   };
 
   const tools: { tool: DrawTool; icon: React.ReactNode; title: string }[] = [
-    { tool: 'rect',  icon: <RectIcon />,  title: 'Виділити область' },
-    { tool: 'arrow', icon: <ArrowIcon />, title: 'Намалювати стрілку' },
-    { tool: 'pin',   icon: <PinIcon />,   title: 'Поставити пін' },
+    { tool: 'rect',    icon: <RectIcon />,    title: 'Виділити область' },
+    { tool: 'arrow',   icon: <ArrowIcon />,   title: 'Намалювати стрілку' },
+    { tool: 'pin',     icon: <PinIcon />,     title: 'Поставити пін' },
+    { tool: 'measure', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.55 6.45L17.55 2.45a1 1 0 0 0-1.41 0L2.45 16.14a1 1 0 0 0 0 1.41l4 4a1 1 0 0 0 1.41 0L21.55 7.86a1 1 0 0 0 0-1.41z"/><path d="M8 8l1.5 1.5"/><path d="M11.5 11.5l1.5 1.5"/><path d="M15 15l1.5 1.5"/></svg>, title: 'Лінійка' },
   ];
 
   return (
@@ -293,6 +294,21 @@ export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {})
       _active = false;
       document.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('buggy-bag:start-voice', startVoice);
+      window.removeEventListener('buggy-bag:stop-voice', stopVoice);
+      host.remove();
+      setTimeout(() => root.unmount(), 0);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null;
+}
+
+export function isActive(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('BUGGY_BAG_ACCESS') === 'active';
+}
+export function activateFromUrl(): void {}
+rtVoice);
       window.removeEventListener('buggy-bag:stop-voice', stopVoice);
       host.remove();
       setTimeout(() => root.unmount(), 0);

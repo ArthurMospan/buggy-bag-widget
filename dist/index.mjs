@@ -820,7 +820,7 @@ async function toPng(node, options = {}) {
 
 // src/components/DrawingCanvas.tsx
 import { useRef, useState, useCallback, useEffect } from "react";
-import { Stage, Layer, Rect, Arrow, Circle, Text, Group } from "react-konva";
+import { Stage, Layer, Rect, Arrow, Circle, Text, Group, Line } from "react-konva";
 import { jsx as jsx2, jsxs } from "react/jsx-runtime";
 var pinCounter = 1;
 function uid() {
@@ -835,7 +835,8 @@ function DrawingCanvas({
   height,
   tool,
   shapes,
-  onShapeComplete
+  onShapeComplete,
+  onMouseMove
 }) {
   const isDrawing = useRef(false);
   const origin = useRef({ x: 0, y: 0 });
@@ -872,24 +873,16 @@ function DrawingCanvas({
   );
   const handleMouseMove = useCallback(
     (e) => {
-      if (!isDrawing.current || !draftRef.current) return;
       const { x, y } = getStagePos(e);
+      onMouseMove?.(Math.round(x), Math.round(y));
+      if (!isDrawing.current || !draftRef.current) return;
       let updated = null;
       if (tool === "rect") {
+        updated = { ...draftRef.current, width: x - origin.current.x, height: y - origin.current.y };
+      } else if (tool === "arrow" || tool === "measure") {
         updated = {
           ...draftRef.current,
-          width: x - origin.current.x,
-          height: y - origin.current.y
-        };
-      } else if (tool === "arrow") {
-        updated = {
-          ...draftRef.current,
-          points: [
-            origin.current.x,
-            origin.current.y,
-            x,
-            y
-          ]
+          points: [origin.current.x, origin.current.y, x, y]
         };
       }
       if (updated) {
@@ -897,8 +890,7 @@ function DrawingCanvas({
         setDraft(updated);
       }
     },
-    [tool]
-    // draftRef and origin are refs — not needed in deps
+    [tool, onMouseMove]
   );
   const handleMouseUp = useCallback(() => {
     if (!isDrawing.current || !draftRef.current) return;
@@ -1011,6 +1003,22 @@ function renderShape(s) {
       )
     ] }, s.id);
   }
+  if (s.type === "measure" && s.points) {
+    const [x1, y1, x2, y2] = s.points;
+    const dist = Math.round(Math.hypot(x2 - x1, y2 - y1));
+    const dx = Math.abs(Math.round(x2 - x1));
+    const dy = Math.abs(Math.round(y2 - y1));
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const label = `${dist}px  (${dx} \xD7 ${dy})`;
+    return /* @__PURE__ */ jsxs(Group, { listening: false, children: [
+      /* @__PURE__ */ jsx2(Line, { points: [x1, y1, x2, y2], stroke: "#f59e0b", strokeWidth: 2, dash: [6, 3] }),
+      /* @__PURE__ */ jsx2(Line, { points: [x1 - 5, y1, x1 + 5, y1], stroke: "#f59e0b", strokeWidth: 2, rotation: Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI, offsetX: 0 }),
+      /* @__PURE__ */ jsx2(Line, { points: [x2 - 5, y2, x2 + 5, y2], stroke: "#f59e0b", strokeWidth: 2 }),
+      /* @__PURE__ */ jsx2(Rect, { x: mx - 52, y: my - 11, width: 104, height: 22, fill: "rgba(0,0,0,0.7)", cornerRadius: 6 }),
+      /* @__PURE__ */ jsx2(Text, { text: label, x: mx - 50, y: my - 8, fontSize: 11, fontStyle: "bold", fill: "#f59e0b", fontFamily: "monospace", align: "center", width: 100 })
+    ] }, s.id);
+  }
   return null;
 }
 
@@ -1025,9 +1033,9 @@ function calcPos(shape, cw, ch) {
   if (shape.type === "rect") {
     cx = shape.x + (shape.width ?? 0) / 2;
     cy = shape.y + Math.abs(shape.height ?? 0) + 14;
-  } else if (shape.type === "arrow" && shape.points) {
-    cx = shape.points[2];
-    cy = shape.points[3] + 14;
+  } else if ((shape.type === "arrow" || shape.type === "measure") && shape.points) {
+    cx = (shape.points[0] + shape.points[2]) / 2;
+    cy = (shape.points[1] + shape.points[3]) / 2 + 20;
   } else if (shape.type === "pin") {
     cx = shape.x;
     cy = shape.y + 28;
@@ -1039,7 +1047,14 @@ function calcPos(shape, cw, ch) {
 }
 var hasSpeechRecognition = typeof window !== "undefined" && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
 function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }) {
-  const [text, setText] = useState2("");
+  const measureDefault = shape.type === "measure" && shape.points ? (() => {
+    const [x1, y1, x2, y2] = shape.points;
+    const dist = Math.round(Math.hypot(x2 - x1, y2 - y1));
+    const dx = Math.abs(Math.round(x2 - x1));
+    const dy = Math.abs(Math.round(y2 - y1));
+    return `\u0412\u0456\u0434\u0441\u0442\u0430\u043D\u044C: ${dist}px (${dx} \xD7 ${dy})`;
+  })() : "";
+  const [text, setText] = useState2(measureDefault);
   const [interim, setInterim] = useState2("");
   const [listening, setListening] = useState2(false);
   const { x, y } = calcPos(shape, containerWidth, containerHeight);
@@ -1454,6 +1469,7 @@ function CaptureMode({ initialTool, apiKey, onSend, onCancel }) {
   const [pendingShape, setPendingShape] = useState3(null);
   const [showSendPanel, setShowSendPanel] = useState3(false);
   const [sending, setSending] = useState3(false);
+  const [cursor, setCursor] = useState3(null);
   const techContextRef = useRef3(collectTechContext());
   const hostRef = useRef3(null);
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
@@ -1537,7 +1553,36 @@ function CaptureMode({ initialTool, apiKey, onSend, onCancel }) {
             /* @__PURE__ */ jsx4("span", { style: { width: 7, height: 7, borderRadius: "50%", background: "#6366f1", display: "inline-block" } }),
             "\u0412\u0438\u0434\u0456\u043B\u0456\u0442\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u043D\u0435 \u043C\u0456\u0441\u0446\u0435"
           ] }),
-          !pendingShape && !showSendPanel && /* @__PURE__ */ jsx4(DrawingCanvas, { width: w, height: h, tool, shapes, onShapeComplete: handleShapeComplete }),
+          !pendingShape && !showSendPanel && /* @__PURE__ */ jsx4(
+            DrawingCanvas,
+            {
+              width: w,
+              height: h,
+              tool,
+              shapes,
+              onShapeComplete: handleShapeComplete,
+              onMouseMove: (x, y) => setCursor({ x, y })
+            }
+          ),
+          !pendingShape && !showSendPanel && cursor && /* @__PURE__ */ jsxs3("div", { style: {
+            position: "fixed",
+            left: cursor.x + 14,
+            top: cursor.y + 14,
+            background: "rgba(0,0,0,0.75)",
+            color: "rgba(255,255,255,0.85)",
+            fontSize: "10px",
+            fontFamily: "monospace",
+            fontWeight: "600",
+            padding: "3px 7px",
+            borderRadius: "5px",
+            pointerEvents: "none",
+            zIndex: 10003,
+            letterSpacing: "0.03em"
+          }, children: [
+            cursor.x,
+            ", ",
+            cursor.y
+          ] }),
           pendingShape && /* @__PURE__ */ jsx4(
             ShapeAnnotation,
             {
@@ -1571,6 +1616,12 @@ function CaptureMode({ initialTool, apiKey, onSend, onCancel }) {
             /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "pin", onClick: () => setTool("pin"), title: "\u041F\u0456\u043D", children: /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
               /* @__PURE__ */ jsx4("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
               /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "10", r: "2.5" })
+            ] }) }),
+            /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "measure", onClick: () => setTool("measure"), title: "\u041B\u0456\u043D\u0456\u0439\u043A\u0430", children: /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+              /* @__PURE__ */ jsx4("path", { d: "M21.55 6.45L17.55 2.45a1 1 0 0 0-1.41 0L2.45 16.14a1 1 0 0 0 0 1.41l4 4a1 1 0 0 0 1.41 0L21.55 7.86a1 1 0 0 0 0-1.41z" }),
+              /* @__PURE__ */ jsx4("path", { d: "M8 8l1.5 1.5" }),
+              /* @__PURE__ */ jsx4("path", { d: "M11.5 11.5l1.5 1.5" }),
+              /* @__PURE__ */ jsx4("path", { d: "M15 15l1.5 1.5" })
             ] }) }),
             shapes.length > 0 && /* @__PURE__ */ jsxs3(Fragment2, { children: [
               /* @__PURE__ */ jsx4("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } }),
@@ -1735,7 +1786,13 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const tools = [
     { tool: "rect", icon: /* @__PURE__ */ jsx5(RectIcon, {}), title: "\u0412\u0438\u0434\u0456\u043B\u0438\u0442\u0438 \u043E\u0431\u043B\u0430\u0441\u0442\u044C" },
     { tool: "arrow", icon: /* @__PURE__ */ jsx5(ArrowIcon, {}), title: "\u041D\u0430\u043C\u0430\u043B\u044E\u0432\u0430\u0442\u0438 \u0441\u0442\u0440\u0456\u043B\u043A\u0443" },
-    { tool: "pin", icon: /* @__PURE__ */ jsx5(PinIcon, {}), title: "\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u043F\u0456\u043D" }
+    { tool: "pin", icon: /* @__PURE__ */ jsx5(PinIcon, {}), title: "\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u043F\u0456\u043D" },
+    { tool: "measure", icon: /* @__PURE__ */ jsxs4("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+      /* @__PURE__ */ jsx5("path", { d: "M21.55 6.45L17.55 2.45a1 1 0 0 0-1.41 0L2.45 16.14a1 1 0 0 0 0 1.41l4 4a1 1 0 0 0 1.41 0L21.55 7.86a1 1 0 0 0 0-1.41z" }),
+      /* @__PURE__ */ jsx5("path", { d: "M8 8l1.5 1.5" }),
+      /* @__PURE__ */ jsx5("path", { d: "M11.5 11.5l1.5 1.5" }),
+      /* @__PURE__ */ jsx5("path", { d: "M15 15l1.5 1.5" })
+    ] }), title: "\u041B\u0456\u043D\u0456\u0439\u043A\u0430" }
   ];
   return /* @__PURE__ */ jsxs4(Fragment3, { children: [
     !activeTool && /* @__PURE__ */ jsx5("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "24px", right: "24px", zIndex: 9997 }, children: expanded ? (
