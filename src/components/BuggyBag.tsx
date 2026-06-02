@@ -143,13 +143,31 @@ export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {})
       _rec = new SR();
       _rec.lang = 'uk-UA';
       _rec.continuous = true;
-      _rec.interimResults = false;
+      _rec.interimResults = true;
       _rec.onresult = (e: any) => {
-        const transcript = Array.from(e.results as any[]).slice(e.resultIndex).map((r: any) => r[0].transcript).join(' ');
-        window.dispatchEvent(new CustomEvent('buggy-bag:transcript', { detail: transcript }));
+        let finalText = '';
+        let interimText = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) finalText += t + ' ';
+          else interimText += t;
+        }
+        if (finalText) {
+          window.dispatchEvent(new CustomEvent('buggy-bag:transcript', { detail: { text: finalText.trim(), isFinal: true } }));
+        }
+        if (interimText) {
+          window.dispatchEvent(new CustomEvent('buggy-bag:transcript', { detail: { text: interimText, isFinal: false } }));
+        }
       };
-      _rec.onend = () => window.dispatchEvent(new CustomEvent('buggy-bag:voice-end'));
-      _rec.onerror = () => window.dispatchEvent(new CustomEvent('buggy-bag:voice-end'));
+      _rec.onend = () => {
+        // auto-restart if still supposed to be listening (continuous mode recovery)
+        if (_rec) { try { _rec.start(); } catch { window.dispatchEvent(new CustomEvent('buggy-bag:voice-end')); } }
+        else window.dispatchEvent(new CustomEvent('buggy-bag:voice-end'));
+      };
+      _rec.onerror = (ev: any) => {
+        if (ev.error === 'no-speech') return; // ignore silence, keep listening
+        window.dispatchEvent(new CustomEvent('buggy-bag:voice-end'));
+      };
       _rec.start();
     };
     window.addEventListener('buggy-bag:start-voice', startVoice);

@@ -35,16 +35,21 @@ function calcPos(shape: DrawShape, cw: number, ch: number): { x: number; y: numb
 
 export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }: ShapeAnnotationProps) {
   const [text, setText] = useState('');
+  const [interim, setInterim] = useState('');
   const [listening, setListening] = useState(false);
   const { x, y } = calcPos(shape, containerWidth, containerHeight);
 
   useEffect(() => {
-    // Voice bridge — listen for transcripts from main window context
     const onTranscript = (e: Event) => {
-      const t = (e as CustomEvent).detail as string;
-      setText(prev => (prev ? prev + ' ' + t : t).trim());
+      const { text: t, isFinal } = (e as CustomEvent).detail as { text: string; isFinal: boolean };
+      if (isFinal) {
+        setText(prev => (prev ? prev + ' ' + t : t).trim());
+        setInterim('');
+      } else {
+        setInterim(t);
+      }
     };
-    const onEnd = () => setListening(false);
+    const onEnd = () => { setListening(false); setInterim(''); };
     window.addEventListener('buggy-bag:transcript', onTranscript);
     window.addEventListener('buggy-bag:voice-end', onEnd);
     return () => {
@@ -65,7 +70,7 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
 
   const handleConfirm = () => {
     window.dispatchEvent(new CustomEvent('buggy-bag:stop-voice'));
-    onConfirm(shape.id, text);
+    onConfirm(shape.id, (text + (interim ? ' ' + interim : '')).trim());
   };
 
   const handleDismiss = () => {
@@ -92,9 +97,9 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
       </div>
 
       <textarea
-        value={text}
-        onChange={e => setText(e.target.value)}
-        placeholder={listening ? 'Слухаю...' : 'Опишіть проблему...'}
+        value={text + (interim ? ' ' + interim : '')}
+        onChange={e => { setText(e.target.value); setInterim(''); }}
+        placeholder={listening ? '🎙 Говоріть...' : 'Опишіть проблему...'}
         rows={3}
         autoFocus
         style={{
