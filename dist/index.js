@@ -31460,12 +31460,13 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const handleSend = async (payload) => {
     setActiveTool(null);
     fireConfetti();
-    if (!apiEndpoint || !apiKey) {
+    const targetEndpoint = apiEndpoint || (portalUrl ? `${portalUrl}/api/bugs/submit` : null);
+    if (!targetEndpoint || !apiKey) {
       showSuccessToast(null);
       return;
     }
     try {
-      const res = await fetch(apiEndpoint, {
+      const res = await fetch(targetEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, api_key: apiKey })
