@@ -16,20 +16,41 @@ async function generateStyles() {
 
 export default defineConfig(async () => {
   await generateStyles();
-  return {
-    entry: ['src/index.ts'],
-    format: ['cjs', 'esm'],
-    dts: true,
-    sourcemap: true,
-    clean: true,
-    platform: 'browser',
-    external: ['react', 'react-dom'],
-    noExternal: ['html-to-image', 'konva', 'react-konva'],
-    esbuildOptions(options, context) {
-      options.conditions = ['browser'];
-      if (context.format === 'esm') {
-        options.banner = { js: '"use client";' };
-      }
+  return [
+    {
+      entry: ['src/index.ts'],
+      format: ['cjs', 'esm'],
+      dts: true,
+      sourcemap: true,
+      clean: true,
+      platform: 'browser',
+      external: ['react', 'react-dom'],
+      noExternal: ['html-to-image', 'konva', 'react-konva'],
+      esbuildOptions(options, context) {
+        options.conditions = ['browser'];
+        if (context.format === 'esm') {
+          options.banner = { js: '"use client";' };
+        }
+      },
     },
-  };
+    {
+      entry: {
+        'buggy-bag-standalone': 'src/standalone.tsx'
+      },
+      format: ['iife'],
+      globalName: 'BuggyBagStandalone',
+      sourcemap: true,
+      clean: false,
+      minify: true,
+      platform: 'browser',
+      external: [],
+      noExternal: ['react', 'react-dom', 'html-to-image', 'konva', 'react-konva', 'zustand', 'lucide-react'],
+      esbuildOptions(options) {
+        options.conditions = ['browser'];
+        options.define = {
+          'process.env.NODE_ENV': '"production"'
+        };
+      }
+    }
+  ];
 });

@@ -1,5 +1,37 @@
-export type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure';
+export type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure' | 'eraser' | 'eyedropper';
 export type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type DebugOverlay = 'invert' | 'spacing' | 'show-code' | 'zoom' | 'auto-bugs' | 'typography';
+
+/**
+ * DOM context captured when a pin is placed on a specific element.
+ * Gives developers instant "what did the user click on" without guessing.
+ */
+export interface PinElementContext {
+  tagName: string;                   // e.g. "button"
+  id?: string;                       // element id if present
+  classes: string[];                 // list of CSS class names
+  selector: string;                  // unique CSS selector, e.g. "button#add-to-cart"
+  ariaLabel?: string;                // aria-label if present
+  innerText?: string;                // first 80 chars of visible text
+  role?: string;                     // aria role
+  href?: string;                     // for anchor elements
+  inputType?: string;                // for input elements (text, checkbox, etc.)
+  inputName?: string;                // name attribute for form elements
+  placeholder?: string;              // placeholder text for inputs
+  dataSources?: string[];            // data-buggy-source attributes (from element + ancestors)
+  reactComponent?: {
+    name: string;
+    filePath?: string;               // from fiber._debugSource.fileName (dev builds only)
+    lineNumber?: number;             // from fiber._debugSource.lineNumber
+    props?: Record<string, unknown>; // primitive props only
+  };
+  boundingRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
 
 export interface DrawShape {
   id: string;
@@ -10,6 +42,8 @@ export interface DrawShape {
   height?: number;
   points?: [number, number, number, number]; // arrow: [x1, y1, x2, y2]
   pinNumber?: number;
+  /** DOM context captured when pin was placed — only set for 'pin' type */
+  elementContext?: PinElementContext;
 }
 
 export interface NetworkRequest {
@@ -18,6 +52,12 @@ export interface NetworkRequest {
   status: number;
   durationMs: number;
   isError: boolean;
+  /** Request body (first 500 chars) — only captured for error responses */
+  requestBody?: string;
+  /** Response body (first 500 chars) — only captured for error responses */
+  responseBody?: string;
+  /** Safe request headers (Auth/Cookie stripped) — only for error responses */
+  requestHeaders?: Record<string, string>;
 }
 
 export interface ConsoleEntry {
@@ -27,15 +67,19 @@ export interface ConsoleEntry {
 }
 
 export interface EventLogEntry {
-  type: 'navigation' | 'click' | 'network_error' | 'console_error' | 'store_change';
+  type: 'navigation' | 'click' | 'network_error' | 'console_error' | 'store_change'
+      | 'form_change' | 'scroll' | 'focus';
   description: string;
   timestamp: number;
+  /** Populated at report time: how many ms before the report this event happened */
+  relativeMs?: number;
 }
 
 export interface ComponentInfo {
   name: string;
   props?: Record<string, unknown>;
-  filePath?: string; // e.g. "src/components/ProductCard.tsx"
+  filePath?: string;   // e.g. "src/components/ProductCard.tsx"
+  lineNumber?: number; // source line number (dev builds only)
 }
 
 export interface TechContext {
@@ -44,9 +88,11 @@ export interface TechContext {
   userAgent: string;
   component: ComponentInfo | null;
   storeSnapshot: Record<string, unknown> | null;
+  /** Task 6: which store fields changed between page load and bug report */
+  storeDiff?: Record<string, { before: unknown; after: unknown }>;
   networkRequests: NetworkRequest[];
   consoleErrors: ConsoleEntry[];
-  eventLog: EventLogEntry[];  // last 30s of interactions
+  eventLog: EventLogEntry[];  // last 5min of interactions
   autoSeverity: BugSeverity;
 }
 

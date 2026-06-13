@@ -3,14 +3,18 @@ import type { DrawShape } from '../types';
 
 interface ShapeAnnotationProps {
   shape: DrawShape;
+  initialText?: string;
+  clipboardHint?: string | null;
+  onClearClipboardHint?: () => void;
   containerWidth: number;
   containerHeight: number;
   onConfirm: (shapeId: string, text: string) => void;
   onDismiss: () => void;
+  onDelete?: (shapeId: string) => void;
 }
 
-const W = 260;
-const H = 160;
+const W = 280;
+const H = 180;
 
 function calcPos(shape: DrawShape, cw: number, ch: number): { x: number; y: number } {
   let cx = shape.x;
@@ -34,11 +38,9 @@ function calcPos(shape: DrawShape, cw: number, ch: number): { x: number; y: numb
 }
 
 const hasSpeechRecognition = typeof window !== 'undefined' &&
-  !!(( window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
+  !!((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
 
-const hasEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in window;
-
-export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }: ShapeAnnotationProps) {
+export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHint, containerWidth, containerHeight, onConfirm, onDismiss, onDelete }: ShapeAnnotationProps) {
   const measureDefault = shape.type === 'measure' && shape.points
     ? (() => {
         const [x1, y1, x2, y2] = shape.points;
@@ -47,22 +49,13 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
         const dy = Math.abs(Math.round(y2 - y1));
         return `Відстань: ${dist}px (${dx} × ${dy})`;
       })()
-    : '';
+    : initialText ?? '';
   const [text, setText] = useState(measureDefault);
   const [interim, setInterim] = useState('');
   const [listening, setListening] = useState(false);
-  const [hidden, setHidden] = useState(false);
+  const [micError, setMicError] = useState('');
   const { x, y } = calcPos(shape, containerWidth, containerHeight);
-
-  const pickColor = async () => {
-    if (!hasEyeDropper) return;
-    try {
-      const dropper = new (window as any).EyeDropper();
-      const result = await dropper.open();
-      const hex = result.sRGBHex.toUpperCase();
-      setText(prev => prev ? `${prev}\nКолір: ${hex}` : `Колір: ${hex}`);
-    } catch { /* cancelled */ }
-  };
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const onTranscript = (e: Event) => {
@@ -83,14 +76,26 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
     };
   }, []);
 
-  const toggleVoice = () => {
+  const toggleVoice = async () => {
     if (listening) {
       window.dispatchEvent(new CustomEvent('buggy-bag:stop-voice'));
       setListening(false);
-    } else {
-      window.dispatchEvent(new CustomEvent('buggy-bag:start-voice'));
-      setListening(true);
+      return;
     }
+    // Request mic permission before starting
+    setMicError('');
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err: any) {
+      if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+        setMicError('Дозвіл на мікрофон відхилено');
+      } else {
+        setMicError('Мікрофон недоступний');
+      }
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('buggy-bag:start-voice'));
+    setListening(true);
   };
 
   const handleConfirm = () => {
@@ -101,6 +106,23 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
   const handleDismiss = () => {
     window.dispatchEvent(new CustomEvent('buggy-bag:stop-voice'));
     onDismiss();
+  };
+
+  const handleDelete = () => {
+    window.dispatchEvent(new CustomEvent('buggy-bag:stop-voice'));
+    if (onDelete) onDelete(shape.id);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ctrl+Enter or Cmd+Enter → confirm
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleConfirm();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      handleDismiss();
+    }
   };
 
   return (
@@ -114,8 +136,6 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
         boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
         padding: '12px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        opacity: hidden ? 0 : 1,
-        pointerEvents: hidden ? 'none' : 'auto',
         transition: 'opacity 0.15s',
       }}
       onClick={e => e.stopPropagation()}
@@ -125,9 +145,11 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
       </div>
 
       <textarea
+        ref={textareaRef}
         value={text + (interim ? ' ' + interim : '')}
         onChange={e => { setText(e.target.value); setInterim(''); }}
-        placeholder={listening ? '🎙 Говоріть...' : 'Опишіть проблему...'}
+        onKeyDown={handleKeyDown}
+        placeholder={listening ? '🎤 Говоріть...' : 'Опишіть проблему... (Ctrl+Enter щоб OK)'}
         rows={3}
         autoFocus
         style={{
@@ -140,42 +162,45 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
         }}
       />
 
-      {/* Quick-insert buttons */}
-      {hasEyeDropper && (
-        <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
-          <button
-            type="button"
-            onClick={pickColor}
-            title="Вибрати колір з екрана"
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: '10px', fontWeight: '600' }}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3z"/>
-              <path d="m19 11-8 8-1.5 1.5a1.5 1.5 0 0 1-2.1 0l-2.9-2.9a1.5 1.5 0 0 1 0-2.1L6 14l8-8"/>
-            </svg>
-            Колір
-          </button>
+      {micError && (
+        <div style={{ fontSize: '10px', color: '#fca5a5', marginTop: '4px', paddingLeft: '2px' }}>
+          ⚠ {micError}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-        {/* Voice button — only shown when SpeechRecognition is available */}
+      {clipboardHint && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', padding: '6px 8px', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', fontWeight: '500' }}>В буфері:</span>
+            <span style={{ fontSize: '10px', fontFamily: 'monospace', color: 'white', background: 'rgba(0,0,0,0.4)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>{clipboardHint}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button type="button" onClick={() => { setText(t => t ? t + ' ' + clipboardHint : clipboardHint); onClearClipboardHint?.(); }} style={{ background: 'rgba(79,70,229,0.8)', border: 'none', color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', transition: 'background 0.15s' }}>Вставити</button>
+            <button type="button" onClick={() => onClearClipboardHint?.()} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '12px', cursor: 'pointer', padding: '0 4px' }} title="Сховати">✕</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+        {/* Voice button */}
         {hasSpeechRecognition ? (
           <button
             type="button"
             onClick={toggleVoice}
-            title={listening ? 'Зупинити' : 'Записати голосом'}
+            title={listening ? 'Зупинити (мікрофон)' : 'Записати голосом'}
             style={{
               width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
-              background: listening ? '#ef4444' : 'rgba(255,255,255,0.08)',
-              border: 'none', cursor: 'pointer', color: 'white',
+              background: listening ? 'rgba(239,68,68,0.9)' : 'rgba(255,255,255,0.08)',
+              border: listening ? '1px solid rgba(239,68,68,0.5)' : '1px solid transparent',
+              cursor: 'pointer', color: 'white',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.15s',
             }}
           >
             {listening ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
             ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
               </svg>
@@ -187,11 +212,23 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
             background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'not-allowed',
           }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
             </svg>
           </div>
+        )}
+
+        {/* Delete */}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            title="Видалити мітку"
+            style={{ width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          </button>
         )}
 
         {/* Cancel */}
@@ -203,13 +240,14 @@ export function ShapeAnnotation({ shape, containerWidth, containerHeight, onConf
           Скасувати
         </button>
 
-        {/* OK */}
+        {/* OK — original indigo color */}
         <button
           type="button"
           onClick={handleConfirm}
+          title="OK (Ctrl+Enter)"
           style={{ flex: 1, height: '32px', borderRadius: '8px', background: '#4f46e5', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '700', color: 'white' }}
         >
-          OK ✓
+          OK
         </button>
       </div>
     </div>

@@ -1,6 +1,6 @@
-export { BuggyBag, isActive, activateFromUrl } from './components/BuggyBag';
+export { BuggyBag, isActive } from './components/BuggyBag';
 export type { BuggyBagProps } from './components/BuggyBag';
-export { initCollector, collectTechContext } from './lib/collector';
+export { initCollector, collectTechContext, registerDataSource } from './lib/collector';
 export type {
   DrawShape,
   DrawTool,

@@ -11884,9 +11884,9 @@ var require_Core = __commonJS({
   }
 });
 
-// node_modules/react-konva/node_modules/scheduler/cjs/scheduler.development.js
+// node_modules/scheduler/cjs/scheduler.development.js
 var require_scheduler_development = __commonJS({
-  "node_modules/react-konva/node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+  "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
     "use strict";
     if (true) {
       (function() {
@@ -12334,9 +12334,9 @@ var require_scheduler_development = __commonJS({
   }
 });
 
-// node_modules/react-konva/node_modules/scheduler/index.js
+// node_modules/scheduler/index.js
 var require_scheduler = __commonJS({
-  "node_modules/react-konva/node_modules/scheduler/index.js"(exports, module) {
+  "node_modules/scheduler/index.js"(exports, module) {
     "use strict";
     if (false) {
       module.exports = null;
@@ -27539,7 +27539,7 @@ var require_constants = __commonJS({
 });
 
 // src/components/BuggyBag.tsx
-import { useState as useState5, useEffect as useEffect4 } from "react";
+import React7, { useState as useState5, useEffect as useEffect5 } from "react";
 import { createRoot } from "react-dom/client";
 
 // src/guard.tsx
@@ -27559,7 +27559,7 @@ function GodModeGuard({ children }) {
 }
 
 // src/components/CaptureMode.tsx
-import { useState as useState4, useCallback as useCallback2, useRef as useRef4 } from "react";
+import { useState as useState4, useCallback as useCallback2, useRef as useRef4, useEffect as useEffect4 } from "react";
 
 // node_modules/html-to-image/es/util.js
 function resolveUrl(url, baseUrl) {
@@ -28858,7 +28858,6 @@ var Stage = React3.forwardRef((props, ref) => {
 
 // src/components/DrawingCanvas.tsx
 import { jsx as jsx2, jsxs } from "react/jsx-runtime";
-var pinCounter = 1;
 function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
@@ -28872,7 +28871,12 @@ function DrawingCanvas({
   tool,
   shapes,
   onShapeComplete,
-  onMouseMove
+  onShapeDelete,
+  onMouseMove,
+  onMouseLeave,
+  onShapeClick,
+  onShapeMove,
+  interactive = true
 }) {
   const isDrawing = useRef2(false);
   const origin = useRef2({ x: 0, y: 0 });
@@ -28881,31 +28885,33 @@ function DrawingCanvas({
   const handleMouseDown = useCallback(
     (e) => {
       if (e.evt.button !== 0) return;
+      const target = e.target;
+      const isPin = target.parent?.name() === "pin-circle" || target.name() === "pin-circle";
+      if (isPin) return;
       const { x, y } = getStagePos(e);
+      if (tool === "eraser") return;
       isDrawing.current = true;
       origin.current = { x, y };
+      const nextPin = Math.max(0, ...shapes.map((s) => s.pinNumber || 0)) + 1;
       if (tool === "pin") {
-        onShapeComplete({
-          id: uid(),
-          type: "pin",
-          x,
-          y,
-          pinNumber: pinCounter++
-        });
+        const newShape = { id: uid(), type: "pin", x, y, pinNumber: nextPin };
+        onShapeComplete(newShape);
         isDrawing.current = false;
-        return;
+      } else if (tool === "rect") {
+        const d = { id: uid(), type: "rect", x, y, width: 0, height: 0, pinNumber: nextPin };
+        draftRef.current = d;
+        setDraft(d);
+      } else if (tool === "arrow") {
+        const d = { id: uid(), type: "arrow", x, y, points: [x, y, x, y], pinNumber: nextPin };
+        draftRef.current = d;
+        setDraft(d);
+      } else if (tool === "measure") {
+        const d = { id: uid(), type: "measure", x, y, points: [x, y, x, y], pinNumber: nextPin };
+        draftRef.current = d;
+        setDraft(d);
       }
-      const newDraft = {
-        id: uid(),
-        type: tool,
-        x,
-        y,
-        ...tool === "rect" ? { width: 0, height: 0 } : { points: [x, y, x, y] }
-      };
-      draftRef.current = newDraft;
-      setDraft(newDraft);
     },
-    [tool, onShapeComplete]
+    [tool, onShapeComplete, shapes]
   );
   const handleMouseMove = useCallback(
     (e) => {
@@ -28941,6 +28947,7 @@ function DrawingCanvas({
     setDraft(null);
   }, [onShapeComplete]);
   const handleMouseLeave = useCallback(() => {
+    onMouseLeave?.();
     if (!isDrawing.current || !draftRef.current) return;
     isDrawing.current = false;
     const current = draftRef.current;
@@ -28951,7 +28958,7 @@ function DrawingCanvas({
     ) < 8;
     if (!tooSmall) onShapeComplete(current);
     setDraft(null);
-  }, [onShapeComplete]);
+  }, [onShapeComplete, onMouseLeave]);
   useEffect2(() => {
     const onWindowMouseUp = () => {
       if (isDrawing.current && draftRef.current) {
@@ -28969,74 +28976,179 @@ function DrawingCanvas({
     window.addEventListener("mouseup", onWindowMouseUp);
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
   }, [onShapeComplete]);
+  let cursorStyle = "default";
+  if (interactive) {
+    if (tool === "eraser") {
+      cursorStyle = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='8' fill='rgba(255,255,255,0.5)' stroke='black' stroke-width='2'/%3E%3C/svg%3E") 12 12, crosshair`;
+    } else if (tool === "measure") {
+      cursorStyle = "crosshair";
+    } else if (tool === "eyedropper") {
+      cursorStyle = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2 22 1-1h3l9-9' stroke='white' stroke-width='4'/%3E%3Cpath d='m2 22 1-1h3l9-9'/%3E%3Cpath d='M3 21v-3l9-9' stroke='white' stroke-width='4'/%3E%3Cpath d='M3 21v-3l9-9'/%3E%3Cpath d='m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z' fill='white'/%3E%3C/svg%3E") 2 22, crosshair`;
+    } else {
+      cursorStyle = "crosshair";
+    }
+  }
   return /* @__PURE__ */ jsx2(
     Stage,
     {
       width,
       height,
-      style: { position: "absolute", top: 0, left: 0, cursor: "crosshair" },
-      onMouseDown: handleMouseDown,
-      onMouseMove: handleMouseMove,
-      onMouseUp: handleMouseUp,
-      onMouseLeave: handleMouseLeave,
+      style: { position: "absolute", top: 0, left: 0, cursor: cursorStyle, pointerEvents: interactive ? "auto" : "none", zIndex: 10001 },
+      onMouseDown: interactive ? handleMouseDown : void 0,
+      onMouseMove: interactive ? handleMouseMove : void 0,
+      onMouseUp: interactive ? handleMouseUp : void 0,
+      onMouseLeave: interactive ? handleMouseLeave : void 0,
       children: /* @__PURE__ */ jsxs(Layer, { children: [
-        shapes.map(renderShape),
-        draft && renderShape(draft)
+        shapes.map((s) => renderShape(s, tool, interactive, onShapeDelete, onShapeClick, onShapeMove)),
+        interactive && draft && renderShape(draft, tool, interactive, void 0, onShapeClick, void 0)
       ] })
     }
   );
 }
-function renderShape(s) {
-  if (s.type === "rect") {
-    return /* @__PURE__ */ jsx2(
-      Rect,
+function renderShape(s, tool, interactive, onDelete, onShapeClick, onShapeMove) {
+  const isEraser = tool === "eraser";
+  const isDraggable = !isEraser && !!onShapeMove && interactive;
+  const handleShapeEnter = (e) => {
+    if (isEraser) {
+      e.target.opacity(0.4);
+      e.target.getLayer().draw();
+      e.target.getStage().container().style.cursor = "pointer";
+    }
+  };
+  const handleShapeLeave = (e) => {
+    if (isEraser) {
+      e.target.opacity(1);
+      e.target.getLayer().draw();
+      e.target.getStage().container().style.cursor = "crosshair";
+    }
+  };
+  const handleShapeClickEvent = (e) => {
+    if (isEraser && onDelete) {
+      e.cancelBubble = true;
+      onDelete(s.id);
+      e.target.getStage().container().style.cursor = "crosshair";
+    }
+  };
+  const shapeListeners = {
+    listening: isEraser,
+    onMouseEnter: handleShapeEnter,
+    onMouseLeave: handleShapeLeave,
+    onClick: handleShapeClickEvent,
+    onTap: handleShapeClickEvent
+  };
+  const handlePinEnter = (e) => {
+    e.target.getStage().container().style.cursor = "pointer";
+    const group = e.target.parent;
+    if (group) {
+      group.scale({ x: 1.15, y: 1.15 });
+    }
+    if (isEraser) {
+      e.target.opacity(0.4);
+      e.target.getLayer().draw();
+    }
+  };
+  const handlePinLeave = (e) => {
+    e.target.getStage().container().style.cursor = "crosshair";
+    const group = e.target.parent;
+    if (group) {
+      group.scale({ x: 1, y: 1 });
+    }
+    if (isEraser) {
+      e.target.opacity(1);
+      e.target.getLayer().draw();
+    }
+  };
+  const handlePinClickEvent = (e) => {
+    e.cancelBubble = true;
+    if (e.evt) {
+      e.evt.stopPropagation();
+      e.evt.preventDefault();
+    }
+    if (isEraser && onDelete) {
+      onDelete(s.id);
+      e.target.getStage().container().style.cursor = "crosshair";
+    } else if (!isEraser && onShapeClick) {
+      onShapeClick(s.id);
+      e.target.getStage().container().style.cursor = "crosshair";
+    }
+  };
+  const pinListeners = {
+    listening: true,
+    onMouseEnter: handlePinEnter,
+    onMouseLeave: handlePinLeave,
+    onClick: handlePinClickEvent,
+    onTap: handlePinClickEvent
+  };
+  const handleDragEnd = (e) => {
+    const dx = e.target.x();
+    const dy = e.target.y();
+    if (dx === 0 && dy === 0) return;
+    e.target.position({ x: 0, y: 0 });
+    e.target.getLayer().batchDraw();
+    if (onShapeMove) onShapeMove(s.id, dx, dy);
+  };
+  let pinX = s.x;
+  let pinY = s.y;
+  if (s.type === "arrow" || s.type === "measure") {
+    if (s.points && s.points.length >= 2) {
+      pinX = s.points[0];
+      pinY = s.points[1];
+    }
+  }
+  const pinCircle = /* @__PURE__ */ jsxs(Group, { name: "pin-circle", x: pinX, y: pinY, ...pinListeners, children: [
+    /* @__PURE__ */ jsx2(Circle, { radius: 14, fill: "#ef4444" }),
+    /* @__PURE__ */ jsx2(
+      Text,
       {
-        x: s.x,
-        y: s.y,
-        width: s.width ?? 0,
-        height: s.height ?? 0,
-        stroke: "#ef4444",
-        strokeWidth: 2,
-        fill: "rgba(239,68,68,0.08)",
-        dash: [6, 3],
-        listening: false
-      },
-      s.id
-    );
+        text: String(s.pinNumber ?? "?"),
+        fontSize: 13,
+        fill: "white",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontStyle: "bold",
+        align: "center",
+        verticalAlign: "middle",
+        x: -14,
+        y: -6.5,
+        width: 28
+      }
+    )
+  ] }, s.id + "_pin_inner");
+  if (s.type === "pin") {
+    return /* @__PURE__ */ jsx2(Group, { draggable: isDraggable, onDragEnd: handleDragEnd, children: pinCircle }, s.id);
+  }
+  if (s.type === "rect") {
+    return /* @__PURE__ */ jsxs(Group, { draggable: isDraggable, onDragEnd: handleDragEnd, children: [
+      /* @__PURE__ */ jsx2(
+        Rect,
+        {
+          x: s.x,
+          y: s.y,
+          width: s.width ?? 0,
+          height: s.height ?? 0,
+          stroke: "#ef4444",
+          strokeWidth: 4,
+          dash: [8, 8],
+          ...shapeListeners
+        }
+      ),
+      pinCircle
+    ] }, s.id);
   }
   if (s.type === "arrow") {
-    return /* @__PURE__ */ jsx2(
-      Arrow,
-      {
-        points: s.points ? [...s.points] : [],
-        stroke: "#ef4444",
-        strokeWidth: 2.5,
-        fill: "#ef4444",
-        pointerLength: 10,
-        pointerWidth: 8,
-        listening: false
-      },
-      s.id
-    );
-  }
-  if (s.type === "pin") {
-    return /* @__PURE__ */ jsxs(Group, { x: s.x, y: s.y, listening: false, children: [
-      /* @__PURE__ */ jsx2(Circle, { radius: 14, fill: "#ef4444" }),
+    return /* @__PURE__ */ jsxs(Group, { draggable: isDraggable, onDragEnd: handleDragEnd, children: [
       /* @__PURE__ */ jsx2(
-        Text,
+        Arrow,
         {
-          text: String(s.pinNumber ?? "?"),
-          fontSize: 12,
-          fontStyle: "bold",
-          fill: "white",
-          align: "center",
-          verticalAlign: "middle",
-          x: -14,
-          y: -8,
-          width: 28,
-          height: 16
+          points: s.points,
+          stroke: "#ef4444",
+          fill: "#ef4444",
+          strokeWidth: 4,
+          pointerLength: 10,
+          pointerWidth: 10,
+          ...shapeListeners
         }
-      )
+      ),
+      pinCircle
     ] }, s.id);
   }
   if (s.type === "measure" && s.points) {
@@ -29047,22 +29159,25 @@ function renderShape(s) {
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
     const label = `${dist}px  (${dx} \xD7 ${dy})`;
-    return /* @__PURE__ */ jsxs(Group, { listening: false, children: [
-      /* @__PURE__ */ jsx2(Line, { points: [x1, y1, x2, y2], stroke: "#f59e0b", strokeWidth: 2, dash: [6, 3] }),
-      /* @__PURE__ */ jsx2(Line, { points: [x1 - 5, y1, x1 + 5, y1], stroke: "#f59e0b", strokeWidth: 2, rotation: Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI, offsetX: 0 }),
-      /* @__PURE__ */ jsx2(Line, { points: [x2 - 5, y2, x2 + 5, y2], stroke: "#f59e0b", strokeWidth: 2 }),
-      /* @__PURE__ */ jsx2(Rect, { x: mx - 52, y: my - 11, width: 104, height: 22, fill: "rgba(0,0,0,0.7)", cornerRadius: 6 }),
-      /* @__PURE__ */ jsx2(Text, { text: label, x: mx - 50, y: my - 8, fontSize: 11, fontStyle: "bold", fill: "#f59e0b", fontFamily: "monospace", align: "center", width: 100 })
+    return /* @__PURE__ */ jsxs(Group, { draggable: isDraggable, onDragEnd: handleDragEnd, children: [
+      /* @__PURE__ */ jsxs(Group, { ...shapeListeners, children: [
+        /* @__PURE__ */ jsx2(Line, { points: [x1, y1, x2, y2], stroke: "#f59e0b", strokeWidth: 2, dash: [6, 3] }),
+        /* @__PURE__ */ jsx2(Line, { points: [x1 - 5, y1, x1 + 5, y1], stroke: "#f59e0b", strokeWidth: 2, rotation: Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI, offsetX: 0 }),
+        /* @__PURE__ */ jsx2(Line, { points: [x2 - 5, y2, x2 + 5, y2], stroke: "#f59e0b", strokeWidth: 2 }),
+        /* @__PURE__ */ jsx2(Rect, { x: mx - 52, y: my - 11, width: 104, height: 22, fill: "rgba(0,0,0,0.7)", cornerRadius: 6 }),
+        /* @__PURE__ */ jsx2(Text, { text: label, x: mx - 50, y: my - 8, fontSize: 11, fontStyle: "bold", fill: "#f59e0b", fontFamily: "monospace", align: "center", width: 100 })
+      ] }),
+      pinCircle
     ] }, s.id);
   }
   return null;
 }
 
 // src/components/ShapeAnnotation.tsx
-import { useState as useState3, useEffect as useEffect3 } from "react";
+import { useState as useState3, useRef as useRef3, useEffect as useEffect3 } from "react";
 import { jsx as jsx3, jsxs as jsxs2 } from "react/jsx-runtime";
-var W = 260;
-var H = 160;
+var W = 280;
+var H = 180;
 function calcPos(shape, cw, ch) {
   let cx = shape.x;
   let cy = shape.y;
@@ -29082,31 +29197,20 @@ function calcPos(shape, cw, ch) {
   };
 }
 var hasSpeechRecognition = typeof window !== "undefined" && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
-var hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
-function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, onDismiss }) {
+function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHint, containerWidth, containerHeight, onConfirm, onDismiss, onDelete }) {
   const measureDefault = shape.type === "measure" && shape.points ? (() => {
     const [x1, y1, x2, y2] = shape.points;
     const dist = Math.round(Math.hypot(x2 - x1, y2 - y1));
     const dx = Math.abs(Math.round(x2 - x1));
     const dy = Math.abs(Math.round(y2 - y1));
     return `\u0412\u0456\u0434\u0441\u0442\u0430\u043D\u044C: ${dist}px (${dx} \xD7 ${dy})`;
-  })() : "";
+  })() : initialText ?? "";
   const [text, setText] = useState3(measureDefault);
   const [interim, setInterim] = useState3("");
   const [listening, setListening] = useState3(false);
-  const [hidden, setHidden] = useState3(false);
+  const [micError, setMicError] = useState3("");
   const { x, y } = calcPos(shape, containerWidth, containerHeight);
-  const pickColor = async () => {
-    if (!hasEyeDropper) return;
-    try {
-      const dropper = new window.EyeDropper();
-      const result = await dropper.open();
-      const hex = result.sRGBHex.toUpperCase();
-      setText((prev) => prev ? `${prev}
-\u041A\u043E\u043B\u0456\u0440: ${hex}` : `\u041A\u043E\u043B\u0456\u0440: ${hex}`);
-    } catch {
-    }
-  };
+  const textareaRef = useRef3(null);
   useEffect3(() => {
     const onTranscript = (e) => {
       const { text: t, isFinal } = e.detail;
@@ -29128,14 +29232,25 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
       window.removeEventListener("buggy-bag:voice-end", onEnd);
     };
   }, []);
-  const toggleVoice = () => {
+  const toggleVoice = async () => {
     if (listening) {
       window.dispatchEvent(new CustomEvent("buggy-bag:stop-voice"));
       setListening(false);
-    } else {
-      window.dispatchEvent(new CustomEvent("buggy-bag:start-voice"));
-      setListening(true);
+      return;
     }
+    setMicError("");
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        setMicError("\u0414\u043E\u0437\u0432\u0456\u043B \u043D\u0430 \u043C\u0456\u043A\u0440\u043E\u0444\u043E\u043D \u0432\u0456\u0434\u0445\u0438\u043B\u0435\u043D\u043E");
+      } else {
+        setMicError("\u041C\u0456\u043A\u0440\u043E\u0444\u043E\u043D \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0439");
+      }
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("buggy-bag:start-voice"));
+    setListening(true);
   };
   const handleConfirm = () => {
     window.dispatchEvent(new CustomEvent("buggy-bag:stop-voice"));
@@ -29144,6 +29259,20 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
   const handleDismiss = () => {
     window.dispatchEvent(new CustomEvent("buggy-bag:stop-voice"));
     onDismiss();
+  };
+  const handleDelete = () => {
+    window.dispatchEvent(new CustomEvent("buggy-bag:stop-voice"));
+    if (onDelete) onDelete(shape.id);
+  };
+  const handleKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleConfirm();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      handleDismiss();
+    }
   };
   return /* @__PURE__ */ jsxs2(
     "div",
@@ -29160,8 +29289,6 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
         boxShadow: "0 12px 40px rgba(0,0,0,0.4)",
         padding: "12px",
         fontFamily: "system-ui, -apple-system, sans-serif",
-        opacity: hidden ? 0 : 1,
-        pointerEvents: hidden ? "none" : "auto",
         transition: "opacity 0.15s"
       },
       onClick: (e) => e.stopPropagation(),
@@ -29170,12 +29297,14 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
         /* @__PURE__ */ jsx3(
           "textarea",
           {
+            ref: textareaRef,
             value: text + (interim ? " " + interim : ""),
             onChange: (e) => {
               setText(e.target.value);
               setInterim("");
             },
-            placeholder: listening ? "\u{1F399} \u0413\u043E\u0432\u043E\u0440\u0456\u0442\u044C..." : "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u0443...",
+            onKeyDown: handleKeyDown,
+            placeholder: listening ? "\u{1F3A4} \u0413\u043E\u0432\u043E\u0440\u0456\u0442\u044C..." : "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u0443... (Ctrl+Enter \u0449\u043E\u0431 OK)",
             rows: 3,
             autoFocus: true,
             style: {
@@ -29195,43 +29324,45 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
             }
           }
         ),
-        hasEyeDropper && /* @__PURE__ */ jsx3("div", { style: { display: "flex", gap: "4px", marginTop: "6px" }, children: /* @__PURE__ */ jsxs2(
-          "button",
-          {
-            type: "button",
-            onClick: pickColor,
-            title: "\u0412\u0438\u0431\u0440\u0430\u0442\u0438 \u043A\u043E\u043B\u0456\u0440 \u0437 \u0435\u043A\u0440\u0430\u043D\u0430",
-            style: { display: "flex", alignItems: "center", gap: "4px", padding: "3px 8px", borderRadius: "6px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer", color: "rgba(255,255,255,0.6)", fontSize: "10px", fontWeight: "600" },
-            children: [
-              /* @__PURE__ */ jsxs2("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                /* @__PURE__ */ jsx3("path", { d: "M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3z" }),
-                /* @__PURE__ */ jsx3("path", { d: "m19 11-8 8-1.5 1.5a1.5 1.5 0 0 1-2.1 0l-2.9-2.9a1.5 1.5 0 0 1 0-2.1L6 14l8-8" })
-              ] }),
-              "\u041A\u043E\u043B\u0456\u0440"
-            ]
-          }
-        ) }),
-        /* @__PURE__ */ jsxs2("div", { style: { display: "flex", gap: "6px", marginTop: "8px" }, children: [
+        micError && /* @__PURE__ */ jsxs2("div", { style: { fontSize: "10px", color: "#fca5a5", marginTop: "4px", paddingLeft: "2px" }, children: [
+          "\u26A0 ",
+          micError
+        ] }),
+        clipboardHint && /* @__PURE__ */ jsxs2("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px", padding: "6px 8px", background: "rgba(255,255,255,0.06)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)" }, children: [
+          /* @__PURE__ */ jsxs2("div", { style: { display: "flex", alignItems: "center", gap: "6px" }, children: [
+            /* @__PURE__ */ jsx3("span", { style: { fontSize: "10px", color: "rgba(255,255,255,0.6)", fontWeight: "500" }, children: "\u0412 \u0431\u0443\u0444\u0435\u0440\u0456:" }),
+            /* @__PURE__ */ jsx3("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "white", background: "rgba(0,0,0,0.4)", padding: "2px 5px", borderRadius: "4px", fontWeight: "600" }, children: clipboardHint })
+          ] }),
+          /* @__PURE__ */ jsxs2("div", { style: { display: "flex", alignItems: "center", gap: "4px" }, children: [
+            /* @__PURE__ */ jsx3("button", { type: "button", onClick: () => {
+              setText((t) => t ? t + " " + clipboardHint : clipboardHint);
+              onClearClipboardHint?.();
+            }, style: { background: "rgba(79,70,229,0.8)", border: "none", color: "white", fontSize: "10px", fontWeight: "bold", padding: "4px 8px", borderRadius: "4px", cursor: "pointer", transition: "background 0.15s" }, children: "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u0438" }),
+            /* @__PURE__ */ jsx3("button", { type: "button", onClick: () => onClearClipboardHint?.(), style: { background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", fontSize: "12px", cursor: "pointer", padding: "0 4px" }, title: "\u0421\u0445\u043E\u0432\u0430\u0442\u0438", children: "\u2715" })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs2("div", { style: { display: "flex", gap: "6px", marginTop: "10px" }, children: [
           hasSpeechRecognition ? /* @__PURE__ */ jsx3(
             "button",
             {
               type: "button",
               onClick: toggleVoice,
-              title: listening ? "\u0417\u0443\u043F\u0438\u043D\u0438\u0442\u0438" : "\u0417\u0430\u043F\u0438\u0441\u0430\u0442\u0438 \u0433\u043E\u043B\u043E\u0441\u043E\u043C",
+              title: listening ? "\u0417\u0443\u043F\u0438\u043D\u0438\u0442\u0438 (\u043C\u0456\u043A\u0440\u043E\u0444\u043E\u043D)" : "\u0417\u0430\u043F\u0438\u0441\u0430\u0442\u0438 \u0433\u043E\u043B\u043E\u0441\u043E\u043C",
               style: {
                 width: "32px",
                 height: "32px",
                 borderRadius: "8px",
                 flexShrink: 0,
-                background: listening ? "#ef4444" : "rgba(255,255,255,0.08)",
-                border: "none",
+                background: listening ? "rgba(239,68,68,0.9)" : "rgba(255,255,255,0.08)",
+                border: listening ? "1px solid rgba(239,68,68,0.5)" : "1px solid transparent",
                 cursor: "pointer",
                 color: "white",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center"
+                justifyContent: "center",
+                transition: "all 0.15s"
               },
-              children: listening ? /* @__PURE__ */ jsx3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ jsx3("rect", { x: "6", y: "6", width: "12", height: "12", rx: "2" }) }) : /* @__PURE__ */ jsxs2("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+              children: listening ? /* @__PURE__ */ jsx3("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ jsx3("rect", { x: "6", y: "6", width: "12", height: "12", rx: "2" }) }) : /* @__PURE__ */ jsxs2("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
                 /* @__PURE__ */ jsx3("path", { d: "M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" }),
                 /* @__PURE__ */ jsx3("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
                 /* @__PURE__ */ jsx3("line", { x1: "12", y1: "19", x2: "12", y2: "22" })
@@ -29247,11 +29378,26 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
             alignItems: "center",
             justifyContent: "center",
             cursor: "not-allowed"
-          }, children: /* @__PURE__ */ jsxs2("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "rgba(255,255,255,0.2)", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          }, children: /* @__PURE__ */ jsxs2("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "rgba(255,255,255,0.2)", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
             /* @__PURE__ */ jsx3("path", { d: "M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" }),
             /* @__PURE__ */ jsx3("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
             /* @__PURE__ */ jsx3("line", { x1: "12", y1: "19", x2: "12", y2: "22" })
           ] }) }),
+          onDelete && /* @__PURE__ */ jsx3(
+            "button",
+            {
+              type: "button",
+              onClick: handleDelete,
+              title: "\u0412\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u043C\u0456\u0442\u043A\u0443",
+              style: { width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" },
+              children: /* @__PURE__ */ jsxs2("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                /* @__PURE__ */ jsx3("path", { d: "M3 6h18" }),
+                /* @__PURE__ */ jsx3("path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" }),
+                /* @__PURE__ */ jsx3("line", { x1: "10", y1: "11", x2: "10", y2: "17" }),
+                /* @__PURE__ */ jsx3("line", { x1: "14", y1: "11", x2: "14", y2: "17" })
+              ] })
+            }
+          ),
           /* @__PURE__ */ jsx3(
             "button",
             {
@@ -29266,8 +29412,9 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
             {
               type: "button",
               onClick: handleConfirm,
+              title: "OK (Ctrl+Enter)",
               style: { flex: 1, height: "32px", borderRadius: "8px", background: "#4f46e5", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700", color: "white" },
-              children: "OK \u2713"
+              children: "OK"
             }
           )
         ] })
@@ -29279,8 +29426,8 @@ function ShapeAnnotation({ shape, containerWidth, containerHeight, onConfirm, on
 // src/lib/collector.ts
 var MAX_NETWORK = 20;
 var MAX_CONSOLE = 10;
-var MAX_EVENTS = 50;
-var EVENT_WINDOW_MS = 3e4;
+var MAX_EVENTS = 100;
+var EVENT_WINDOW_MS = 5 * 60 * 1e3;
 var networkLog = [];
 var consoleLog = [];
 var eventLog = [];
@@ -29292,6 +29439,57 @@ function recentEvents() {
   const cutoff = Date.now() - EVENT_WINDOW_MS;
   return eventLog.filter((e) => e.timestamp >= cutoff);
 }
+function redactSensitive(body) {
+  try {
+    const parsed = JSON.parse(body);
+    const redacted = redactObj(parsed);
+    return JSON.stringify(redacted).slice(0, 500);
+  } catch {
+    return body.slice(0, 500);
+  }
+}
+function redactObj(obj, depth = 0) {
+  if (depth > 3 || typeof obj !== "object" || obj === null) return obj;
+  if (Array.isArray(obj)) return obj.slice(0, 5).map((v) => redactObj(v, depth + 1));
+  const result = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (/password|token|secret|key|auth|credential|cookie|authorization/i.test(k)) {
+      result[k] = "***";
+    } else {
+      result[k] = redactObj(v, depth + 1);
+    }
+  }
+  return result;
+}
+function safeHeaders(headers) {
+  if (!headers) return void 0;
+  const safe = {};
+  const BLOCKED = /^(authorization|cookie|x-api-key|x-auth|x-token|set-cookie)$/i;
+  const entries = headers instanceof Headers ? Array.from(headers.entries()) : Array.isArray(headers) ? headers : Object.entries(headers);
+  for (const [k, v] of entries) {
+    if (!BLOCKED.test(k)) safe[k] = v;
+  }
+  return Object.keys(safe).length > 0 ? safe : void 0;
+}
+async function readRequestBody(init) {
+  if (!init?.body) return void 0;
+  try {
+    if (typeof init.body === "string") return init.body.slice(0, 500);
+    if (init.body instanceof URLSearchParams) return init.body.toString().slice(0, 500);
+    if (init.body instanceof FormData) {
+      const parts = [];
+      init.body.forEach((v, k) => {
+        if (typeof v === "string") parts.push(`${k}=${v}`);
+      });
+      return parts.join("&").slice(0, 500);
+    }
+    if (init.body instanceof ArrayBuffer || ArrayBuffer.isView(init.body)) {
+      return "[binary data]";
+    }
+  } catch {
+  }
+  return void 0;
+}
 var fetchPatched = false;
 function patchFetch() {
   if (fetchPatched || typeof window === "undefined") return;
@@ -29299,41 +29497,51 @@ function patchFetch() {
   const original = window.fetch.bind(window);
   window.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    const method = init?.method ?? "GET";
+    const method = (init?.method ?? "GET").toUpperCase();
     const start = Date.now();
+    if (url.includes("/api/bugs/submit")) return original(input, init);
     try {
       const res = await original(input, init);
       const duration = Date.now() - start;
       const isError = res.status >= 400;
       const entry = {
         url: url.length > 120 ? url.slice(0, 120) + "\u2026" : url,
-        method: method.toUpperCase(),
+        method,
         status: res.status,
         durationMs: duration,
         isError
       };
-      pushCapped(networkLog, entry, MAX_NETWORK);
       if (isError) {
+        const rawReqBody = await readRequestBody(init);
+        if (rawReqBody) entry.requestBody = redactSensitive(rawReqBody);
+        const hdrs = safeHeaders(init?.headers);
+        if (hdrs) entry.requestHeaders = hdrs;
+        try {
+          const cloned = res.clone();
+          const text = await cloned.text();
+          if (text) entry.responseBody = redactSensitive(text);
+        } catch {
+        }
         pushCapped(eventLog, {
           type: "network_error",
-          description: `${method.toUpperCase()} ${shortUrl(url)} \u2192 ${res.status}`,
+          description: `${method} ${shortUrl(url)} \u2192 ${res.status}`,
           timestamp: Date.now()
         }, MAX_EVENTS);
       }
+      pushCapped(networkLog, entry, MAX_NETWORK);
       return res;
     } catch (err) {
       const duration = Date.now() - start;
-      const entry = {
+      pushCapped(networkLog, {
         url: url.length > 120 ? url.slice(0, 120) + "\u2026" : url,
-        method: method.toUpperCase(),
+        method,
         status: 0,
         durationMs: duration,
         isError: true
-      };
-      pushCapped(networkLog, entry, MAX_NETWORK);
+      }, MAX_NETWORK);
       pushCapped(eventLog, {
         type: "network_error",
-        description: `${method.toUpperCase()} ${shortUrl(url)} \u2192 network error`,
+        description: `${method} ${shortUrl(url)} \u2192 network error`,
         timestamp: Date.now()
       }, MAX_EVENTS);
       throw err;
@@ -29347,6 +29555,63 @@ function shortUrl(url) {
   } catch {
     return url.slice(0, 60);
   }
+}
+var xhrPatched = false;
+function patchXHR() {
+  if (xhrPatched || typeof window === "undefined") return;
+  xhrPatched = true;
+  const OriginalXHR = window.XMLHttpRequest;
+  window.XMLHttpRequest = function() {
+    const xhr = new OriginalXHR();
+    let method = "GET";
+    let url = "";
+    let requestBody;
+    let start = 0;
+    const origOpen = xhr.open.bind(xhr);
+    xhr.open = function(m, u, async, user, password) {
+      method = m.toUpperCase();
+      url = u;
+      return origOpen(m, u, async, user, password);
+    };
+    const origSend = xhr.send.bind(xhr);
+    xhr.send = function(body) {
+      start = Date.now();
+      if (body && typeof body === "string") {
+        requestBody = redactSensitive(body);
+      } else if (body instanceof URLSearchParams) {
+        requestBody = body.toString().slice(0, 500);
+      }
+      xhr.addEventListener("loadend", () => {
+        if (url.includes("/api/bugs/submit")) return;
+        const duration = Date.now() - start;
+        const status = xhr.status;
+        const isError = status === 0 || status >= 400;
+        const entry = {
+          url: url.length > 120 ? url.slice(0, 120) + "\u2026" : url,
+          method,
+          status,
+          durationMs: duration,
+          isError
+        };
+        if (isError) {
+          if (requestBody) entry.requestBody = requestBody;
+          try {
+            const resText = xhr.responseText;
+            if (resText) entry.responseBody = redactSensitive(resText);
+          } catch {
+          }
+          pushCapped(eventLog, {
+            type: "network_error",
+            description: `${method} ${shortUrl(url)} \u2192 ${status || "network error"}`,
+            timestamp: Date.now()
+          }, MAX_EVENTS);
+        }
+        pushCapped(networkLog, entry, MAX_NETWORK);
+      });
+      return origSend(body);
+    };
+    return xhr;
+  };
 }
 var consolePaetched = false;
 function patchConsole() {
@@ -29451,7 +29716,72 @@ function patchDom() {
     }, MAX_EVENTS);
   }, { capture: true, passive: true });
 }
-function findReactComponent(element) {
+var formPatched = false;
+function patchFormEvents() {
+  if (formPatched || typeof window === "undefined") return;
+  formPatched = true;
+  document.addEventListener("change", (e) => {
+    const target = e.target;
+    if (!target || target.closest("[data-buggy-bag]")) return;
+    const tag = target.tagName.toLowerCase();
+    if (!["input", "select", "textarea"].includes(tag)) return;
+    const name = target.getAttribute("name") || target.getAttribute("id") || target.getAttribute("aria-label") || tag;
+    const inputEl = target;
+    let detail = "";
+    if (tag === "select") {
+      const sel = target;
+      detail = sel.options[sel.selectedIndex]?.text?.slice(0, 30) ?? "";
+    } else if (inputEl.type === "checkbox" || inputEl.type === "radio") {
+      detail = inputEl.checked ? "checked" : "unchecked";
+    } else {
+      detail = "(value hidden)";
+    }
+    pushCapped(eventLog, {
+      type: "form_change",
+      description: `Changed field "${name}"${detail ? `: ${detail}` : ""}`,
+      timestamp: Date.now()
+    }, MAX_EVENTS);
+  }, { capture: true, passive: true });
+  document.addEventListener("focus", (e) => {
+    const target = e.target;
+    if (!target || target.closest("[data-buggy-bag]")) return;
+    const tag = target.tagName.toLowerCase();
+    if (!["input", "select", "textarea"].includes(tag)) return;
+    const name = target.getAttribute("name") || target.getAttribute("id") || target.getAttribute("aria-label") || target.getAttribute("placeholder") || tag;
+    pushCapped(eventLog, {
+      type: "focus",
+      description: `Focused field "${name}"`,
+      timestamp: Date.now()
+    }, MAX_EVENTS);
+  }, { capture: true, passive: true });
+}
+var scrollPatched = false;
+var scrollMilestones = /* @__PURE__ */ new Set();
+function patchScrollTracking() {
+  if (scrollPatched || typeof window === "undefined") return;
+  scrollPatched = true;
+  const milestones = [25, 50, 75, 100];
+  const onScroll = () => {
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    if (docHeight <= 0) return;
+    const pct = Math.round(window.scrollY / docHeight * 100);
+    for (const m of milestones) {
+      if (pct >= m && !scrollMilestones.has(m)) {
+        scrollMilestones.add(m);
+        pushCapped(eventLog, {
+          type: "scroll",
+          description: `Scrolled to ${m}% of page`,
+          timestamp: Date.now()
+        }, MAX_EVENTS);
+      }
+    }
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("popstate", () => {
+    scrollMilestones.clear();
+  });
+}
+function findReactComponentFromFiber(element) {
   if (!element) return null;
   let el = element;
   while (el) {
@@ -29471,7 +29801,24 @@ function findReactComponent(element) {
               props[k] = v;
             }
           }
-          return { name, props: Object.keys(props).length ? props : void 0 };
+          let filePath;
+          let lineNumber;
+          try {
+            const debugSource = fiber._debugSource;
+            if (debugSource?.fileName) {
+              const raw = debugSource.fileName;
+              const srcIdx = raw.lastIndexOf("/src/");
+              filePath = srcIdx >= 0 ? raw.slice(srcIdx + 1) : raw.split("/").slice(-2).join("/");
+              lineNumber = debugSource.lineNumber;
+            }
+          } catch {
+          }
+          return {
+            name,
+            props: Object.keys(props).length ? props : void 0,
+            filePath,
+            lineNumber
+          };
         }
         fiber = fiber.return;
       }
@@ -29480,6 +29827,138 @@ function findReactComponent(element) {
   }
   return null;
 }
+function buildCssSelector(element) {
+  if (!element || element === document.body) return "body";
+  const tag = element.tagName.toLowerCase();
+  if (element.id) {
+    return `${tag}#${CSS.escape(element.id)}`;
+  }
+  const ariaLabel = element.getAttribute("aria-label");
+  if (ariaLabel) {
+    return `${tag}[aria-label="${ariaLabel.slice(0, 40)}"]`;
+  }
+  const name = element.getAttribute("name");
+  if (name && ["input", "select", "textarea", "button"].includes(tag)) {
+    return `${tag}[name="${name}"]`;
+  }
+  const parts = [];
+  let el = element;
+  let depth = 0;
+  while (el && el !== document.body && depth < 4) {
+    let part = el.tagName.toLowerCase();
+    if (el.id) {
+      parts.unshift(`${part}#${CSS.escape(el.id)}`);
+      break;
+    }
+    const classes = Array.from(el.classList).filter((c) => c.length > 2 && !/^(w-|h-|p-|m-|flex|grid|text-|bg-|border|rounded|block|inline|hidden|absolute|relative|fixed|overflow|z-|cursor-)/.test(c)).slice(0, 2);
+    if (classes.length > 0) {
+      part += "." + classes.join(".");
+    }
+    const parent = el.parentElement;
+    if (parent) {
+      const siblings = Array.from(parent.children).filter((c) => c.tagName === el.tagName);
+      if (siblings.length > 1) {
+        const idx = siblings.indexOf(el) + 1;
+        part += `:nth-child(${idx})`;
+      }
+    }
+    parts.unshift(part);
+    el = el.parentElement;
+    depth++;
+  }
+  return parts.join(" > ");
+}
+var dataSourceRegistry = /* @__PURE__ */ new Map();
+function registerDataSource(selector, source) {
+  dataSourceRegistry.set(selector, source);
+}
+function readDataSources(element) {
+  if (!element) return [];
+  const sources = [];
+  let el = element;
+  let depth = 0;
+  while (el && el !== document.body && depth < 5) {
+    const src = el.getAttribute("data-buggy-source");
+    if (src && !sources.includes(src)) {
+      sources.push(src);
+    }
+    el = el.parentElement;
+    depth++;
+  }
+  if (dataSourceRegistry.size > 0) {
+    let checkEl = element;
+    let checkDepth = 0;
+    while (checkEl && checkEl !== document.body && checkDepth < 5) {
+      for (const [selector, source] of dataSourceRegistry) {
+        try {
+          if (checkEl.matches(selector) && !sources.includes(source)) {
+            sources.push(source);
+          }
+        } catch {
+        }
+      }
+      checkEl = checkEl.parentElement;
+      checkDepth++;
+    }
+  }
+  return sources;
+}
+function getPinElementContext(x, y) {
+  if (typeof document === "undefined") return null;
+  try {
+    const elements = document.elementsFromPoint(x, y);
+    const target = elements.find((el) => {
+      const htmlEl = el;
+      return !htmlEl.closest?.("[data-buggy-bag]") && el !== document.documentElement && el !== document.body;
+    });
+    if (!target) return null;
+    const tag = target.tagName.toLowerCase();
+    const rect = target.getBoundingClientRect();
+    const rawText = target.innerText?.trim() ?? target.textContent?.trim() ?? "";
+    const innerText = rawText.length > 0 ? rawText.slice(0, 80) : void 0;
+    const classes = Array.from(target.classList).filter(Boolean);
+    const id = target.id || void 0;
+    const ariaLabel = target.getAttribute("aria-label") || void 0;
+    const role = target.getAttribute("role") || void 0;
+    const href = target.href || void 0;
+    const inputType = tag === "input" ? target.type || void 0 : void 0;
+    const inputName = target.getAttribute("name") || void 0;
+    const placeholder = target.getAttribute("placeholder") || void 0;
+    const selector = buildCssSelector(target);
+    const dataSources = readDataSources(target);
+    const reactInfo = findReactComponentFromFiber(target);
+    const reactComponent = reactInfo ? {
+      name: reactInfo.name,
+      filePath: reactInfo.filePath,
+      lineNumber: reactInfo.lineNumber,
+      props: reactInfo.props
+    } : void 0;
+    return {
+      tagName: tag,
+      id,
+      classes,
+      selector,
+      ariaLabel,
+      innerText,
+      role,
+      href: href && href.length > 0 && href !== window.location.href ? href : void 0,
+      inputType,
+      inputName,
+      placeholder,
+      dataSources: dataSources.length > 0 ? dataSources : void 0,
+      reactComponent,
+      boundingRect: {
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+var baselineSnapshot = null;
 function readStoreSnapshot() {
   if (typeof window === "undefined") return null;
   const w = window;
@@ -29520,6 +29999,23 @@ function sanitizeSnapshot(state, depth = 0) {
   }
   return result;
 }
+function getStoreDiff(before, after) {
+  if (!before || !after) return null;
+  const diff = {};
+  const allKeys = /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)]);
+  for (const key of allKeys) {
+    const bVal = before[key];
+    const aVal = after[key];
+    try {
+      if (JSON.stringify(bVal) !== JSON.stringify(aVal)) {
+        diff[key] = { before: bVal, after: aVal };
+      }
+    } catch {
+      if (bVal !== aVal) diff[key] = { before: bVal, after: aVal };
+    }
+  }
+  return Object.keys(diff).length > 0 ? diff : null;
+}
 function calcAutoSeverity(network, console_) {
   const has5xx = network.some((r) => r.status >= 500);
   const has4xx = network.some((r) => r.status >= 400 && r.status < 500);
@@ -29531,27 +30027,39 @@ function calcAutoSeverity(network, console_) {
 }
 function initCollector() {
   patchFetch();
+  patchXHR();
   patchConsole();
   patchGlobalErrors();
   patchDom();
+  patchFormEvents();
+  patchScrollTracking();
   pushCapped(eventLog, {
     type: "navigation",
     description: `Opened ${window.location.pathname}`,
     timestamp: Date.now()
   }, MAX_EVENTS);
+  setTimeout(() => {
+    baselineSnapshot = readStoreSnapshot();
+  }, 500);
 }
 function collectTechContext(clickedElement) {
   const network = [...networkLog];
   const console_ = [...consoleLog];
-  const events = recentEvents();
-  const component = findReactComponent(clickedElement ?? null);
+  const now = Date.now();
+  const events = recentEvents().map((e) => ({
+    ...e,
+    relativeMs: now - e.timestamp
+  }));
+  const component = findReactComponentFromFiber(clickedElement ?? null);
   const storeSnapshot = readStoreSnapshot();
+  const storeDiff = getStoreDiff(baselineSnapshot, storeSnapshot);
   return {
     route: window.location.pathname + window.location.search,
     viewport: `${window.innerWidth}x${window.innerHeight}`,
     userAgent: navigator.userAgent,
     component,
     storeSnapshot,
+    storeDiff: storeDiff ?? void 0,
     networkRequests: network,
     consoleErrors: console_,
     eventLog: events,
@@ -29561,305 +30069,1393 @@ function collectTechContext(clickedElement) {
 
 // src/components/CaptureMode.tsx
 import { Fragment as Fragment2, jsx as jsx4, jsxs as jsxs3 } from "react/jsx-runtime";
-function ToolBtn({ active, onClick, title, children }) {
-  return /* @__PURE__ */ jsx4("button", { type: "button", onClick, title, style: { width: "34px", height: "34px", borderRadius: "8px", background: active ? "#1f1f1f" : "transparent", border: "none", cursor: "pointer", color: active ? "white" : "#9a9a9a", display: "flex", alignItems: "center", justifyContent: "center" }, children });
+var hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
+function ToolBtn({ active, onClick, title, hotkey, children }) {
+  return /* @__PURE__ */ jsxs3(
+    "button",
+    {
+      type: "button",
+      onClick,
+      title: hotkey ? `${title} (${hotkey})` : title,
+      style: {
+        width: "34px",
+        height: "34px",
+        borderRadius: "8px",
+        position: "relative",
+        background: active ? "rgba(255,255,255,0.15)" : "transparent",
+        border: "none",
+        cursor: "pointer",
+        color: active ? "white" : "#9a9a9a",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.15s"
+      },
+      onMouseEnter: (e) => {
+        if (!active) {
+          e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+          e.currentTarget.style.color = "white";
+        }
+      },
+      onMouseLeave: (e) => {
+        if (!active) {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = "#9a9a9a";
+        }
+      },
+      children: [
+        children,
+        hotkey && /* @__PURE__ */ jsx4("span", { style: {
+          position: "absolute",
+          bottom: "2px",
+          right: "3px",
+          fontSize: "7px",
+          fontFamily: "monospace",
+          fontWeight: "700",
+          color: active ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.2)",
+          lineHeight: 1
+        }, children: hotkey })
+      ]
+    }
+  );
 }
-function CaptureMode({ initialTool, apiKey, onSend, onCancel }) {
+var SPACING_STYLE_ID = "buggy-bag-spacing-overlay";
+function enableSpacingOverlay() {
+  if (document.getElementById(SPACING_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = SPACING_STYLE_ID;
+  style.textContent = `
+    *:not([data-buggy-bag]) { outline: 1px solid rgba(99,102,241,0.35) !important; }
+    *:not([data-buggy-bag]):hover { outline: 1px solid rgba(139,92,246,0.8) !important; background-color: rgba(139,92,246,0.04) !important; }
+  `;
+  document.head.appendChild(style);
+}
+function disableSpacingOverlay() {
+  document.getElementById(SPACING_STYLE_ID)?.remove();
+}
+function runAutoBugScan() {
+  const issues = [];
+  document.querySelectorAll("img").forEach((img, i) => {
+    if (img.naturalWidth === 0 && img.complete) {
+      issues.push(`\u{1F5BC} Broken image: ${img.src.slice(0, 60) || `img[${i}]`}`);
+    }
+  });
+  document.querySelectorAll("*").forEach((el) => {
+    if (el.dataset?.buggyBag) return;
+    const s = window.getComputedStyle(el);
+    if (s.overflow === "hidden" || s.overflowX === "hidden" || s.overflowY === "hidden") {
+      if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) {
+        const tag = el.tagName.toLowerCase();
+        const cls = el.className?.toString?.().slice?.(0, 30) ?? "";
+        issues.push(`\u{1F4CF} Overflow hidden with scroll: <${tag} class="${cls}">`);
+      }
+    }
+  });
+  try {
+    const ctx = window.__BUGGY_BAG_CONTEXT__;
+    if (ctx?.consoleErrors?.length) {
+      ctx.consoleErrors.slice(0, 5).forEach((e) => {
+        issues.push(`\u274C Console error: ${String(e.message).slice(0, 80)}`);
+      });
+    }
+  } catch {
+  }
+  document.querySelectorAll("img:not([alt])").forEach((img, i) => {
+    if (i < 3) issues.push(`\u267F Missing alt: ${img.src.slice(0, 50)}`);
+  });
+  if (issues.length === 0) issues.push("\u2705 \u041F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E!");
+  return issues;
+}
+var _zoomActive = false;
+var _zoomEl = null;
+var _zoomHandler = null;
+function enableZoom() {
+  if (_zoomActive) return;
+  _zoomActive = true;
+  const el = document.createElement("div");
+  el.setAttribute("data-buggy-bag", "true");
+  Object.assign(el.style, {
+    position: "fixed",
+    width: "160px",
+    height: "160px",
+    borderRadius: "50%",
+    border: "3px solid rgba(139,92,246,0.9)",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.3)",
+    overflow: "hidden",
+    pointerEvents: "none",
+    zIndex: "2147483000",
+    display: "none",
+    backgroundRepeat: "no-repeat",
+    backgroundColor: "rgba(18,18,20,0.95)",
+    transition: "opacity 0.2s",
+    opacity: "0"
+  });
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8b5cf6;font-family:monospace;font-size:11px;">\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F...</div>`;
+  document.body.appendChild(el);
+  _zoomEl = el;
+  let bgUrl = "";
+  const scale = 2;
+  const handler = (e) => {
+    if (!bgUrl) {
+      el.style.display = "block";
+      el.style.left = e.clientX + 20 + "px";
+      el.style.top = e.clientY - 80 + "px";
+      el.style.opacity = "1";
+      return;
+    }
+    const x = e.clientX;
+    const y = e.clientY;
+    el.style.left = x + 20 + "px";
+    el.style.top = y - 80 + "px";
+    const bx = x * scale - 80;
+    const by = y * scale - 80;
+    el.style.backgroundPosition = `-${bx}px -${by}px`;
+  };
+  _zoomHandler = handler;
+  document.addEventListener("mousemove", handler);
+  const host = document.querySelector('[data-buggy-bag="true"]');
+  let oldOpacity = "";
+  if (host) {
+    oldOpacity = host.style.opacity;
+    host.style.opacity = "0";
+  }
+  toPng(document.body, { skipFonts: true, filter: (n) => !n.closest?.("[data-buggy-bag]") }).then((dataUrl) => {
+    if (!_zoomActive) return;
+    bgUrl = dataUrl;
+    el.innerHTML = "";
+    el.style.backgroundImage = `url(${dataUrl})`;
+    el.style.backgroundSize = `${window.innerWidth * scale}px ${window.innerHeight * scale}px`;
+  }).catch((err) => {
+    if (!_zoomActive) return;
+    el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:red;font-size:11px;">\u041F\u043E\u043C\u0438\u043B\u043A\u0430</div>`;
+  }).finally(() => {
+    if (host) host.style.opacity = oldOpacity;
+  });
+}
+function disableZoom() {
+  _zoomActive = false;
+  _zoomEl?.remove();
+  _zoomEl = null;
+  if (_zoomHandler) {
+    document.removeEventListener("mousemove", _zoomHandler);
+    _zoomHandler = null;
+  }
+}
+function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const [tool, setTool] = useState4(initialTool);
   const [shapes, setShapes] = useState4([]);
   const [annotations, setAnnotations] = useState4({});
   const [pendingShape, setPendingShape] = useState4(null);
-  const [showSendPanel, setShowSendPanel] = useState4(false);
+  const [lastCopiedColor, setLastCopiedColor] = useState4(null);
+  const [showExitConfirm, setShowExitConfirm] = useState4(false);
   const [sending, setSending] = useState4(false);
   const [cursor, setCursor] = useState4(null);
+  const [showKebab, setShowKebab] = useState4(false);
+  const [hoveredShapeId, setHoveredShapeId] = useState4(null);
+  const [activeDebug, setActiveDebug] = useState4(/* @__PURE__ */ new Set());
+  const [autoBugResults, setAutoBugResults] = useState4(null);
+  const [hoveredCode, setHoveredCode] = useState4("");
+  const [hoveredStyle, setHoveredStyle] = useState4("");
+  const [hoveredRect, setHoveredRect] = useState4(null);
+  const [codeWinPos, setCodeWinPos] = useState4({ x: typeof window !== "undefined" ? window.innerWidth - 440 : 800, y: 24 });
+  const [bugWinPos, setBugWinPos] = useState4({ x: 24, y: 24 });
+  const dragRef = useRef4(null);
+  const dragOffsetRef = useRef4({ x: 0, y: 0 });
+  const kebabRef = useRef4(null);
+  const [isCapturing, setIsCapturing] = useState4(false);
+  const glowRef = useRef4(null);
   const techContextRef = useRef4(collectTechContext());
   const hostRef = useRef4(null);
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
   const h = typeof window !== "undefined" ? window.innerHeight : 800;
-  const handleShapeComplete = useCallback2((shape) => {
-    setShapes((prev) => [...prev, shape]);
-    setPendingShape(shape);
+  const handleShapeComplete = useCallback2(async (shape) => {
+    if (shape.type === "eyedropper") {
+      try {
+        if (hostRef.current) hostRef.current.style.opacity = "0";
+        if (glowRef.current) glowRef.current.style.display = "none";
+        const canvas = await toCanvas(document.body, { skipFonts: true });
+        const ctx = canvas.getContext("2d");
+        let hex = "#ffffff";
+        if (ctx) {
+          const pixel = ctx.getImageData(shape.x, shape.y, 1, 1).data;
+          hex = "#" + [pixel[0], pixel[1], pixel[2]].map((x) => x.toString(16).padStart(2, "0")).join("");
+        }
+        const hexUp = hex.toUpperCase();
+        if (hostRef.current) hostRef.current.style.opacity = "1";
+        if (glowRef.current) glowRef.current.style.display = "block";
+        navigator.clipboard.writeText(hexUp).catch(() => {
+        });
+        window.dispatchEvent(new CustomEvent("buggy-bag:toast", { detail: { msg: `\u041A\u043E\u043B\u0456\u0440 ${hexUp} \u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E`, ok: true, color: hexUp } }));
+        setLastCopiedColor(hexUp);
+        const finalShape = { ...shape, type: "pin" };
+        setShapes((prev) => [...prev, finalShape]);
+        setPendingShape({ shape: finalShape, isNew: true });
+        setTool("pin");
+      } catch (err) {
+        console.error("Eyedropper error:", err);
+      }
+      return;
+    }
+    const enrichedShape = shape.type === "pin" ? { ...shape, elementContext: getPinElementContext(shape.x, shape.y) ?? void 0 } : shape;
+    setShapes((prev) => {
+      const next = [...prev, enrichedShape];
+      try {
+        localStorage.setItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`, JSON.stringify({ shapes: next, annotations }));
+        window.dispatchEvent(new CustomEvent("buggy-bag:draft-changed"));
+      } catch {
+      }
+      return next;
+    });
+    setPendingShape({ shape: enrichedShape, isNew: true });
+  }, [annotations]);
+  const handleShapeDelete = useCallback2((id) => {
+    setShapes((prev) => prev.filter((s) => s.id !== id));
+    setAnnotations((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }, []);
+  const handleShapeMove = useCallback2((id, dx, dy) => {
+    setShapes((prev) => {
+      const next = prev.map((s) => {
+        if (s.id !== id) return s;
+        const moved = { ...s, x: s.x + dx, y: s.y + dy };
+        if (s.points) {
+          moved.points = s.points.map((p, i) => i % 2 === 0 ? p + dx : p + dy);
+        }
+        return moved;
+      });
+      try {
+        localStorage.setItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`, JSON.stringify({ shapes: next, annotations }));
+        window.dispatchEvent(new CustomEvent("buggy-bag:draft-changed"));
+      } catch {
+      }
+      return next;
+    });
+  }, [annotations]);
   const handleAnnotationConfirm = useCallback2((shapeId, text) => {
-    setAnnotations((prev) => ({ ...prev, [shapeId]: text }));
+    setAnnotations((prev) => {
+      const next = { ...prev, [shapeId]: text };
+      try {
+        localStorage.setItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`, JSON.stringify({ shapes, annotations: next }));
+        window.dispatchEvent(new CustomEvent("buggy-bag:draft-changed"));
+      } catch {
+      }
+      return next;
+    });
     setPendingShape(null);
-  }, []);
+  }, [shapes]);
   const handleAnnotationDismiss = useCallback2(() => {
     setPendingShape((pending) => {
-      if (pending) setShapes((prev) => prev.filter((s) => s.id !== pending.id));
+      if (pending && pending.isNew) {
+        setShapes((prev) => {
+          const next = prev.filter((s) => s.id !== pending.shape.id);
+          try {
+            const draftKey = `BUGGY_BAG_DRAFT_${window.location.pathname}`;
+            if (next.length > 0) {
+              localStorage.setItem(draftKey, JSON.stringify({ shapes: next, annotations }));
+            } else {
+              localStorage.removeItem(draftKey);
+            }
+            window.dispatchEvent(new CustomEvent("buggy-bag:draft-changed"));
+          } catch {
+          }
+          return next;
+        });
+      }
       return null;
     });
+  }, [annotations]);
+  const handleAnnotationDelete = useCallback2((shapeId) => {
+    handleShapeDelete(shapeId);
+    setPendingShape(null);
+  }, [handleShapeDelete]);
+  const handleShapeClick = useCallback2((shapeId) => {
+    const shape = shapes.find((s) => s.id === shapeId);
+    if (shape) {
+      setPendingShape({ shape, isNew: false });
+    }
+  }, [shapes]);
+  const handleClearAll = useCallback2(() => {
+    setShapes([]);
+    setAnnotations({});
+    try {
+      localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
+      window.dispatchEvent(new CustomEvent("buggy-bag:draft-changed"));
+    } catch {
+    }
   }, []);
   const handleSend = useCallback2(async () => {
+    if (sending) return;
     setSending(true);
-    const host = document.querySelector('[data-buggy-bag="true"]');
+    setIsCapturing(true);
+    await new Promise((r) => setTimeout(r, 80));
+    const host = document.querySelector("#buggy-bag-host");
+    let konvaDataUrl = null;
+    if (host?.shadowRoot) {
+      const canvas = host.shadowRoot.querySelector("canvas");
+      if (canvas) {
+        try {
+          konvaDataUrl = canvas.toDataURL("image/png");
+        } catch {
+        }
+      }
+    }
     if (host) host.style.opacity = "0";
-    await new Promise((r) => setTimeout(r, 60));
     let imageUrl = "";
     try {
-      imageUrl = await toPng(document.body, {
+      const pageDataUrl = await toPng(document.body, {
         width: window.innerWidth,
         height: window.innerHeight,
-        pixelRatio: 1,
-        skipFonts: true
+        pixelRatio: 1
       });
+      if (konvaDataUrl) {
+        const composite = document.createElement("canvas");
+        composite.width = window.innerWidth;
+        composite.height = window.innerHeight;
+        const ctx = composite.getContext("2d");
+        if (ctx) {
+          await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              ctx.drawImage(img, 0, 0);
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = pageDataUrl;
+          });
+          await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              ctx.drawImage(img, 0, 0);
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = konvaDataUrl;
+          });
+          imageUrl = composite.toDataURL("image/png");
+        } else {
+          imageUrl = pageDataUrl;
+        }
+      } else {
+        imageUrl = pageDataUrl;
+      }
     } catch (e) {
-      console.warn("[BuggyBag] screenshot failed, sending without image", e);
+      console.warn("[BuggyBag] screenshot failed", e);
     }
     if (host) host.style.opacity = "";
-    onSend({
-      api_key: apiKey,
-      base64_image: imageUrl,
-      shapes,
-      annotations,
-      description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443",
-      tech_context: techContextRef.current
+    setIsCapturing(false);
+    try {
+      localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
+      window.dispatchEvent(new CustomEvent("buggy-bag:draft-changed"));
+    } catch {
+    }
+    onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443", tech_context: techContextRef.current });
+  }, [shapes, annotations, apiKey, onSend, sending]);
+  const handleCloseRequest = useCallback2(() => {
+    if (shapes.length > 0) {
+      setShowExitConfirm(true);
+    } else {
+      onCancel();
+      window.dispatchEvent(new CustomEvent("buggy-bag:close-confirmed"));
+    }
+  }, [shapes, onCancel]);
+  const handleClearAndExit = useCallback2(() => {
+    handleClearAll();
+    onCancel();
+    window.dispatchEvent(new CustomEvent("buggy-bag:close-confirmed"));
+  }, [handleClearAll, onCancel]);
+  useEffect4(() => {
+    try {
+      const saved = localStorage.getItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.shapes && parsed.annotations) {
+          setShapes(parsed.shapes);
+          setAnnotations(parsed.annotations);
+        }
+      }
+    } catch (e) {
+      console.warn("[BuggyBag] failed to load draft", e);
+    }
+  }, []);
+  useEffect4(() => {
+    const handleOutsideClose = () => {
+      handleCloseRequest();
+    };
+    window.addEventListener("buggy-bag:request-close", handleOutsideClose);
+    return () => window.removeEventListener("buggy-bag:request-close", handleOutsideClose);
+  }, [handleCloseRequest]);
+  useEffect4(() => {
+    const handleEsc = () => {
+      if (activeDebug.size > 0) {
+        setActiveDebug(/* @__PURE__ */ new Set());
+        disableSpacingOverlay();
+        disableZoom();
+        document.body.style.filter = "";
+        document.body.style.cursor = "";
+        setAutoBugResults(null);
+      }
+    };
+    window.addEventListener("buggy-bag:escape", handleEsc);
+    return () => window.removeEventListener("buggy-bag:escape", handleEsc);
+  }, [activeDebug]);
+  useEffect4(() => {
+    if (shapes.length === 0) return;
+    const h2 = (e) => {
+      e.preventDefault();
+      e.returnValue = "\u0423 \u0432\u0430\u0441 \u0454 \u043D\u0435\u0432\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0456 \u0430\u043D\u043E\u0442\u0430\u0446\u0456\u0457.";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", h2);
+    return () => window.removeEventListener("beforeunload", h2);
+  }, [shapes]);
+  const toggleDebug = useCallback2((overlay) => {
+    setActiveDebug((prev) => {
+      const next = new Set(prev);
+      if (next.has(overlay)) {
+        next.delete(overlay);
+        if (overlay === "spacing") disableSpacingOverlay();
+        if (overlay === "zoom") disableZoom();
+        if (overlay === "invert") document.body.style.filter = "";
+        if (overlay === "auto-bugs") setAutoBugResults(null);
+        if (overlay === "show-code") document.body.style.cursor = "";
+      } else {
+        next.add(overlay);
+        if (overlay === "spacing") enableSpacingOverlay();
+        if (overlay === "zoom") enableZoom();
+        if (overlay === "invert") document.body.style.filter = "invert(1) hue-rotate(180deg)";
+        if (overlay === "auto-bugs") {
+          setAutoBugResults(runAutoBugScan());
+        }
+        if (overlay === "show-code") document.body.style.cursor = "crosshair";
+      }
+      return next;
     });
-  }, [shapes, annotations, apiKey, onSend]);
-  return (
-    // Transparent overlay — real page shows through, but clicks are blocked
-    /* @__PURE__ */ jsxs3(
-      "div",
-      {
-        ref: hostRef,
-        "data-buggy-bag": "true",
-        style: { position: "fixed", inset: 0, zIndex: 1e4, userSelect: "none" },
-        children: [
-          /* @__PURE__ */ jsx4("div", { style: {
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
-            boxShadow: "inset 0 0 0 3px rgba(99,102,241,0.7)",
-            borderRadius: "0px",
-            zIndex: 1
-          } }),
-          !pendingShape && !showSendPanel && /* @__PURE__ */ jsxs3("div", { style: {
-            position: "fixed",
-            top: "16px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "rgba(31,31,31,0.92)",
-            backdropFilter: "blur(10px)",
-            borderRadius: "10px",
-            padding: "6px 14px",
+    setShowKebab(false);
+  }, []);
+  useEffect4(() => {
+    const handler = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === "textarea" || tag === "input") return;
+      if (e.ctrlKey || e.metaKey) {
+        if (e.code === "KeyS" || e.key.toLowerCase() === "s") {
+          e.preventDefault();
+          if (shapes.length > 0) handleSend();
+        }
+        return;
+      }
+      if (!pendingShape && !showExitConfirm) {
+        if (e.key === "1") {
+          e.preventDefault();
+          setTool("pin");
+        }
+        if (e.key === "2") {
+          e.preventDefault();
+          setTool("rect");
+        }
+        if (e.key === "3") {
+          e.preventDefault();
+          setTool("arrow");
+        }
+        if (e.key === "4") {
+          e.preventDefault();
+          setTool("eraser");
+        }
+        if (e.key === "5") {
+          e.preventDefault();
+          if (hasEyeDropper) {
+            try {
+              const eyeDropper = new window.EyeDropper();
+              eyeDropper.open().then((result) => {
+                const hex = result.sRGBHex.toUpperCase();
+                navigator.clipboard.writeText(hex).catch(() => {
+                });
+                window.dispatchEvent(new CustomEvent("buggy-bag:toast", { detail: { msg: `\u041A\u043E\u043B\u0456\u0440 ${hex} \u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E`, ok: true, color: hex } }));
+                setLastCopiedColor(hex);
+                setTool("pin");
+              }).catch(() => {
+              });
+            } catch (err) {
+            }
+          } else {
+            setTool("eyedropper");
+          }
+        }
+        if (e.key === "6") {
+          e.preventDefault();
+          setTool("measure");
+        }
+      }
+      if (e.altKey) {
+        if (e.key.toLowerCase() === "i") {
+          e.preventDefault();
+          toggleDebug("invert");
+        }
+        if (e.key.toLowerCase() === "s") {
+          e.preventDefault();
+          toggleDebug("spacing");
+        }
+        if (e.key.toLowerCase() === "a") {
+          e.preventDefault();
+          toggleDebug("auto-bugs");
+        }
+        if (e.key.toLowerCase() === "c") {
+          e.preventDefault();
+          toggleDebug("show-code");
+        }
+        if (e.key.toLowerCase() === "l") {
+          e.preventDefault();
+          toggleDebug("zoom");
+        }
+        if (e.key.toLowerCase() === "t") {
+          e.preventDefault();
+          toggleDebug("typography");
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [pendingShape, showExitConfirm, shapes, handleSend, toggleDebug]);
+  useEffect4(() => {
+    return () => {
+      disableSpacingOverlay();
+      disableZoom();
+      document.body.style.filter = "";
+    };
+  }, []);
+  useEffect4(() => {
+    if (!showKebab) return;
+    const handleClickOutside = (e) => {
+      if (kebabRef.current && !e.composedPath().includes(kebabRef.current)) {
+        setShowKebab(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showKebab]);
+  const formatNode = useCallback2((node, depth = 0, maxDepth = 2) => {
+    if (depth > maxDepth) return "  ".repeat(depth) + "...\n";
+    const indent = "  ".repeat(depth);
+    const clone = node.cloneNode(false);
+    let str = clone.outerHTML;
+    const tagOpen = str.substring(0, str.indexOf(">") + 1);
+    const tagClose = str.substring(str.lastIndexOf("<"));
+    if (node.children.length === 0) {
+      const text = node.innerHTML.trim();
+      return indent + tagOpen + (text.length > 50 ? text.slice(0, 50) + "..." : text) + tagClose + "\n";
+    }
+    let res = indent + tagOpen + "\n";
+    for (let i = 0; i < Math.min(node.children.length, 4); i++) {
+      res += formatNode(node.children[i], depth + 1, maxDepth);
+    }
+    if (node.children.length > 4) {
+      res += indent + "  <!-- ... " + (node.children.length - 4) + " more child nodes -->\n";
+    }
+    res += indent + tagClose + "\n";
+    return res;
+  }, []);
+  useEffect4(() => {
+    const onMove = (e) => {
+      if (dragRef.current === "code") setCodeWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
+      else if (dragRef.current === "bug") setBugWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+  const startDrag = (e, type) => {
+    dragRef.current = type;
+    const rect = e.currentTarget.closest("[data-buggy-bag]")?.getBoundingClientRect();
+    if (rect) dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+  useEffect4(() => {
+    if (!activeDebug.has("show-code") && !activeDebug.has("typography") || !cursor) return;
+    const els = document.elementsFromPoint(cursor.x, cursor.y);
+    const target = els.find((el) => !el.closest?.("[data-buggy-bag]"));
+    if (target) {
+      if (activeDebug.has("show-code")) {
+        const path = [];
+        let curr = target;
+        while (curr && curr.tagName !== "HTML") {
+          let sel = curr.tagName.toLowerCase();
+          if (curr.id) sel += "#" + curr.id;
+          else if (curr.className && typeof curr.className === "string") sel += "." + curr.className.split(" ")[0];
+          path.unshift(sel);
+          curr = curr.parentElement;
+        }
+        const breadcrumb = path.slice(-4).join(" > ");
+        const html = formatNode(target, 0, 2);
+        setHoveredCode(`/* ${breadcrumb} */
+
+${html}`);
+      }
+      if (activeDebug.has("typography")) {
+        const style = window.getComputedStyle(target);
+        const typ = `\u0428\u0440\u0438\u0444\u0442: ${style.fontFamily}
+\u0420\u043E\u0437\u043C\u0456\u0440: ${style.fontSize}
+\u0412\u0430\u0433\u0430: ${style.fontWeight}
+\u041A\u043E\u043B\u0456\u0440: ${style.color}
+\u0412\u0438\u0441\u043E\u0442\u0430 \u0440\u044F\u0434\u043A\u0430: ${style.lineHeight}
+Letter-spacing: ${style.letterSpacing}`;
+        setHoveredStyle(typ);
+      }
+      setHoveredRect(target.getBoundingClientRect());
+    } else {
+      setHoveredRect(null);
+    }
+  }, [cursor, activeDebug, formatNode]);
+  const divider = /* @__PURE__ */ jsx4("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } });
+  return /* @__PURE__ */ jsxs3(
+    "div",
+    {
+      ref: hostRef,
+      "data-buggy-bag": "true",
+      style: { position: "fixed", inset: 0, zIndex: 1e4, userSelect: "none" },
+      children: [
+        /* @__PURE__ */ jsx4("style", { children: `
+        @keyframes bb-glow-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.55; }
+        }
+      ` }),
+        (activeDebug.has("show-code") || activeDebug.has("typography")) && hoveredRect && /* @__PURE__ */ jsx4("div", { id: "buggy-bag-highlighter", style: {
+          position: "fixed",
+          top: hoveredRect.top,
+          left: hoveredRect.left,
+          width: hoveredRect.width,
+          height: hoveredRect.height,
+          background: "rgba(56, 189, 248, 0.2)",
+          border: "1px solid rgba(56, 189, 248, 0.8)",
+          pointerEvents: "none",
+          zIndex: 9999,
+          transition: "all 0.1s ease-out"
+        } }),
+        /* @__PURE__ */ jsx4(
+          "div",
+          {
+            ref: glowRef,
+            style: {
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              animation: "bb-glow-pulse 2.8s ease-in-out infinite",
+              boxShadow: [
+                "inset 0 0 70px rgba(99,102,241,0.24)",
+                "inset 0 0 28px rgba(99,102,241,0.20)",
+                "inset 0 0 10px rgba(99,102,241,0.32)"
+              ].join(", "),
+              zIndex: 1,
+              visibility: isCapturing ? "hidden" : "visible"
+            }
+          }
+        ),
+        (activeDebug.has("show-code") || activeDebug.has("typography")) && /* @__PURE__ */ jsxs3("div", { id: "buggy-bag-code-window", "data-buggy-bag": "true", style: {
+          position: "fixed",
+          top: codeWinPos.y + "px",
+          left: codeWinPos.x + "px",
+          width: "420px",
+          maxHeight: "calc(100vh - 48px)",
+          background: "rgba(22,22,26,0.95)",
+          border: "1px solid rgba(56,189,248,0.3)",
+          borderRadius: "16px",
+          padding: "0",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          backdropFilter: "blur(10px)",
+          fontFamily: "monospace",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          zIndex: 10005
+        }, children: [
+          /* @__PURE__ */ jsxs3("div", { onMouseDown: (e) => startDrag(e, "code"), style: {
+            padding: "16px 20px",
+            cursor: "grab",
+            background: "rgba(255,255,255,0.03)",
+            borderBottom: "1px solid rgba(255,255,255,0.05)",
             display: "flex",
             alignItems: "center",
-            gap: "8px",
-            fontSize: "12px",
-            fontWeight: "600",
-            color: "rgba(255,255,255,0.7)",
-            zIndex: 10002,
-            pointerEvents: "none",
-            border: "1px solid rgba(255,255,255,0.1)"
+            justifyContent: "space-between"
           }, children: [
-            /* @__PURE__ */ jsx4("span", { style: { width: 7, height: 7, borderRadius: "50%", background: "#6366f1", display: "inline-block" } }),
-            "\u0412\u0438\u0434\u0456\u043B\u0456\u0442\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u043D\u0435 \u043C\u0456\u0441\u0446\u0435"
+            /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(56,189,248,0.9)", textTransform: "uppercase", letterSpacing: "0.07em" }, children: "Live Inspector" }),
+            /* @__PURE__ */ jsx4(
+              "button",
+              {
+                type: "button",
+                onClick: () => setActiveDebug((prev) => {
+                  const n = new Set(prev);
+                  n.delete("show-code");
+                  n.delete("typography");
+                  return n;
+                }),
+                style: {
+                  background: "rgba(255,255,255,0.1)",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "20px",
+                  height: "20px",
+                  cursor: "pointer",
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.15s"
+                },
+                onMouseEnter: (e) => {
+                  e.currentTarget.style.background = "rgba(239,68,68,0.8)";
+                },
+                onMouseLeave: (e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                },
+                children: "\u2715"
+              }
+            )
           ] }),
-          !pendingShape && !showSendPanel && /* @__PURE__ */ jsx4(
-            DrawingCanvas,
+          /* @__PURE__ */ jsxs3("div", { style: { padding: "20px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }, children: [
+            activeDebug.has("show-code") && /* @__PURE__ */ jsx4("div", { style: { flex: "1 1 auto" }, children: /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5" }, children: hoveredCode }) }),
+            activeDebug.has("typography") && /* @__PURE__ */ jsxs3("div", { style: { flex: "0 0 auto" }, children: [
+              /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(56,189,248,0.9)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }, children: "\u0421\u0442\u0438\u043B\u0456" }),
+              /* @__PURE__ */ jsx4("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.9)", whiteSpace: "pre-wrap", lineHeight: "1.6" }, children: hoveredStyle })
+            ] })
+          ] })
+        ] }),
+        autoBugResults && /* @__PURE__ */ jsxs3("div", { id: "buggy-bag-autobug-window", "data-buggy-bag": "true", style: {
+          position: "fixed",
+          top: bugWinPos.y + "px",
+          left: bugWinPos.x + "px",
+          width: "420px",
+          maxHeight: "calc(100vh - 48px)",
+          background: "rgba(22,22,26,0.95)",
+          border: "1px solid rgba(139,92,246,0.3)",
+          borderRadius: "16px",
+          padding: "0",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          backdropFilter: "blur(10px)",
+          fontFamily: "monospace",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          zIndex: 10005
+        }, children: [
+          /* @__PURE__ */ jsxs3("div", { onMouseDown: (e) => startDrag(e, "bug"), style: {
+            padding: "16px 20px",
+            cursor: "grab",
+            background: "rgba(255,255,255,0.03)",
+            borderBottom: "1px solid rgba(255,255,255,0.05)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }, children: [
+            /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(139,92,246,0.9)", textTransform: "uppercase", letterSpacing: "0.07em" }, children: "\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u0438 \u0430\u043D\u0430\u043B\u0456\u0437\u0443" }),
+            /* @__PURE__ */ jsx4(
+              "button",
+              {
+                type: "button",
+                onClick: () => toggleDebug("auto-bugs"),
+                style: {
+                  background: "rgba(255,255,255,0.1)",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "20px",
+                  height: "20px",
+                  cursor: "pointer",
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.15s"
+                },
+                onMouseEnter: (e) => {
+                  e.currentTarget.style.background = "rgba(239,68,68,0.8)";
+                },
+                onMouseLeave: (e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                },
+                children: "\u2715"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsx4("div", { style: { padding: "20px", fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5", overflowY: "auto" }, children: autoBugResults.map((r, i) => /* @__PURE__ */ jsx4("div", { children: r }, i)) })
+        ] }),
+        !showExitConfirm && /* @__PURE__ */ jsx4(
+          DrawingCanvas,
+          {
+            width: w,
+            height: h,
+            tool,
+            shapes,
+            onShapeComplete: !pendingShape ? handleShapeComplete : () => {
+            },
+            onShapeDelete: handleShapeDelete,
+            onShapeMove: handleShapeMove,
+            onMouseMove: (x, y) => setCursor({ x, y }),
+            onMouseLeave: () => setCursor(null),
+            onShapeClick: handleShapeClick,
+            interactive: !pendingShape
+          }
+        ),
+        !pendingShape && !showExitConfirm && cursor && /* @__PURE__ */ jsx4("div", { style: {
+          position: "fixed",
+          left: cursor.x + 14,
+          top: cursor.y + 14,
+          background: "rgba(0,0,0,0.75)",
+          color: "rgba(255,255,255,0.85)",
+          fontSize: "10px",
+          fontFamily: "monospace",
+          fontWeight: "600",
+          padding: "3px 7px",
+          borderRadius: "5px",
+          pointerEvents: "none",
+          zIndex: 10001,
+          letterSpacing: "0.03em",
+          visibility: isCapturing ? "hidden" : "visible",
+          maxWidth: "250px"
+        }, children: tool === "measure" ? "\u0437\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u0456 \u043F\u0440\u043E\u0432\u0435\u0434\u0456\u0442\u044C \u043B\u0456\u043D\u0456\u044E" : tool === "eraser" ? "\u043D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u0449\u043E\u0431 \u0432\u0438\u0434\u0430\u043B\u0438\u0442\u0438" : tool === "eyedropper" ? "\u043D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u0449\u043E\u0431 \u0432\u0438\u0431\u0440\u0430\u0442\u0438 \u043A\u043E\u043B\u0456\u0440" : `${cursor.x}, ${cursor.y}` }),
+        pendingShape && /* @__PURE__ */ jsxs3("div", { style: { visibility: isCapturing ? "hidden" : "visible" }, children: [
+          /* @__PURE__ */ jsx4(
+            "div",
             {
-              width: w,
-              height: h,
-              tool,
-              shapes,
-              onShapeComplete: handleShapeComplete,
-              onMouseMove: (x, y) => setCursor({ x, y })
+              style: { position: "fixed", inset: 0, zIndex: 10001, cursor: "pointer" },
+              onClick: handleAnnotationDismiss
             }
           ),
-          !pendingShape && !showSendPanel && cursor && /* @__PURE__ */ jsxs3("div", { style: {
-            position: "fixed",
-            left: cursor.x + 14,
-            top: cursor.y + 14,
-            background: "rgba(0,0,0,0.75)",
-            color: "rgba(255,255,255,0.85)",
-            fontSize: "10px",
-            fontFamily: "monospace",
-            fontWeight: "600",
-            padding: "3px 7px",
-            borderRadius: "5px",
-            pointerEvents: "none",
-            zIndex: 10003,
-            letterSpacing: "0.03em"
-          }, children: [
-            cursor.x,
-            ", ",
-            cursor.y
-          ] }),
-          pendingShape && /* @__PURE__ */ jsx4(
+          /* @__PURE__ */ jsx4("div", { style: { position: "relative", zIndex: 10002 }, children: /* @__PURE__ */ jsx4(
             ShapeAnnotation,
             {
-              shape: pendingShape,
+              shape: pendingShape.shape,
+              initialText: annotations[pendingShape.shape.id],
+              clipboardHint: lastCopiedColor,
+              onClearClipboardHint: () => setLastCopiedColor(null),
               containerWidth: w,
               containerHeight: h,
               onConfirm: handleAnnotationConfirm,
-              onDismiss: handleAnnotationDismiss
+              onDismiss: handleAnnotationDismiss,
+              onDelete: !pendingShape.isNew ? handleAnnotationDelete : void 0
             }
-          ),
-          !pendingShape && !showSendPanel && /* @__PURE__ */ jsxs3("div", { "data-buggy-bag": "true", style: {
-            position: "fixed",
-            bottom: "24px",
-            right: "24px",
-            background: "rgba(31,31,31,0.95)",
-            backdropFilter: "blur(10px)",
-            borderRadius: "14px",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            padding: "8px",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            zIndex: 10002
-          }, children: [
-            /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "rect", onClick: () => setTool("rect"), title: "\u041E\u0431\u043B\u0430\u0441\u0442\u044C", children: /* @__PURE__ */ jsx4("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsx4("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) }) }),
-            /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "arrow", onClick: () => setTool("arrow"), title: "\u0421\u0442\u0440\u0456\u043B\u043A\u0430", children: /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-              /* @__PURE__ */ jsx4("path", { d: "M5 19L19 5" }),
-              /* @__PURE__ */ jsx4("path", { d: "M8 5h11v11" })
-            ] }) }),
-            /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "pin", onClick: () => setTool("pin"), title: "\u041F\u0456\u043D", children: /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-              /* @__PURE__ */ jsx4("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
-              /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "10", r: "2.5" })
-            ] }) }),
-            /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "measure", onClick: () => setTool("measure"), title: "\u041B\u0456\u043D\u0456\u0439\u043A\u0430", children: /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-              /* @__PURE__ */ jsx4("path", { d: "M21.55 6.45L17.55 2.45a1 1 0 0 0-1.41 0L2.45 16.14a1 1 0 0 0 0 1.41l4 4a1 1 0 0 0 1.41 0L21.55 7.86a1 1 0 0 0 0-1.41z" }),
-              /* @__PURE__ */ jsx4("path", { d: "M8 8l1.5 1.5" }),
-              /* @__PURE__ */ jsx4("path", { d: "M11.5 11.5l1.5 1.5" }),
-              /* @__PURE__ */ jsx4("path", { d: "M15 15l1.5 1.5" })
-            ] }) }),
-            shapes.length > 0 && /* @__PURE__ */ jsxs3(Fragment2, { children: [
-              /* @__PURE__ */ jsx4("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } }),
-              /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setShowSendPanel(true), style: { height: "32px", padding: "0 14px", borderRadius: "8px", background: "#4f46e5", color: "white", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }, children: "\u0414\u0430\u043B\u0456 \u2192" })
-            ] }),
-            /* @__PURE__ */ jsx4("button", { type: "button", onClick: onCancel, style: { height: "32px", padding: "0 10px", borderRadius: "8px", background: "transparent", color: "rgba(255,255,255,0.4)", border: "none", cursor: "pointer", fontSize: "14px" }, children: "\u2715" })
-          ] }),
-          showSendPanel && /* @__PURE__ */ jsx4("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: "24px", zIndex: 10003 }, children: /* @__PURE__ */ jsxs3("div", { style: { width: "100%", maxWidth: "480px", margin: "0 16px", background: "#1c1c1e", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.1)", padding: "16px" }, children: [
-            /* @__PURE__ */ jsxs3("div", { style: { marginBottom: "12px" }, children: [
-              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.6)", marginBottom: "8px" }, children: [
-                shapes.length,
-                " ",
-                shapes.length === 1 ? "\u0430\u043D\u043E\u0442\u0430\u0446\u0456\u044F" : "\u0430\u043D\u043E\u0442\u0430\u0446\u0456\u0457"
+          ) })
+        ] }),
+        !pendingShape && !showExitConfirm && /* @__PURE__ */ jsxs3("div", { "data-buggy-bag": "true", style: {
+          position: "fixed",
+          bottom: "24px",
+          right: "24px",
+          background: "rgba(18,18,20,0.96)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          borderRadius: "14px",
+          border: "1px solid rgba(255,255,255,0.1)",
+          padding: "8px",
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+          zIndex: 10002,
+          transformOrigin: "calc(100% - 24px) 50%",
+          animation: "bb-toolbar-entry 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+          visibility: isCapturing ? "hidden" : "visible"
+        }, children: [
+          /* @__PURE__ */ jsx4("style", { children: `
+            @keyframes bb-toolbar-entry {
+              0% { transform: scale(0.1); opacity: 0; border-radius: 24px; }
+              100% { transform: scale(1); opacity: 1; border-radius: 14px; }
+            }
+          ` }),
+          /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "pin", onClick: () => setTool("pin"), title: "\u041F\u0456\u043D", hotkey: "1", children: /* @__PURE__ */ jsxs3("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
+            /* @__PURE__ */ jsx4("line", { x1: "12", y1: "5", x2: "12", y2: "19" }),
+            /* @__PURE__ */ jsx4("line", { x1: "5", y1: "12", x2: "19", y2: "12" })
+          ] }) }),
+          /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "rect", onClick: () => setTool("rect"), title: "\u041E\u0431\u043B\u0430\u0441\u0442\u044C", hotkey: "2", children: /* @__PURE__ */ jsx4("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsx4("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) }) }),
+          /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "arrow", onClick: () => setTool("arrow"), title: "\u0421\u0442\u0440\u0456\u043B\u043A\u0430", hotkey: "3", children: /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+            /* @__PURE__ */ jsx4("path", { d: "M5 19L19 5" }),
+            /* @__PURE__ */ jsx4("path", { d: "M8 5h11v11" })
+          ] }) }),
+          /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "eraser", onClick: () => setTool("eraser"), title: "\u041B\u0430\u0441\u0442\u0438\u043A", hotkey: "4", children: /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+            /* @__PURE__ */ jsx4("path", { d: "M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20H20V20Z" }),
+            /* @__PURE__ */ jsx4("path", { d: "M17.5 11.5L12 17" })
+          ] }) }),
+          /* @__PURE__ */ jsxs3("div", { ref: kebabRef, style: { position: "relative" }, children: [
+            /* @__PURE__ */ jsxs3(ToolBtn, { active: showKebab || activeDebug.size > 0 || tool === "measure", onClick: () => setShowKebab((v) => !v), title: "\u0411\u0456\u043B\u044C\u0448\u0435 \u0456\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u0456\u0432", children: [
+              /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "currentColor", children: [
+                /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "5", r: "1.5" }),
+                /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "12", r: "1.5" }),
+                /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "19", r: "1.5" })
               ] }),
-              Object.values(annotations).filter(Boolean).map((text, i) => /* @__PURE__ */ jsxs3("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginBottom: "4px", display: "flex", gap: "6px" }, children: [
-                /* @__PURE__ */ jsxs3("span", { style: { color: "#6366f1", fontWeight: "700" }, children: [
-                  i + 1,
-                  "."
-                ] }),
-                " ",
-                text
-              ] }, i))
+              (activeDebug.size > 0 || tool === "measure") && /* @__PURE__ */ jsx4("span", { style: { position: "absolute", top: "5px", right: "5px", width: "5px", height: "5px", borderRadius: "50%", background: "white" } })
             ] }),
-            /* @__PURE__ */ jsxs3("div", { style: { display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "12px" }, children: [
-              /* @__PURE__ */ jsx4("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", padding: "2px 7px", borderRadius: "4px" }, children: techContextRef.current.route }),
-              techContextRef.current.component && /* @__PURE__ */ jsx4("span", { style: { fontSize: "10px", fontFamily: "monospace", color: "#a5b4fc", background: "rgba(99,102,241,0.15)", padding: "2px 7px", borderRadius: "4px" }, children: techContextRef.current.component.name }),
-              techContextRef.current.networkRequests.filter((r) => r.isError).slice(0, 2).map((r, i) => /* @__PURE__ */ jsxs3("span", { style: { fontSize: "10px", color: "#fca5a5", background: "rgba(239,68,68,0.15)", padding: "2px 7px", borderRadius: "4px", fontFamily: "monospace" }, children: [
-                r.status,
-                " ",
-                r.url.split("/").slice(-1)[0]
-              ] }, i)),
-              techContextRef.current.consoleErrors.length > 0 && /* @__PURE__ */ jsxs3("span", { style: { fontSize: "10px", color: "#fcd34d", background: "rgba(245,158,11,0.15)", padding: "2px 7px", borderRadius: "4px" }, children: [
-                techContextRef.current.consoleErrors.length,
-                " errors"
+            showKebab && /* @__PURE__ */ jsxs3("div", { "data-buggy-bag": "true", style: {
+              position: "absolute",
+              bottom: "44px",
+              right: 0,
+              background: "rgba(20,20,22,0.96)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              borderRadius: "12px",
+              padding: "6px",
+              minWidth: "220px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "2px",
+              zIndex: 10003
+            }, children: [
+              /* @__PURE__ */ jsx4("div", { style: { fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 8px 4px" }, children: "\u0406\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u0438" }),
+              /* @__PURE__ */ jsxs3(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => {
+                    setTool((t) => t === "measure" ? "pin" : "measure");
+                    setShowKebab(false);
+                  },
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "7px 10px",
+                    borderRadius: "8px",
+                    background: tool === "measure" ? "rgba(255,255,255,0.15)" : "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: tool === "measure" ? "white" : "rgba(255,255,255,0.65)",
+                    fontSize: "12px",
+                    fontWeight: "500",
+                    textAlign: "left",
+                    width: "100%",
+                    transition: "all 0.1s"
+                  },
+                  onMouseEnter: (e) => {
+                    if (tool !== "measure") {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                      e.currentTarget.style.color = "white";
+                    }
+                  },
+                  onMouseLeave: (e) => {
+                    if (tool !== "measure") {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "rgba(255,255,255,0.65)";
+                    }
+                  },
+                  children: [
+                    /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                      /* @__PURE__ */ jsx4("rect", { x: "1", y: "8", width: "22", height: "8", rx: "1" }),
+                      /* @__PURE__ */ jsx4("line", { x1: "5", y1: "12", x2: "5", y2: "16" }),
+                      /* @__PURE__ */ jsx4("line", { x1: "9", y1: "12", x2: "9", y2: "14" }),
+                      /* @__PURE__ */ jsx4("line", { x1: "13", y1: "12", x2: "13", y2: "16" }),
+                      /* @__PURE__ */ jsx4("line", { x1: "17", y1: "12", x2: "17", y2: "14" })
+                    ] }),
+                    /* @__PURE__ */ jsx4("span", { children: "\u041B\u0456\u043D\u0456\u0439\u043A\u0430" }),
+                    /* @__PURE__ */ jsx4("kbd", { style: { marginLeft: "auto", fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)", borderRadius: "3px", padding: "1px 4px", flexShrink: 0 }, children: "6" })
+                  ]
+                }
+              ),
+              hasEyeDropper && /* @__PURE__ */ jsxs3(
+                "button",
+                {
+                  type: "button",
+                  onClick: async () => {
+                    setShowKebab(false);
+                    try {
+                      const eyeDropper = new window.EyeDropper();
+                      const result = await eyeDropper.open();
+                      const hex = result.sRGBHex.toUpperCase();
+                      navigator.clipboard.writeText(hex).catch(() => {
+                      });
+                      window.dispatchEvent(new CustomEvent("buggy-bag:toast", { detail: { msg: `\u041A\u043E\u043B\u0456\u0440 ${hex} \u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E`, ok: true, color: hex } }));
+                      setLastCopiedColor(hex);
+                      setTool("pin");
+                    } catch (e) {
+                    }
+                  },
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "7px 10px",
+                    borderRadius: "8px",
+                    background: tool === "eyedropper" ? "rgba(255,255,255,0.15)" : "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: tool === "eyedropper" ? "white" : "rgba(255,255,255,0.65)",
+                    fontSize: "12px",
+                    fontWeight: "500",
+                    textAlign: "left",
+                    width: "100%",
+                    transition: "all 0.1s"
+                  },
+                  onMouseEnter: (e) => {
+                    if (tool !== "eyedropper") {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                      e.currentTarget.style.color = "white";
+                    }
+                  },
+                  onMouseLeave: (e) => {
+                    if (tool !== "eyedropper") {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "rgba(255,255,255,0.65)";
+                    }
+                  },
+                  children: [
+                    /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                      /* @__PURE__ */ jsx4("path", { d: "m2 22 1-1h3l9-9" }),
+                      /* @__PURE__ */ jsx4("path", { d: "M3 21v-3l9-9" }),
+                      /* @__PURE__ */ jsx4("path", { d: "m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" })
+                    ] }),
+                    /* @__PURE__ */ jsx4("span", { children: "\u041F\u0456\u043F\u0435\u0442\u043A\u0430" }),
+                    /* @__PURE__ */ jsx4("kbd", { style: { marginLeft: "auto", fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)", borderRadius: "3px", padding: "1px 4px", flexShrink: 0 }, children: "5" })
+                  ]
+                }
+              ),
+              /* @__PURE__ */ jsx4("div", { style: { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 6px" } }),
+              /* @__PURE__ */ jsx4("div", { style: { fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 8px 4px" }, children: "Debug" }),
+              [
+                {
+                  id: "invert",
+                  label: "\u0406\u043D\u0432\u0435\u0440\u0442 \u043A\u043E\u043B\u044C\u043E\u0440\u0456\u0432",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "12", r: "10" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M12 2a10 10 0 0 1 0 20z" })
+                  ] }),
+                  hotkey: "Alt+I"
+                },
+                {
+                  id: "spacing",
+                  label: "Spacing overlay",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("path", { d: "M21 6H3" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M21 18H3" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M3 6v12" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M21 6v12" })
+                  ] }),
+                  hotkey: "Alt+S"
+                },
+                {
+                  id: "auto-bugs",
+                  label: "\u0410\u0432\u0442\u043E\u043F\u043E\u0448\u0443\u043A \u0431\u0430\u0433\u0456\u0432",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("path", { d: "M8 2l1.88 1.88" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M14.12 3.88 16 2" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M9 7.13v-1a3 3 0 1 1 6 0v1" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M12 20v-9" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M6.53 9C4.6 8.8 3 7 3 5" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M6 13H2" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M3 21c0-2.1 1.7-3.9 3.8-4" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M20.97 5c0 2.1-1.6 3.8-3.5 4" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M22 13h-4" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M17.2 17c2.1.1 3.8 1.9 3.8 4" })
+                  ] }),
+                  hotkey: "Alt+A"
+                },
+                {
+                  id: "show-code",
+                  label: "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u043A\u043E\u0434",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("polyline", { points: "16 18 22 12 16 6" }),
+                    /* @__PURE__ */ jsx4("polyline", { points: "8 6 2 12 8 18" })
+                  ] }),
+                  hotkey: "Alt+C"
+                },
+                {
+                  id: "zoom",
+                  label: "\u041B\u0443\u043F\u0430",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("circle", { cx: "11", cy: "11", r: "8" }),
+                    /* @__PURE__ */ jsx4("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }),
+                    /* @__PURE__ */ jsx4("line", { x1: "11", y1: "8", x2: "11", y2: "14" }),
+                    /* @__PURE__ */ jsx4("line", { x1: "8", y1: "11", x2: "14", y2: "11" })
+                  ] }),
+                  hotkey: "Alt+L"
+                },
+                {
+                  id: "typography",
+                  label: "\u0428\u0440\u0438\u0444\u0442\u0438",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("polyline", { points: "4 7 4 4 20 4 20 7" }),
+                    /* @__PURE__ */ jsx4("line", { x1: "9", y1: "20", x2: "15", y2: "20" }),
+                    /* @__PURE__ */ jsx4("line", { x1: "12", y1: "4", x2: "12", y2: "20" })
+                  ] }),
+                  hotkey: "Alt+T"
+                }
+              ].map(({ id, label, icon, hotkey }) => /* @__PURE__ */ jsxs3("button", { type: "button", onClick: () => toggleDebug(id), style: {
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "7px 10px",
+                borderRadius: "8px",
+                background: activeDebug.has(id) ? "rgba(255,255,255,0.07)" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: activeDebug.has(id) ? "white" : "rgba(255,255,255,0.65)",
+                fontSize: "12px",
+                fontWeight: "500",
+                textAlign: "left",
+                width: "100%",
+                transition: "all 0.1s"
+              }, children: [
+                icon,
+                /* @__PURE__ */ jsx4("span", { children: label }),
+                /* @__PURE__ */ jsxs3("span", { style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px" }, children: [
+                  /* @__PURE__ */ jsx4("kbd", { style: { fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)", borderRadius: "3px", padding: "1px 4px", flexShrink: 0 }, children: hotkey }),
+                  /* @__PURE__ */ jsx4("span", { style: {
+                    width: "28px",
+                    height: "16px",
+                    borderRadius: "8px",
+                    background: activeDebug.has(id) ? "rgba(99,102,241,0.8)" : "rgba(255,255,255,0.12)",
+                    position: "relative",
+                    display: "inline-block",
+                    transition: "background 0.2s",
+                    flexShrink: 0
+                  }, children: /* @__PURE__ */ jsx4("span", { style: {
+                    position: "absolute",
+                    top: "2px",
+                    left: activeDebug.has(id) ? "14px" : "2px",
+                    width: "12px",
+                    height: "12px",
+                    borderRadius: "50%",
+                    background: "white",
+                    transition: "left 0.2s",
+                    display: "block"
+                  } }) })
+                ] })
+              ] }, id)),
+              portalUrl && /* @__PURE__ */ jsxs3(Fragment2, { children: [
+                /* @__PURE__ */ jsx4("div", { style: { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 6px" } }),
+                /* @__PURE__ */ jsxs3(
+                  "a",
+                  {
+                    href: portalUrl,
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    onClick: () => setShowKebab(false),
+                    style: { display: "flex", alignItems: "center", gap: "8px", padding: "7px 10px", borderRadius: "8px", color: "rgba(255,255,255,0.45)", textDecoration: "none", fontSize: "12px", fontWeight: "500", transition: "all 0.1s" },
+                    onMouseEnter: (e) => {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                      e.currentTarget.style.color = "white";
+                    },
+                    onMouseLeave: (e) => {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "rgba(255,255,255,0.45)";
+                    },
+                    children: [
+                      /* @__PURE__ */ jsxs3("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                        /* @__PURE__ */ jsx4("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }),
+                        /* @__PURE__ */ jsx4("polyline", { points: "15 3 21 3 21 9" }),
+                        /* @__PURE__ */ jsx4("line", { x1: "10", y1: "14", x2: "21", y2: "3" })
+                      ] }),
+                      /* @__PURE__ */ jsx4("span", { children: "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u0432 \u043F\u0440\u043E\u0454\u043A\u0442" })
+                    ]
+                  }
+                )
+              ] }),
+              shapes.length > 0 && /* @__PURE__ */ jsxs3(Fragment2, { children: [
+                /* @__PURE__ */ jsx4("div", { style: { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 6px" } }),
+                /* @__PURE__ */ jsxs3(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => {
+                      handleClearAll();
+                      setShowKebab(false);
+                    },
+                    style: {
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "7px 10px",
+                      borderRadius: "8px",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#ef4444",
+                      fontSize: "12px",
+                      fontWeight: "500",
+                      textAlign: "left",
+                      width: "100%",
+                      transition: "all 0.1s"
+                    },
+                    onMouseEnter: (e) => {
+                      e.currentTarget.style.background = "rgba(239,68,68,0.12)";
+                    },
+                    onMouseLeave: (e) => {
+                      e.currentTarget.style.background = "transparent";
+                    },
+                    children: [
+                      /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                        /* @__PURE__ */ jsx4("path", { d: "M3 6h18" }),
+                        /* @__PURE__ */ jsx4("path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }),
+                        /* @__PURE__ */ jsx4("path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" })
+                      ] }),
+                      /* @__PURE__ */ jsx4("span", { children: "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u0438 \u0432\u0441\u0456 \u043C\u0456\u0442\u043A\u0438" })
+                    ]
+                  }
+                )
               ] })
-            ] }),
-            techContextRef.current.eventLog.length > 0 && /* @__PURE__ */ jsxs3("div", { style: { marginBottom: "12px" }, children: [
-              /* @__PURE__ */ jsx4("div", { style: { fontSize: "10px", fontWeight: "700", color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "5px" }, children: "\u041A\u0440\u043E\u043A\u0438 \u0434\u043E \u0431\u0430\u0433\u0430 (\u0430\u0432\u0442\u043E)" }),
-              /* @__PURE__ */ jsx4("div", { style: { background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "7px 10px", maxHeight: "64px", overflowY: "auto" }, children: techContextRef.current.eventLog.slice(-5).map((e, i) => /* @__PURE__ */ jsxs3("div", { style: { fontSize: "11px", fontFamily: "monospace", color: e.type === "console_error" || e.type === "network_error" ? "#fca5a5" : "rgba(255,255,255,0.35)", lineHeight: "1.6" }, children: [
-                i + 1,
-                ". ",
-                e.description
-              ] }, i)) })
-            ] }),
-            /* @__PURE__ */ jsxs3("div", { style: { display: "flex", gap: "8px" }, children: [
-              /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setShowSendPanel(false), disabled: sending, style: { padding: "10px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.5)" }, children: "\u2190 \u041D\u0430\u0437\u0430\u0434" }),
-              /* @__PURE__ */ jsx4("button", { type: "button", onClick: handleSend, disabled: sending, style: { flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", background: sending ? "rgba(79,70,229,0.5)" : "#4f46e5", color: "white", border: "none", cursor: sending ? "default" : "pointer" }, children: sending ? "\u041D\u0430\u0434\u0441\u0438\u043B\u0430\u044E..." : "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u043D\u0430 \u043F\u043E\u0440\u0442\u0430\u043B \u2192" })
             ] })
-          ] }) })
-        ]
-      }
-    )
+          ] }),
+          " ",
+          shapes.length > 0 && /* @__PURE__ */ jsx4(Fragment2, { children: /* @__PURE__ */ jsx4(
+            "button",
+            {
+              type: "button",
+              onClick: handleSend,
+              disabled: sending,
+              title: "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 (Ctrl+S)",
+              style: { height: "32px", padding: "0 12px", borderRadius: "8px", background: "#4f46e5", color: "white", border: "none", cursor: sending ? "default" : "pointer", fontSize: "12px", fontWeight: "700", opacity: sending ? 0.7 : 1, transition: "all 0.15s", display: "flex", alignItems: "center", gap: "6px" },
+              children: sending ? "\u041D\u0430\u0434\u0441\u0438\u043B\u0430\u044E..." : /* @__PURE__ */ jsxs3(Fragment2, { children: [
+                /* @__PURE__ */ jsx4("span", { children: "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438" }),
+                /* @__PURE__ */ jsx4("span", { style: { background: "rgba(255,255,255,0.2)", borderRadius: "10px", fontSize: "10px", fontWeight: "800", padding: "0 6px", lineHeight: "18px" }, children: shapes.length })
+              ] })
+            }
+          ) }),
+          /* @__PURE__ */ jsx4(
+            "button",
+            {
+              type: "button",
+              onClick: handleCloseRequest,
+              style: { width: "30px", height: "30px", borderRadius: "8px", background: "transparent", color: "rgba(255,255,255,0.35)", border: "none", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, margin: 0, lineHeight: "30px" },
+              children: "\u2715"
+            }
+          )
+        ] }),
+        showExitConfirm && /* @__PURE__ */ jsx4("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10003 }, children: /* @__PURE__ */ jsxs3("div", { style: { width: "100%", maxWidth: "380px", margin: "0 16px", background: "rgba(22,22,26,0.99)", borderRadius: "20px", border: "1px solid rgba(139,92,246,0.2)", padding: "22px", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,0.6)" }, children: [
+          /* @__PURE__ */ jsx4("div", { style: { fontSize: "15px", fontWeight: "700", color: "white", marginBottom: "8px" }, children: "\u041D\u0435\u0432\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0456 \u0430\u043D\u043E\u0442\u0430\u0446\u0456\u0457" }),
+          /* @__PURE__ */ jsx4("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginBottom: "20px", lineHeight: "1.5" }, children: "\u0423 \u0432\u0430\u0441 \u0454 \u043D\u0435\u0432\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0456 \u043C\u0430\u043B\u044E\u043D\u043A\u0438. \u0411\u0430\u0436\u0430\u0454\u0442\u0435 \u043D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u0457\u0445 \u043F\u0435\u0440\u0435\u0434 \u0432\u0438\u0445\u043E\u0434\u043E\u043C?" }),
+          /* @__PURE__ */ jsxs3("div", { style: { display: "flex", flexDirection: "column", gap: "8px" }, children: [
+            /* @__PURE__ */ jsx4("button", { type: "button", onClick: handleSend, disabled: sending, style: { padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", background: "#4f46e5", color: "white", border: "none", cursor: "pointer" }, children: sending ? "\u041D\u0430\u0434\u0441\u0438\u043B\u0430\u044E..." : "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u0456 \u0432\u0438\u0439\u0442\u0438" }),
+            /* @__PURE__ */ jsx4("button", { type: "button", onClick: handleClearAndExit, style: { padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: "600", background: "rgba(239,68,68,0.15)", color: "#fca5a5", border: "none", cursor: "pointer" }, children: "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u0438 \u0456 \u0432\u0438\u0439\u0442\u0438" }),
+            /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setShowExitConfirm(false), style: { padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", border: "none", cursor: "pointer" }, children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438" })
+          ] })
+        ] }) })
+      ]
+    }
   );
 }
 
 // src/styles.gen.ts
-var styles = '.container {\n    width: 100%\n}\n@media (min-width: 640px) {\n    .container {\n        max-width: 640px\n    }\n}\n@media (min-width: 768px) {\n    .container {\n        max-width: 768px\n    }\n}\n@media (min-width: 1024px) {\n    .container {\n        max-width: 1024px\n    }\n}\n@media (min-width: 1280px) {\n    .container {\n        max-width: 1280px\n    }\n}\n@media (min-width: 1536px) {\n    .container {\n        max-width: 1536px\n    }\n}\n.sr-only {\n    position: absolute;\n    width: 1px;\n    height: 1px;\n    padding: 0;\n    margin: -1px;\n    overflow: hidden;\n    clip: rect(0, 0, 0, 0);\n    white-space: nowrap;\n    border-width: 0\n}\n.pointer-events-none {\n    pointer-events: none\n}\n.visible {\n    visibility: visible\n}\n.fixed {\n    position: fixed\n}\n.absolute {\n    position: absolute\n}\n.relative {\n    position: relative\n}\n.inset-0 {\n    inset: 0px\n}\n.-right-1 {\n    right: -0.25rem\n}\n.-top-1 {\n    top: -0.25rem\n}\n.bottom-24 {\n    bottom: 6rem\n}\n.bottom-6 {\n    bottom: 1.5rem\n}\n.left-1 {\n    left: 0.25rem\n}\n.right-6 {\n    right: 1.5rem\n}\n.top-1 {\n    top: 0.25rem\n}\n.top-4 {\n    top: 1rem\n}\n.z-\\[9998\\] {\n    z-index: 9998\n}\n.mx-1 {\n    margin-left: 0.25rem;\n    margin-right: 0.25rem\n}\n.mx-4 {\n    margin-left: 1rem;\n    margin-right: 1rem\n}\n.mx-auto {\n    margin-left: auto;\n    margin-right: auto\n}\n.mb-1 {\n    margin-bottom: 0.25rem\n}\n.mb-2 {\n    margin-bottom: 0.5rem\n}\n.mb-3 {\n    margin-bottom: 0.75rem\n}\n.mb-4 {\n    margin-bottom: 1rem\n}\n.mb-6 {\n    margin-bottom: 1.5rem\n}\n.ml-1 {\n    margin-left: 0.25rem\n}\n.mt-0 {\n    margin-top: 0px\n}\n.mt-1 {\n    margin-top: 0.25rem\n}\n.mt-2 {\n    margin-top: 0.5rem\n}\n.mt-6 {\n    margin-top: 1.5rem\n}\n.line-clamp-2 {\n    overflow: hidden;\n    display: -webkit-box;\n    -webkit-box-orient: vertical;\n    -webkit-line-clamp: 2\n}\n.block {\n    display: block\n}\n.inline-block {\n    display: inline-block\n}\n.flex {\n    display: flex\n}\n.inline-flex {\n    display: inline-flex\n}\n.hidden {\n    display: none\n}\n.h-10 {\n    height: 2.5rem\n}\n.h-12 {\n    height: 3rem\n}\n.h-6 {\n    height: 1.5rem\n}\n.h-\\[28px\\] {\n    height: 28px\n}\n.h-\\[32px\\] {\n    height: 32px\n}\n.h-\\[36px\\] {\n    height: 36px\n}\n.h-full {\n    height: 100%\n}\n.max-h-\\[calc\\(100vh-200px\\)\\] {\n    max-height: calc(100vh - 200px)\n}\n.w-10 {\n    width: 2.5rem\n}\n.w-12 {\n    width: 3rem\n}\n.w-\\[32px\\] {\n    width: 32px\n}\n.w-full {\n    width: 100%\n}\n.w-px {\n    width: 1px\n}\n.min-w-0 {\n    min-width: 0px\n}\n.max-w-\\[1200px\\] {\n    max-width: 1200px\n}\n.max-w-\\[480px\\] {\n    max-width: 480px\n}\n.max-w-\\[640px\\] {\n    max-width: 640px\n}\n.max-w-\\[900px\\] {\n    max-width: 900px\n}\n.flex-1 {\n    flex: 1 1 0%\n}\n.flex-shrink {\n    flex-shrink: 1\n}\n.shrink-0 {\n    flex-shrink: 0\n}\n.-translate-x-1 {\n    --tw-translate-x: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1 {\n    --tw-translate-y: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.transform {\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n@keyframes pulse {\n    50% {\n        opacity: .5\n    }\n}\n.animate-pulse {\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\n@keyframes spin {\n    to {\n        transform: rotate(360deg)\n    }\n}\n.animate-spin {\n    animation: spin 1s linear infinite\n}\n.cursor-default {\n    cursor: default\n}\n.select-none {\n    -webkit-user-select: none;\n       -moz-user-select: none;\n            user-select: none\n}\n.resize-none {\n    resize: none\n}\n.resize {\n    resize: both\n}\n.flex-col {\n    flex-direction: column\n}\n.flex-wrap {\n    flex-wrap: wrap\n}\n.items-start {\n    align-items: flex-start\n}\n.items-end {\n    align-items: flex-end\n}\n.items-center {\n    align-items: center\n}\n.justify-center {\n    justify-content: center\n}\n.justify-between {\n    justify-content: space-between\n}\n.gap-1 {\n    gap: 0.25rem\n}\n.gap-2 {\n    gap: 0.5rem\n}\n.gap-3 {\n    gap: 0.75rem\n}\n.gap-4 {\n    gap: 1rem\n}\n.gap-\\[6px\\] {\n    gap: 6px\n}\n.self-start {\n    align-self: flex-start\n}\n.overflow-hidden {\n    overflow: hidden\n}\n.overflow-y-auto {\n    overflow-y: auto\n}\n.rounded {\n    border-radius: 0.25rem\n}\n.rounded-\\[10px\\] {\n    border-radius: 10px\n}\n.rounded-\\[16px\\] {\n    border-radius: 16px\n}\n.rounded-\\[24px\\] {\n    border-radius: 24px\n}\n.rounded-\\[8px\\] {\n    border-radius: 8px\n}\n.rounded-full {\n    border-radius: 9999px\n}\n.border {\n    border-width: 1px\n}\n.border-2 {\n    border-width: 2px\n}\n.border-b {\n    border-bottom-width: 1px\n}\n.border-t {\n    border-top-width: 1px\n}\n.border-\\[\\#f0f0f0\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\n.border-red-500 {\n    --tw-border-opacity: 1;\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\n.border-transparent {\n    border-color: transparent\n}\n.border-white {\n    --tw-border-opacity: 1;\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\n.bg-\\[\\#1f1f1f\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#ef4444\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f0f0f0\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f4f4f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f5f5f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\n.bg-amber-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1))\n}\n.bg-black {\n    --tw-bg-opacity: 1;\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\n.bg-black\\/40 {\n    background-color: rgb(0 0 0 / 0.4)\n}\n.bg-indigo-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(99 102 241 / var(--tw-bg-opacity, 1))\n}\n.bg-red-50 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-transparent {\n    background-color: transparent\n}\n.bg-white {\n    --tw-bg-opacity: 1;\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\n.object-contain {\n    -o-object-fit: contain;\n       object-fit: contain\n}\n.object-cover {\n    -o-object-fit: cover;\n       object-fit: cover\n}\n.p-0 {\n    padding: 0px\n}\n.p-1 {\n    padding: 0.25rem\n}\n.p-3 {\n    padding: 0.75rem\n}\n.p-4 {\n    padding: 1rem\n}\n.p-\\[12px\\] {\n    padding: 12px\n}\n.p-\\[16px\\] {\n    padding: 16px\n}\n.p-\\[20px\\] {\n    padding: 20px\n}\n.p-\\[24px\\] {\n    padding: 24px\n}\n.px-1 {\n    padding-left: 0.25rem;\n    padding-right: 0.25rem\n}\n.px-2 {\n    padding-left: 0.5rem;\n    padding-right: 0.5rem\n}\n.px-3 {\n    padding-left: 0.75rem;\n    padding-right: 0.75rem\n}\n.px-4 {\n    padding-left: 1rem;\n    padding-right: 1rem\n}\n.px-6 {\n    padding-left: 1.5rem;\n    padding-right: 1.5rem\n}\n.px-\\[12px\\] {\n    padding-left: 12px;\n    padding-right: 12px\n}\n.px-\\[16px\\] {\n    padding-left: 16px;\n    padding-right: 16px\n}\n.px-\\[18px\\] {\n    padding-left: 18px;\n    padding-right: 18px\n}\n.py-0 {\n    padding-top: 0px;\n    padding-bottom: 0px\n}\n.py-12 {\n    padding-top: 3rem;\n    padding-bottom: 3rem\n}\n.py-2 {\n    padding-top: 0.5rem;\n    padding-bottom: 0.5rem\n}\n.py-3 {\n    padding-top: 0.75rem;\n    padding-bottom: 0.75rem\n}\n.py-5 {\n    padding-top: 1.25rem;\n    padding-bottom: 1.25rem\n}\n.py-8 {\n    padding-top: 2rem;\n    padding-bottom: 2rem\n}\n.pb-2 {\n    padding-bottom: 0.5rem\n}\n.pb-3 {\n    padding-bottom: 0.75rem\n}\n.pb-4 {\n    padding-bottom: 1rem\n}\n.pb-6 {\n    padding-bottom: 1.5rem\n}\n.pt-12 {\n    padding-top: 3rem\n}\n.pt-3 {\n    padding-top: 0.75rem\n}\n.pt-4 {\n    padding-top: 1rem\n}\n.pt-6 {\n    padding-top: 1.5rem\n}\n.text-center {\n    text-align: center\n}\n.font-mono {\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\n.text-\\[12px\\] {\n    font-size: 12px\n}\n.text-\\[13px\\] {\n    font-size: 13px\n}\n.text-\\[18px\\] {\n    font-size: 18px\n}\n.font-bold {\n    font-weight: 700\n}\n.font-semibold {\n    font-weight: 600\n}\n.uppercase {\n    text-transform: uppercase\n}\n.italic {\n    font-style: italic\n}\n.leading-none {\n    line-height: 1\n}\n.leading-relaxed {\n    line-height: 1.625\n}\n.leading-snug {\n    line-height: 1.375\n}\n.tracking-wider {\n    letter-spacing: 0.05em\n}\n.text-\\[\\#1f1f1f\\] {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#9a9a9a\\] {\n    --tw-text-opacity: 1;\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\n.text-amber-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 211 77 / var(--tw-text-opacity, 1))\n}\n.text-indigo-300 {\n    --tw-text-opacity: 1;\n    color: rgb(165 180 252 / var(--tw-text-opacity, 1))\n}\n.text-red-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 165 165 / var(--tw-text-opacity, 1))\n}\n.text-white {\n    --tw-text-opacity: 1;\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\n.opacity-60 {\n    opacity: 0.6\n}\n.shadow {\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-lg {\n    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-sm {\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.outline-none {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.outline {\n    outline-style: solid\n}\n.blur {\n    --tw-blur: blur(8px);\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.filter {\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.backdrop-blur-sm {\n    --tw-backdrop-blur: blur(4px);\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.backdrop-filter {\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.transition {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-all {\n    transition-property: all;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-colors {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.duration-150 {\n    transition-duration: 150ms\n}\n.hover\\:bg-\\[\\#303030\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#dc2626\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.focus\\:outline-none:focus {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.disabled\\:cursor-not-allowed:disabled {\n    cursor: not-allowed\n}\n.disabled\\:opacity-50:disabled {\n    opacity: 0.5\n}\n';
+var styles = '.container {\n    width: 100%\n}\n@media (min-width: 640px) {\n    .container {\n        max-width: 640px\n    }\n}\n@media (min-width: 768px) {\n    .container {\n        max-width: 768px\n    }\n}\n@media (min-width: 1024px) {\n    .container {\n        max-width: 1024px\n    }\n}\n@media (min-width: 1280px) {\n    .container {\n        max-width: 1280px\n    }\n}\n@media (min-width: 1536px) {\n    .container {\n        max-width: 1536px\n    }\n}\n.sr-only {\n    position: absolute;\n    width: 1px;\n    height: 1px;\n    padding: 0;\n    margin: -1px;\n    overflow: hidden;\n    clip: rect(0, 0, 0, 0);\n    white-space: nowrap;\n    border-width: 0\n}\n.pointer-events-none {\n    pointer-events: none\n}\n.visible {\n    visibility: visible\n}\n.static {\n    position: static\n}\n.fixed {\n    position: fixed\n}\n.absolute {\n    position: absolute\n}\n.relative {\n    position: relative\n}\n.inset-0 {\n    inset: 0px\n}\n.-right-1 {\n    right: -0.25rem\n}\n.-top-1 {\n    top: -0.25rem\n}\n.bottom-24 {\n    bottom: 6rem\n}\n.bottom-6 {\n    bottom: 1.5rem\n}\n.left-1 {\n    left: 0.25rem\n}\n.right-6 {\n    right: 1.5rem\n}\n.top-1 {\n    top: 0.25rem\n}\n.top-4 {\n    top: 1rem\n}\n.z-\\[9998\\] {\n    z-index: 9998\n}\n.mx-1 {\n    margin-left: 0.25rem;\n    margin-right: 0.25rem\n}\n.mx-4 {\n    margin-left: 1rem;\n    margin-right: 1rem\n}\n.mx-auto {\n    margin-left: auto;\n    margin-right: auto\n}\n.mb-1 {\n    margin-bottom: 0.25rem\n}\n.mb-2 {\n    margin-bottom: 0.5rem\n}\n.mb-3 {\n    margin-bottom: 0.75rem\n}\n.mb-4 {\n    margin-bottom: 1rem\n}\n.mb-6 {\n    margin-bottom: 1.5rem\n}\n.ml-1 {\n    margin-left: 0.25rem\n}\n.mt-0 {\n    margin-top: 0px\n}\n.mt-1 {\n    margin-top: 0.25rem\n}\n.mt-2 {\n    margin-top: 0.5rem\n}\n.mt-6 {\n    margin-top: 1.5rem\n}\n.line-clamp-2 {\n    overflow: hidden;\n    display: -webkit-box;\n    -webkit-box-orient: vertical;\n    -webkit-line-clamp: 2\n}\n.block {\n    display: block\n}\n.inline-block {\n    display: inline-block\n}\n.flex {\n    display: flex\n}\n.inline-flex {\n    display: inline-flex\n}\n.hidden {\n    display: none\n}\n.h-10 {\n    height: 2.5rem\n}\n.h-12 {\n    height: 3rem\n}\n.h-6 {\n    height: 1.5rem\n}\n.h-\\[28px\\] {\n    height: 28px\n}\n.h-\\[32px\\] {\n    height: 32px\n}\n.h-\\[36px\\] {\n    height: 36px\n}\n.h-full {\n    height: 100%\n}\n.max-h-\\[calc\\(100vh-200px\\)\\] {\n    max-height: calc(100vh - 200px)\n}\n.w-10 {\n    width: 2.5rem\n}\n.w-12 {\n    width: 3rem\n}\n.w-\\[32px\\] {\n    width: 32px\n}\n.w-full {\n    width: 100%\n}\n.w-px {\n    width: 1px\n}\n.min-w-0 {\n    min-width: 0px\n}\n.max-w-\\[1200px\\] {\n    max-width: 1200px\n}\n.max-w-\\[480px\\] {\n    max-width: 480px\n}\n.max-w-\\[640px\\] {\n    max-width: 640px\n}\n.max-w-\\[900px\\] {\n    max-width: 900px\n}\n.flex-1 {\n    flex: 1 1 0%\n}\n.flex-shrink {\n    flex-shrink: 1\n}\n.shrink-0 {\n    flex-shrink: 0\n}\n.-translate-x-1 {\n    --tw-translate-x: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.-translate-y-1 {\n    --tw-translate-y: -0.25rem;\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n.transform {\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\n@keyframes pulse {\n    50% {\n        opacity: .5\n    }\n}\n.animate-pulse {\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\n@keyframes spin {\n    to {\n        transform: rotate(360deg)\n    }\n}\n.animate-spin {\n    animation: spin 1s linear infinite\n}\n.cursor-default {\n    cursor: default\n}\n.select-none {\n    -webkit-user-select: none;\n       -moz-user-select: none;\n            user-select: none\n}\n.resize-none {\n    resize: none\n}\n.resize {\n    resize: both\n}\n.flex-col {\n    flex-direction: column\n}\n.flex-wrap {\n    flex-wrap: wrap\n}\n.items-start {\n    align-items: flex-start\n}\n.items-end {\n    align-items: flex-end\n}\n.items-center {\n    align-items: center\n}\n.justify-center {\n    justify-content: center\n}\n.justify-between {\n    justify-content: space-between\n}\n.gap-1 {\n    gap: 0.25rem\n}\n.gap-2 {\n    gap: 0.5rem\n}\n.gap-3 {\n    gap: 0.75rem\n}\n.gap-4 {\n    gap: 1rem\n}\n.gap-\\[6px\\] {\n    gap: 6px\n}\n.self-start {\n    align-self: flex-start\n}\n.overflow-hidden {\n    overflow: hidden\n}\n.overflow-y-auto {\n    overflow-y: auto\n}\n.truncate {\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap\n}\n.break-all {\n    word-break: break-all\n}\n.rounded {\n    border-radius: 0.25rem\n}\n.rounded-\\[10px\\] {\n    border-radius: 10px\n}\n.rounded-\\[16px\\] {\n    border-radius: 16px\n}\n.rounded-\\[24px\\] {\n    border-radius: 24px\n}\n.rounded-\\[8px\\] {\n    border-radius: 8px\n}\n.rounded-full {\n    border-radius: 9999px\n}\n.border {\n    border-width: 1px\n}\n.border-2 {\n    border-width: 2px\n}\n.border-b {\n    border-bottom-width: 1px\n}\n.border-t {\n    border-top-width: 1px\n}\n.border-\\[\\#f0f0f0\\] {\n    --tw-border-opacity: 1;\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\n.border-red-500 {\n    --tw-border-opacity: 1;\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\n.border-transparent {\n    border-color: transparent\n}\n.border-white {\n    --tw-border-opacity: 1;\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\n.bg-\\[\\#1f1f1f\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#ef4444\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f0f0f0\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f4f4f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.bg-\\[\\#f5f5f5\\] {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\n.bg-amber-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1))\n}\n.bg-black {\n    --tw-bg-opacity: 1;\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\n.bg-black\\/40 {\n    background-color: rgb(0 0 0 / 0.4)\n}\n.bg-indigo-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(99 102 241 / var(--tw-bg-opacity, 1))\n}\n.bg-red-50 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\n.bg-red-500 {\n    --tw-bg-opacity: 1;\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\n.bg-transparent {\n    background-color: transparent\n}\n.bg-white {\n    --tw-bg-opacity: 1;\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\n.object-contain {\n    -o-object-fit: contain;\n       object-fit: contain\n}\n.object-cover {\n    -o-object-fit: cover;\n       object-fit: cover\n}\n.p-0 {\n    padding: 0px\n}\n.p-1 {\n    padding: 0.25rem\n}\n.p-3 {\n    padding: 0.75rem\n}\n.p-4 {\n    padding: 1rem\n}\n.p-\\[12px\\] {\n    padding: 12px\n}\n.p-\\[16px\\] {\n    padding: 16px\n}\n.p-\\[20px\\] {\n    padding: 20px\n}\n.p-\\[24px\\] {\n    padding: 24px\n}\n.px-1 {\n    padding-left: 0.25rem;\n    padding-right: 0.25rem\n}\n.px-2 {\n    padding-left: 0.5rem;\n    padding-right: 0.5rem\n}\n.px-3 {\n    padding-left: 0.75rem;\n    padding-right: 0.75rem\n}\n.px-4 {\n    padding-left: 1rem;\n    padding-right: 1rem\n}\n.px-6 {\n    padding-left: 1.5rem;\n    padding-right: 1.5rem\n}\n.px-\\[12px\\] {\n    padding-left: 12px;\n    padding-right: 12px\n}\n.px-\\[16px\\] {\n    padding-left: 16px;\n    padding-right: 16px\n}\n.px-\\[18px\\] {\n    padding-left: 18px;\n    padding-right: 18px\n}\n.py-0 {\n    padding-top: 0px;\n    padding-bottom: 0px\n}\n.py-12 {\n    padding-top: 3rem;\n    padding-bottom: 3rem\n}\n.py-2 {\n    padding-top: 0.5rem;\n    padding-bottom: 0.5rem\n}\n.py-3 {\n    padding-top: 0.75rem;\n    padding-bottom: 0.75rem\n}\n.py-5 {\n    padding-top: 1.25rem;\n    padding-bottom: 1.25rem\n}\n.py-8 {\n    padding-top: 2rem;\n    padding-bottom: 2rem\n}\n.pb-2 {\n    padding-bottom: 0.5rem\n}\n.pb-3 {\n    padding-bottom: 0.75rem\n}\n.pb-4 {\n    padding-bottom: 1rem\n}\n.pb-6 {\n    padding-bottom: 1.5rem\n}\n.pt-12 {\n    padding-top: 3rem\n}\n.pt-3 {\n    padding-top: 0.75rem\n}\n.pt-4 {\n    padding-top: 1rem\n}\n.pt-6 {\n    padding-top: 1.5rem\n}\n.text-center {\n    text-align: center\n}\n.font-mono {\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\n.text-\\[12px\\] {\n    font-size: 12px\n}\n.text-\\[13px\\] {\n    font-size: 13px\n}\n.text-\\[18px\\] {\n    font-size: 18px\n}\n.font-bold {\n    font-weight: 700\n}\n.font-semibold {\n    font-weight: 600\n}\n.uppercase {\n    text-transform: uppercase\n}\n.italic {\n    font-style: italic\n}\n.leading-none {\n    line-height: 1\n}\n.leading-relaxed {\n    line-height: 1.625\n}\n.leading-snug {\n    line-height: 1.375\n}\n.tracking-wider {\n    letter-spacing: 0.05em\n}\n.text-\\[\\#1f1f1f\\] {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.text-\\[\\#9a9a9a\\] {\n    --tw-text-opacity: 1;\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\n.text-amber-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 211 77 / var(--tw-text-opacity, 1))\n}\n.text-indigo-300 {\n    --tw-text-opacity: 1;\n    color: rgb(165 180 252 / var(--tw-text-opacity, 1))\n}\n.text-red-300 {\n    --tw-text-opacity: 1;\n    color: rgb(252 165 165 / var(--tw-text-opacity, 1))\n}\n.text-white {\n    --tw-text-opacity: 1;\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\n.opacity-60 {\n    opacity: 0.6\n}\n.shadow {\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-lg {\n    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);\n    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.shadow-sm {\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\n.outline-none {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.outline {\n    outline-style: solid\n}\n.ring {\n    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\n    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);\n    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)\n}\n.blur {\n    --tw-blur: blur(8px);\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.invert {\n    --tw-invert: invert(100%);\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.filter {\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\n.backdrop-blur-sm {\n    --tw-backdrop-blur: blur(4px);\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.backdrop-filter {\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\n.transition {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-all {\n    transition-property: all;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.transition-colors {\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n    transition-duration: 150ms\n}\n.duration-150 {\n    transition-duration: 150ms\n}\n.ease-in-out {\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)\n}\n.ease-out {\n    transition-timing-function: cubic-bezier(0, 0, 0.2, 1)\n}\n.hover\\:bg-\\[\\#303030\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#dc2626\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\n    --tw-bg-opacity: 1;\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\n    --tw-text-opacity: 1;\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\n.focus\\:outline-none:focus {\n    outline: 2px solid transparent;\n    outline-offset: 2px\n}\n.disabled\\:cursor-not-allowed:disabled {\n    cursor: not-allowed\n}\n.disabled\\:opacity-50:disabled {\n    opacity: 0.5\n}\n';
 var styles_gen_default = styles;
 
 // src/components/BuggyBag.tsx
 import { Fragment as Fragment3, jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
-function RectIcon() {
-  return /* @__PURE__ */ jsx5("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsx5("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }) });
-}
-function ArrowIcon() {
-  return /* @__PURE__ */ jsxs4("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-    /* @__PURE__ */ jsx5("path", { d: "M5 19L19 5" }),
-    /* @__PURE__ */ jsx5("path", { d: "M8 5h11v11" })
-  ] });
-}
-function PinIcon() {
-  return /* @__PURE__ */ jsxs4("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-    /* @__PURE__ */ jsx5("path", { d: "M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" }),
-    /* @__PURE__ */ jsx5("circle", { cx: "12", cy: "10", r: "3" })
-  ] });
-}
 function BugIcon() {
-  return /* @__PURE__ */ jsxs4("svg", { width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", children: [
-    /* @__PURE__ */ jsx5("path", { d: "M8 2l1.88 1.88" }),
-    /* @__PURE__ */ jsx5("path", { d: "M14.12 3.88L16 2" }),
-    /* @__PURE__ */ jsx5("path", { d: "M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" }),
-    /* @__PURE__ */ jsx5("path", { d: "M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z" }),
-    /* @__PURE__ */ jsx5("path", { d: "M12 20v-9" }),
-    /* @__PURE__ */ jsx5("path", { d: "M6.53 9C4.6 8.8 3 7 3 5" }),
-    /* @__PURE__ */ jsx5("path", { d: "M6 13H2" }),
-    /* @__PURE__ */ jsx5("path", { d: "M3 21c0-2.1 1.7-3.9 3.8-4" }),
-    /* @__PURE__ */ jsx5("path", { d: "M20.97 5c0 2.1-1.6 3.8-3.5 4" }),
-    /* @__PURE__ */ jsx5("path", { d: "M22 13h-4" }),
-    /* @__PURE__ */ jsx5("path", { d: "M17.2 17c2.1.1 3.8 1.9 3.8 4" })
+  return /* @__PURE__ */ jsxs4("svg", { width: "56", height: "56", viewBox: "0 0 194 194", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [
+    /* @__PURE__ */ jsx5("path", { d: "M10.7365 18.4947C-0.604524 20.9451 -6.27503 -5.19299 10.7365 0.933186C24.3457 5.83418 36.659 21.4903 41.1144 28.7056L42.7999 31.4049C54.7817 28.0012 71.5545 27.9996 97.0001 27.9996C122.445 27.9996 139.218 28.0014 151.199 31.4049L152.886 28.7056C157.341 21.4903 169.655 5.83418 183.264 0.933186C200.275 -5.19278 194.605 20.9448 183.264 18.4947C174.191 16.5343 165.982 22.0348 163.012 25.0299L157.341 31.1558L156.075 33.0904C159.532 34.5302 162.546 36.377 165.248 38.7467C166.669 39.9929 168.008 41.3305 169.254 42.7515C180 55.0055 180 73.6704 180 111C180 148.329 180 166.994 169.254 179.248C168.008 180.669 166.669 182.007 165.248 183.253C152.994 194 134.33 194 97.0001 194C59.6708 194 41.006 194 28.7521 183.253C27.331 182.007 25.9925 180.669 24.7462 179.248C14.0002 166.994 14.0001 148.329 14.0001 111C14.0001 73.6703 13.9999 55.0054 24.7462 42.7515C25.9925 41.3304 27.331 39.9929 28.7521 38.7467C31.454 36.3772 34.4674 34.5302 37.924 33.0904L36.6593 31.1558L30.9884 25.0299C28.0181 22.0348 19.8093 16.5343 10.7365 18.4947Z", fill: "#1F1F1F" }),
+    /* @__PURE__ */ jsx5("path", { d: "M30.6001 102.7C30.6001 86.6564 43.6062 73.6503 59.6501 73.6503C75.6939 73.6503 88.7001 86.6564 88.7001 102.7V106.85C88.7001 122.894 75.6939 135.9 59.6501 135.9C43.6062 135.9 30.6001 122.894 30.6001 106.85V102.7Z", fill: "white" }),
+    /* @__PURE__ */ jsx5("path", { d: "M105.3 102.7C105.3 86.6564 118.306 73.6503 134.35 73.6503C150.394 73.6503 163.4 86.6564 163.4 102.7V106.85C163.4 122.894 150.394 135.9 134.35 135.9C118.306 135.9 105.3 122.894 105.3 106.85V102.7Z", fill: "white" }),
+    /* @__PURE__ */ jsx5("path", { d: "M126.05 97.512C126.05 88.917 133.018 81.9495 141.613 81.9495C150.208 81.9495 157.175 88.917 157.175 97.512C157.175 106.107 150.208 113.074 141.613 113.074C133.018 113.074 126.05 106.107 126.05 97.512Z", fill: "#1F1F1F" }),
+    /* @__PURE__ */ jsx5("path", { d: "M51.3501 97.512C51.3501 88.917 58.3176 81.9495 66.9126 81.9495C75.5075 81.9495 82.4751 88.917 82.4751 97.512C82.4751 106.107 75.5075 113.074 66.9126 113.074C58.3176 113.074 51.3501 106.107 51.3501 97.512Z", fill: "#1F1F1F" })
   ] });
 }
-var hasEyeDropper2 = typeof window !== "undefined" && "EyeDropper" in window;
 function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
-  const [expanded, setExpanded] = useState5(false);
   const [activeTool, setActiveTool] = useState5(null);
   const [toast, setToast] = useState5(null);
-  useEffect4(() => {
+  const [projectUrl, setProjectUrl] = useState5(null);
+  const [draftCount, setDraftCount] = useState5(0);
+  const [draftConflict, setDraftConflict] = useState5(null);
+  useEffect5(() => {
     initCollector();
   }, []);
-  useEffect4(() => {
-    const handler = () => {
-      setExpanded((v) => !v);
-      setActiveTool(null);
+  useEffect5(() => {
+    const checkDraft = () => {
+      try {
+        const saved = localStorage.getItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.shapes && parsed.shapes.length > 0) {
+            setDraftCount(parsed.shapes.length);
+          } else {
+            setDraftCount(0);
+          }
+        } else {
+          setDraftCount(0);
+        }
+      } catch (e) {
+        setDraftCount(0);
+      }
     };
-    const escHandler = () => {
-      setExpanded(false);
-      setActiveTool(null);
+    checkDraft();
+    window.addEventListener("buggy-bag:draft-changed", checkDraft);
+    return () => window.removeEventListener("buggy-bag:draft-changed", checkDraft);
+  }, []);
+  const handleBugBtnClick = () => {
+    if (activeTool) {
+      window.dispatchEvent(new CustomEvent("buggy-bag:request-close"));
+      return;
+    }
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("BUGGY_BAG_DRAFT_") && key !== `BUGGY_BAG_DRAFT_${window.location.pathname}`) {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+          if (parsed.shapes && parsed.shapes.length > 0) {
+            setDraftConflict({ path: key.replace("BUGGY_BAG_DRAFT_", ""), count: parsed.shapes.length });
+            return;
+          }
+        } catch (e) {
+        }
+      }
+    }
+    setActiveTool("pin");
+  };
+  useEffect5(() => {
+    const handler = () => {
+      if (activeTool) {
+        window.dispatchEvent(new CustomEvent("buggy-bag:request-close"));
+      } else {
+        handleBugBtnClick();
+      }
+    };
+    const toastHandler = (e) => {
+      if (e.detail) {
+        setToast({ msg: e.detail.msg, ok: e.detail.ok, isBugReport: false });
+        setTimeout(() => setToast(null), 4e3);
+      }
     };
     window.addEventListener("buggy-bag:toggle", handler);
-    window.addEventListener("buggy-bag:escape", escHandler);
+    window.addEventListener("buggy-bag:toast", toastHandler);
     return () => {
       window.removeEventListener("buggy-bag:toggle", handler);
-      window.removeEventListener("buggy-bag:escape", escHandler);
+      window.removeEventListener("buggy-bag:toast", toastHandler);
     };
-  }, []);
-  const handleToolSelect = (tool) => {
-    setExpanded(false);
-    setActiveTool(tool);
-  };
-  const handleEyeDropper = async () => {
-    setExpanded(false);
-    try {
-      const dropper = new window.EyeDropper();
-      const result = await dropper.open();
-      const hex = result.sRGBHex.toUpperCase();
-      await navigator.clipboard.writeText(hex).catch(() => {
+  }, [activeTool]);
+  const fireConfetti = () => {
+    const colors = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ec4899"];
+    if (!document.getElementById("bb-cf-kf")) {
+      const s = document.createElement("style");
+      s.id = "bb-cf-kf";
+      s.textContent = "@keyframes bb-cf-fall { 0% { transform: translateY(0) rotate(0deg); opacity:1; } 100% { transform: translateY(-220px) rotate(540deg); opacity:0; } }";
+      document.head.appendChild(s);
+    }
+    for (let i = 0; i < 48; i++) {
+      const el = document.createElement("div");
+      const size = Math.random() * 6 + 4;
+      const isRect = Math.random() > 0.5;
+      Object.assign(el.style, {
+        position: "fixed",
+        width: size + "px",
+        height: isRect ? size * 2.2 + "px" : size + "px",
+        background: colors[i % colors.length],
+        borderRadius: isRect ? "2px" : "50%",
+        right: 20 + Math.random() * 180 + "px",
+        bottom: 60 + Math.random() * 40 + "px",
+        zIndex: "2147483646",
+        pointerEvents: "none",
+        animation: `bb-cf-fall ${Math.random() * 1 + 0.8}s ease-out ${Math.random() * 0.3}s forwards`
       });
-      setToast({ msg: hex, ok: true, color: hex });
-      setTimeout(() => setToast(null), 5e3);
-    } catch {
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2e3);
     }
   };
   const handleSend = async (payload) => {
     setActiveTool(null);
+    fireConfetti();
     if (!apiEndpoint || !apiKey) {
-      showToast("\u0412\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E (\u0431\u0435\u0437 API)", true);
+      showSuccessToast(null);
       return;
     }
     try {
@@ -29868,95 +31464,231 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, api_key: apiKey })
       });
-      showToast(res.ok ? "\u2713 \u0412\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E" : "\u26A0 \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430", res.ok);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const pId = data?.bug?.project_id || null;
+        const targetProjUrl = pId && portalUrl ? `${portalUrl}/projects/${pId}` : portalUrl || null;
+        showSuccessToast(targetProjUrl);
+      } else showToast("\u26A0 \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430", false);
     } catch {
       showToast("\u26A0 \u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u0456\u0434\u043F\u0440\u0430\u0432\u0438\u0442\u0438", false);
     }
   };
+  const showSuccessToast = (projUrl) => {
+    setProjectUrl(projUrl);
+    setToast({ ok: true, isBugReport: true });
+    setTimeout(() => setToast(null), 5e3);
+  };
   const showToast = (msg, ok) => {
-    setToast({ msg, ok });
+    setToast({ msg, ok, isBugReport: false });
     setTimeout(() => setToast(null), 4e3);
   };
-  const tools = [
-    { tool: "rect", icon: /* @__PURE__ */ jsx5(RectIcon, {}), title: "\u0412\u0438\u0434\u0456\u043B\u0438\u0442\u0438 \u043E\u0431\u043B\u0430\u0441\u0442\u044C" },
-    { tool: "arrow", icon: /* @__PURE__ */ jsx5(ArrowIcon, {}), title: "\u041D\u0430\u043C\u0430\u043B\u044E\u0432\u0430\u0442\u0438 \u0441\u0442\u0440\u0456\u043B\u043A\u0443" },
-    { tool: "pin", icon: /* @__PURE__ */ jsx5(PinIcon, {}), title: "\u041F\u043E\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u043F\u0456\u043D" },
-    { tool: "measure", icon: /* @__PURE__ */ jsxs4("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-      /* @__PURE__ */ jsx5("path", { d: "M21.55 6.45L17.55 2.45a1 1 0 0 0-1.41 0L2.45 16.14a1 1 0 0 0 0 1.41l4 4a1 1 0 0 0 1.41 0L21.55 7.86a1 1 0 0 0 0-1.41z" }),
-      /* @__PURE__ */ jsx5("path", { d: "M8 8l1.5 1.5" }),
-      /* @__PURE__ */ jsx5("path", { d: "M11.5 11.5l1.5 1.5" }),
-      /* @__PURE__ */ jsx5("path", { d: "M15 15l1.5 1.5" })
-    ] }), title: "\u041B\u0456\u043D\u0456\u0439\u043A\u0430" }
-  ];
   return /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    !activeTool && /* @__PURE__ */ jsx5("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "24px", right: "24px", zIndex: 9997 }, children: expanded ? (
-      // Same dark pill style as CaptureMode toolbar
-      /* @__PURE__ */ jsxs4("div", { style: {
-        background: "rgba(31,31,31,0.95)",
-        backdropFilter: "blur(10px)",
-        borderRadius: "14px",
-        border: "1px solid rgba(255,255,255,0.1)",
-        padding: "8px",
+    !activeTool && /* @__PURE__ */ jsxs4("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "12px", right: "12px", zIndex: 9997, fontFamily: "system-ui, sans-serif" }, children: [
+      draftConflict && /* @__PURE__ */ jsx5("div", { style: {
+        position: "fixed",
+        inset: 0,
+        zIndex: 1e4,
         display: "flex",
         alignItems: "center",
-        gap: "4px"
-      }, children: [
-        tools.map(({ tool, icon, title }) => /* @__PURE__ */ jsx5(
-          "button",
-          {
-            type: "button",
-            onClick: () => handleToolSelect(tool),
-            title,
-            style: { width: "34px", height: "34px", borderRadius: "8px", background: "transparent", border: "none", cursor: "pointer", color: "#9a9a9a", display: "flex", alignItems: "center", justifyContent: "center" },
-            onMouseEnter: (e) => (e.currentTarget.style.background = "rgba(255,255,255,0.1)", e.currentTarget.style.color = "white"),
-            onMouseLeave: (e) => (e.currentTarget.style.background = "transparent", e.currentTarget.style.color = "#9a9a9a"),
-            children: icon
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)"
+      }, children: /* @__PURE__ */ jsxs4("div", { style: { background: "#1c1c1e", padding: "24px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.1)", maxWidth: "320px", textAlign: "center" }, children: [
+        /* @__PURE__ */ jsxs4("div", { style: { fontSize: "15px", color: "white", fontWeight: "600", marginBottom: "16px", lineHeight: "1.4" }, children: [
+          "\u0412\u0438 \u043F\u0435\u0440\u0435\u0439\u0448\u043B\u0438 \u043D\u0430 \u0456\u043D\u0448\u0443 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443. \u0412\u0430\u0448\u0456 \u043E\u0441\u0442\u0430\u043D\u043D\u0456 \u043C\u0456\u0442\u043A\u0438 (",
+          draftConflict.count,
+          ") \u0437\u0430\u043B\u0438\u0448\u0438\u043B\u0438\u0441\u044C \u043D\u0430 \u043C\u0438\u043D\u0443\u043B\u0456\u0439 \u0441\u0442\u043E\u0440\u0456\u043D\u0446\u0456. \u0429\u043E \u0440\u043E\u0431\u0438\u0442\u0438?"
+        ] }),
+        /* @__PURE__ */ jsxs4("div", { style: { display: "flex", flexDirection: "column", gap: "8px" }, children: [
+          /* @__PURE__ */ jsx5("button", { onClick: () => window.location.href = draftConflict.path, style: { background: "rgb(79, 70, 229)", color: "white", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }, children: "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043D\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443" }),
+          /* @__PURE__ */ jsx5("button", { onClick: () => {
+            localStorage.removeItem(`BUGGY_BAG_DRAFT_${draftConflict.path}`);
+            setDraftConflict(null);
+            setActiveTool("pin");
+          }, style: { background: "rgba(239,68,68,0.2)", color: "#ef4444", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }, children: "\u0421\u0442\u0435\u0440\u0442\u0438 \u0432\u0441\u0456 \u043C\u0456\u0442\u043A\u0438" }),
+          /* @__PURE__ */ jsx5("button", { onClick: () => setDraftConflict(null), style: { background: "transparent", color: "rgba(255,255,255,0.5)", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }, children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438" })
+        ] })
+      ] }) }),
+      /* @__PURE__ */ jsx5("div", { children: /* @__PURE__ */ jsxs4(
+        "button",
+        {
+          type: "button",
+          className: "bb-bug-btn",
+          onClick: handleBugBtnClick,
+          title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
+          style: { width: "56px", height: "56px", background: "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "transform 0.15s", animation: "bb-bugbtn-entry 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards", position: "relative" },
+          onMouseEnter: (e) => {
+            e.currentTarget.style.transform = "scale(1.1)";
           },
-          tool
-        )),
-        /* @__PURE__ */ jsx5("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } }),
+          onMouseLeave: (e) => {
+            e.currentTarget.style.transform = "scale(1)";
+          },
+          children: [
+            /* @__PURE__ */ jsx5("style", { children: `
+                @keyframes bb-bugbtn-entry {
+                  0% { transform: scale(0.1) rotate(-45deg); opacity: 0; }
+                  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+                }
+                @keyframes bb-wiggle {
+                  0%, 100% { transform: rotate(0deg); }
+                  25% { transform: rotate(-8deg) translateY(-2px); }
+                  75% { transform: rotate(8deg) translateY(-2px); }
+                }
+                .bb-bug-btn:hover svg {
+                  animation: bb-wiggle 0.25s ease-in-out infinite;
+                  transform-origin: center bottom;
+                }
+                .bb-bug-btn:hover .bb-bug-hint {
+                  opacity: 1 !important;
+                }
+              ` }),
+            /* @__PURE__ */ jsx5("span", { className: "bb-bug-hint", style: { position: "absolute", top: "-24px", left: "50%", transform: "translateX(-50%)", fontSize: "9px", fontFamily: "monospace", background: "rgba(28,28,30,0.6)", color: "rgba(255,255,255,0.85)", padding: "2px 6px", borderRadius: "6px", userSelect: "none", backdropFilter: "blur(4px)", fontWeight: "600", opacity: 0, transition: "opacity 0.2s", pointerEvents: "none", whiteSpace: "nowrap" }, children: "Alt+B" }),
+            /* @__PURE__ */ jsx5(BugIcon, {}),
+            draftCount > 0 && /* @__PURE__ */ jsx5("span", { style: { position: "absolute", top: "-2px", right: "-2px", background: "rgb(79, 70, 229)", color: "white", fontSize: "9px", fontWeight: "bold", minWidth: "14px", height: "14px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }, children: draftCount })
+          ]
+        }
+      ) })
+    ] }),
+    activeTool && /* @__PURE__ */ jsx5(
+      CaptureMode,
+      {
+        initialTool: activeTool,
+        apiKey: apiKey ?? "",
+        portalUrl,
+        onSend: handleSend,
+        onCancel: () => setActiveTool(null)
+      }
+    ),
+    toast && /* @__PURE__ */ jsx5("div", { "data-buggy-bag": "true", style: {
+      position: "fixed",
+      bottom: "32px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 9999,
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      padding: "10px 16px",
+      borderRadius: "12px",
+      background: toast.ok ? "rgba(18,22,20,0.96)" : "rgba(36,18,18,0.96)",
+      border: `1px solid ${toast.ok ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      whiteSpace: "nowrap",
+      fontFamily: "system-ui, -apple-system, sans-serif"
+    }, children: toast.ok ? (
+      // Success state
+      /* @__PURE__ */ jsxs4(Fragment3, { children: [
+        /* @__PURE__ */ jsx5("div", { style: { width: "20px", height: "20px", borderRadius: "50%", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }, children: /* @__PURE__ */ jsx5("svg", { width: "11", height: "11", viewBox: "0 0 24 24", fill: "none", stroke: "#22c55e", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsx5("polyline", { points: "20 6 9 17 4 12" }) }) }),
+        /* @__PURE__ */ jsx5("span", { style: { fontSize: "13px", fontWeight: "600", color: "white" }, children: toast.msg || "\u0411\u0430\u0433 \u0440\u0435\u043F\u043E\u0440\u0442 \u043D\u0430\u0434\u0456\u0441\u043B\u0430\u043D\u043E" }),
+        toast.isBugReport && (projectUrl || portalUrl) && /* @__PURE__ */ jsxs4(
+          "a",
+          {
+            href: projectUrl || portalUrl,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            style: {
+              fontSize: "11px",
+              color: "#1a1a1a",
+              background: "#f4f4f5",
+              textDecoration: "none",
+              fontWeight: "700",
+              padding: "5px 10px",
+              borderRadius: "6px",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              marginLeft: "6px",
+              transition: "background 0.15s"
+            },
+            onMouseEnter: (e) => {
+              e.currentTarget.style.background = "#ffffff";
+            },
+            onMouseLeave: (e) => {
+              e.currentTarget.style.background = "#f4f4f5";
+            },
+            children: [
+              "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u0432 \u043F\u0440\u043E\u0454\u043A\u0442",
+              /* @__PURE__ */ jsxs4("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                /* @__PURE__ */ jsx5("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }),
+                /* @__PURE__ */ jsx5("polyline", { points: "15 3 21 3 21 9" }),
+                /* @__PURE__ */ jsx5("line", { x1: "10", y1: "14", x2: "21", y2: "3" })
+              ] })
+            ]
+          }
+        ),
         /* @__PURE__ */ jsx5(
           "button",
           {
             type: "button",
-            onClick: () => setExpanded(false),
-            title: "\u0417\u0430\u043A\u0440\u0438\u0442\u0438",
-            style: { width: "34px", height: "34px", borderRadius: "8px", background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" },
+            onClick: () => setToast(null),
+            style: { marginLeft: "4px", background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)", fontSize: "13px", display: "flex", alignItems: "center", padding: "2px" },
+            onMouseEnter: (e) => {
+              e.currentTarget.style.color = "white";
+            },
+            onMouseLeave: (e) => {
+              e.currentTarget.style.color = "rgba(255,255,255,0.35)";
+            },
             children: "\u2715"
           }
         )
       ] })
     ) : (
-      // Collapsed — just the bug button
-      /* @__PURE__ */ jsxs4("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }, children: [
-        /* @__PURE__ */ jsx5("span", { style: { fontSize: "10px", fontFamily: "monospace", background: "rgba(0,0,0,0.35)", color: "rgba(255,255,255,0.6)", padding: "2px 6px", borderRadius: "4px", userSelect: "none" }, children: "Alt+B" }),
-        /* @__PURE__ */ jsx5(
-          "button",
-          {
-            type: "button",
-            onClick: () => setExpanded(true),
-            title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0431\u0430\u0433 (Alt+B)",
-            style: { width: "48px", height: "48px", borderRadius: "50%", background: "rgba(28,28,30,0.65)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "rgba(255,255,255,0.85)", transition: "all 0.15s", backdropFilter: "blur(8px)" },
-            children: /* @__PURE__ */ jsx5(BugIcon, {})
-          }
-        )
+      // Error state
+      /* @__PURE__ */ jsxs4(Fragment3, { children: [
+        /* @__PURE__ */ jsxs4("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "#ef4444", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsx5("circle", { cx: "12", cy: "12", r: "10" }),
+          /* @__PURE__ */ jsx5("line", { x1: "12", y1: "8", x2: "12", y2: "12" }),
+          /* @__PURE__ */ jsx5("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" })
+        ] }),
+        /* @__PURE__ */ jsx5("span", { style: { fontSize: "13px", color: "#fca5a5", fontWeight: "600" }, children: toast.msg })
       ] })
-    ) }),
-    activeTool && /* @__PURE__ */ jsx5(CaptureMode, { initialTool: activeTool, apiKey: apiKey ?? "", onSend: handleSend, onCancel: () => setActiveTool(null) }),
-    toast && /* @__PURE__ */ jsx5("div", { "data-buggy-bag": "true", style: { position: "fixed", bottom: "90px", right: "24px", zIndex: 9999, display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px", borderRadius: "12px", background: toast.ok ? "#1c1c1e" : "#3f1c1c", color: toast.ok ? "white" : "#fca5a5", border: `1px solid ${toast.ok ? "rgba(255,255,255,0.1)" : "#7f1d1d"}`, fontSize: "13px", fontWeight: "600" }, children: toast.color ? /* @__PURE__ */ jsxs4(Fragment3, { children: [
-      /* @__PURE__ */ jsx5("div", { style: { width: "22px", height: "22px", borderRadius: "6px", background: toast.color, border: "2px solid rgba(255,255,255,0.2)", flexShrink: 0 } }),
-      /* @__PURE__ */ jsxs4("div", { children: [
-        /* @__PURE__ */ jsx5("div", { style: { fontSize: "14px", fontWeight: "700", fontFamily: "monospace" }, children: toast.color }),
-        /* @__PURE__ */ jsx5("div", { style: { fontSize: "10px", color: "rgba(255,255,255,0.4)", fontWeight: "500", marginTop: "1px" }, children: "\u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E" })
-      ] })
-    ] }) : /* @__PURE__ */ jsxs4(Fragment3, { children: [
-      toast.msg,
-      toast.ok && portalUrl && /* @__PURE__ */ jsx5("a", { href: portalUrl, target: "_blank", rel: "noopener noreferrer", style: { color: "#818cf8", marginLeft: "4px", fontSize: "12px" }, children: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u2192" })
-    ] }) })
+    ) })
   ] });
 }
+var ErrorBoundary = class extends React7.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error2) {
+    return { error: error2 };
+  }
+  componentDidCatch(error2, errorInfo) {
+    console.error("[BuggyBag] Crash:", error2, errorInfo);
+  }
+  render() {
+    if (this.state.error) {
+      return /* @__PURE__ */ jsxs4("div", { style: { position: "fixed", bottom: "24px", right: "24px", zIndex: 9999, background: "red", color: "white", padding: "10px", borderRadius: "8px", maxWidth: "300px", fontSize: "12px", fontFamily: "monospace" }, children: [
+        /* @__PURE__ */ jsx5("strong", { children: "Widget Crashed!" }),
+        /* @__PURE__ */ jsx5("br", {}),
+        this.state.error.message
+      ] });
+    }
+    return this.props.children;
+  }
+};
 function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
-  useEffect4(() => {
+  return /* @__PURE__ */ jsx5(ErrorBoundary, { children: /* @__PURE__ */ jsx5(BuggyBagWithHooks, { apiEndpoint, apiKey, portalUrl }) });
+}
+function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }) {
+  const [isDisabled, setIsDisabled] = useState5(false);
+  useEffect5(() => {
+    if (apiKey) {
+      const pingUrl = apiEndpoint ? apiEndpoint.replace("/bugs/submit", "/ping") : `${portalUrl}/api/ping`;
+      fetch(pingUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: apiKey })
+      }).then((r) => r.json()).then((data) => {
+        if (data.ok && data.is_active === false) {
+          setIsDisabled(true);
+        }
+      }).catch(() => {
+      });
+    }
+    if (isDisabled) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("bb") === "on") {
       localStorage.setItem("BUGGY_BAG_ACCESS", "active");
@@ -29964,16 +31696,17 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
       window.history.replaceState({}, "", window.location.pathname + (params.toString() ? "?" + params.toString() : ""));
     }
     let _active = false;
+    let _rec = null;
     const dispatchTranscript = (text, isFinal) => window.dispatchEvent(new CustomEvent("buggy-bag:transcript", { detail: { text, isFinal } }));
     const createRec = () => {
       const w = window;
       const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
       if (!SR || !_active) return;
-      const rec = new SR();
-      rec.lang = "uk-UA";
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.onresult = (e) => {
+      _rec = new SR();
+      _rec.lang = "uk-UA";
+      _rec.continuous = true;
+      _rec.interimResults = true;
+      _rec.onresult = (e) => {
         let finalText = "";
         let interimText = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -29984,31 +31717,55 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
         if (finalText) dispatchTranscript(finalText.trim(), true);
         if (interimText) dispatchTranscript(interimText, false);
       };
-      rec.onerror = (ev) => {
+      _rec.onerror = (ev) => {
         if (ev.error === "no-speech" || ev.error === "aborted") return;
+        if (ev.error === "not-allowed") {
+          _active = false;
+          window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
+          return;
+        }
         _active = false;
         window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
       };
-      rec.onend = () => {
+      _rec.onend = () => {
         if (_active) setTimeout(createRec, 150);
         else window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
       };
       try {
-        rec.start();
+        _rec.start();
       } catch {
         _active = false;
         window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
       }
     };
-    const startVoice = () => {
+    const startVoice = async () => {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        window.dispatchEvent(new CustomEvent("buggy-bag:voice-end"));
+        return;
+      }
       _active = true;
       createRec();
     };
     const stopVoice = () => {
       _active = false;
+      try {
+        _rec?.stop();
+      } catch {
+      }
+      _rec = null;
     };
     window.addEventListener("buggy-bag:start-voice", startVoice);
     window.addEventListener("buggy-bag:stop-voice", stopVoice);
+    const handleEyedropperOpen = () => {
+      host.style.opacity = "0";
+    };
+    const handleEyedropperClose = () => {
+      host.style.opacity = "";
+    };
+    window.addEventListener("buggy-bag:eyedropper-open", handleEyedropperOpen);
+    window.addEventListener("buggy-bag:eyedropper-close", handleEyedropperClose);
     const handleKeyDown = (e) => {
       if (e.altKey && e.code === "KeyB") {
         e.preventDefault();
@@ -30018,6 +31775,7 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
     };
     document.addEventListener("keydown", handleKeyDown);
     const host = document.createElement("div");
+    host.id = "buggy-bag-host";
     host.setAttribute("data-buggy-bag", "true");
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;";
     document.body.appendChild(host);
@@ -30032,17 +31790,24 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
     shadow.appendChild(mountPoint);
     const root = createRoot(mountPoint);
     root.render(
-      /* @__PURE__ */ jsx5(GodModeGuard, { children: /* @__PURE__ */ jsx5(BuggyBagInner, { apiEndpoint, apiKey, portalUrl }) })
+      /* @__PURE__ */ jsx5(ErrorBoundary, { children: /* @__PURE__ */ jsx5(GodModeGuard, { children: /* @__PURE__ */ jsx5(BuggyBagInner, { apiEndpoint, apiKey, portalUrl }) }) })
     );
     return () => {
       _active = false;
+      try {
+        _rec?.stop();
+      } catch {
+      }
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("buggy-bag:start-voice", startVoice);
       window.removeEventListener("buggy-bag:stop-voice", stopVoice);
+      window.removeEventListener("buggy-bag:eyedropper-open", handleEyedropperOpen);
+      window.removeEventListener("buggy-bag:eyedropper-close", handleEyedropperClose);
       host.remove();
       setTimeout(() => root.unmount(), 0);
     };
-  }, []);
+  }, [isDisabled, apiEndpoint, apiKey, portalUrl]);
+  if (isDisabled) return null;
   return null;
 }
 function isActive() {
@@ -30053,7 +31818,8 @@ export {
   BuggyBag,
   collectTechContext,
   initCollector,
-  isActive
+  isActive,
+  registerDataSource
 };
 /*! Bundled license information:
 
