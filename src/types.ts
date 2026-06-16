@@ -1,4 +1,4 @@
-export type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure' | 'eraser' | 'eyedropper';
+export type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure' | 'eraser';
 export type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type DebugOverlay = 'invert' | 'spacing' | 'show-code' | 'zoom' | 'auto-bugs' | 'typography';
 

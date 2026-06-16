@@ -8,7 +8,7 @@ interface BuggyBagProps {
 declare function BuggyBag({ apiEndpoint, apiKey, portalUrl }?: BuggyBagProps): react_jsx_runtime.JSX.Element;
 declare function isActive(): boolean;
 
-type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure' | 'eraser' | 'eyedropper';
+type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure' | 'eraser';
 type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
 /**
  * DOM context captured when a pin is placed on a specific element.

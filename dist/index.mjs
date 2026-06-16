@@ -30069,7 +30069,6 @@ function collectTechContext(clickedElement) {
 
 // src/components/CaptureMode.tsx
 import { Fragment as Fragment2, jsx as jsx4, jsxs as jsxs3 } from "react/jsx-runtime";
-var hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
 function ToolBtn({ active, onClick, title, hotkey, children }) {
   return /* @__PURE__ */ jsxs3(
     "button",
@@ -30246,7 +30245,6 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const [shapes, setShapes] = useState4([]);
   const [annotations, setAnnotations] = useState4({});
   const [pendingShape, setPendingShape] = useState4(null);
-  const [lastCopiedColor, setLastCopiedColor] = useState4(null);
   const [showExitConfirm, setShowExitConfirm] = useState4(false);
   const [sending, setSending] = useState4(false);
   const [cursor, setCursor] = useState4(null);
@@ -30269,33 +30267,6 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
   const h = typeof window !== "undefined" ? window.innerHeight : 800;
   const handleShapeComplete = useCallback2(async (shape) => {
-    if (shape.type === "eyedropper") {
-      try {
-        if (hostRef.current) hostRef.current.style.opacity = "0";
-        if (glowRef.current) glowRef.current.style.display = "none";
-        const canvas = await toCanvas(document.body, { skipFonts: true });
-        const ctx = canvas.getContext("2d");
-        let hex = "#ffffff";
-        if (ctx) {
-          const pixel = ctx.getImageData(shape.x, shape.y, 1, 1).data;
-          hex = "#" + [pixel[0], pixel[1], pixel[2]].map((x) => x.toString(16).padStart(2, "0")).join("");
-        }
-        const hexUp = hex.toUpperCase();
-        if (hostRef.current) hostRef.current.style.opacity = "1";
-        if (glowRef.current) glowRef.current.style.display = "block";
-        navigator.clipboard.writeText(hexUp).catch(() => {
-        });
-        window.dispatchEvent(new CustomEvent("buggy-bag:toast", { detail: { msg: `\u041A\u043E\u043B\u0456\u0440 ${hexUp} \u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E`, ok: true, color: hexUp } }));
-        setLastCopiedColor(hexUp);
-        const finalShape = { ...shape, type: "pin" };
-        setShapes((prev) => [...prev, finalShape]);
-        setPendingShape({ shape: finalShape, isNew: true });
-        setTool("pin");
-      } catch (err) {
-        console.error("Eyedropper error:", err);
-      }
-      return;
-    }
     const enrichedShape = shape.type === "pin" ? { ...shape, elementContext: getPinElementContext(shape.x, shape.y) ?? void 0 } : shape;
     setShapes((prev) => {
       const next = [...prev, enrichedShape];
@@ -30564,26 +30535,6 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
           setTool("eraser");
         }
         if (e.key === "5") {
-          e.preventDefault();
-          if (hasEyeDropper) {
-            try {
-              const eyeDropper = new window.EyeDropper();
-              eyeDropper.open().then((result) => {
-                const hex = result.sRGBHex.toUpperCase();
-                navigator.clipboard.writeText(hex).catch(() => {
-                });
-                window.dispatchEvent(new CustomEvent("buggy-bag:toast", { detail: { msg: `\u041A\u043E\u043B\u0456\u0440 ${hex} \u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E`, ok: true, color: hex } }));
-                setLastCopiedColor(hex);
-                setTool("pin");
-              }).catch(() => {
-              });
-            } catch (err) {
-            }
-          } else {
-            setTool("eyedropper");
-          }
-        }
-        if (e.key === "6") {
           e.preventDefault();
           setTool("measure");
         }
@@ -30978,14 +30929,21 @@ Letter-spacing: ${style.letterSpacing}`;
             /* @__PURE__ */ jsx4("path", { d: "M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20H20V20Z" }),
             /* @__PURE__ */ jsx4("path", { d: "M17.5 11.5L12 17" })
           ] }) }),
+          /* @__PURE__ */ jsx4(ToolBtn, { active: tool === "measure", onClick: () => setTool((t) => t === "measure" ? "pin" : "measure"), title: "\u041B\u0456\u043D\u0456\u0439\u043A\u0430", hotkey: "5", children: /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+            /* @__PURE__ */ jsx4("rect", { x: "1", y: "8", width: "22", height: "8", rx: "1" }),
+            /* @__PURE__ */ jsx4("line", { x1: "5", y1: "12", x2: "5", y2: "16" }),
+            /* @__PURE__ */ jsx4("line", { x1: "9", y1: "12", x2: "9", y2: "14" }),
+            /* @__PURE__ */ jsx4("line", { x1: "13", y1: "12", x2: "13", y2: "16" }),
+            /* @__PURE__ */ jsx4("line", { x1: "17", y1: "12", x2: "17", y2: "14" })
+          ] }) }),
           /* @__PURE__ */ jsxs3("div", { ref: kebabRef, style: { position: "relative" }, children: [
-            /* @__PURE__ */ jsxs3(ToolBtn, { active: showKebab || activeDebug.size > 0 || tool === "measure", onClick: () => setShowKebab((v) => !v), title: "\u0411\u0456\u043B\u044C\u0448\u0435 \u0456\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u0456\u0432", children: [
+            /* @__PURE__ */ jsxs3(ToolBtn, { active: showKebab || activeDebug.size > 0, onClick: () => setShowKebab((v) => !v), title: "\u0411\u0456\u043B\u044C\u0448\u0435 \u0456\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u0456\u0432", children: [
               /* @__PURE__ */ jsxs3("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "currentColor", children: [
                 /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "5", r: "1.5" }),
                 /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "12", r: "1.5" }),
                 /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "19", r: "1.5" })
               ] }),
-              (activeDebug.size > 0 || tool === "measure") && /* @__PURE__ */ jsx4("span", { style: { position: "absolute", top: "5px", right: "5px", width: "5px", height: "5px", borderRadius: "50%", background: "white" } })
+              activeDebug.size > 0 && /* @__PURE__ */ jsx4("span", { style: { position: "absolute", top: "5px", right: "5px", width: "5px", height: "5px", borderRadius: "50%", background: "white" } })
             ] }),
             showKebab && /* @__PURE__ */ jsxs3("div", { "data-buggy-bag": "true", style: {
               position: "absolute",
@@ -31003,114 +30961,6 @@ Letter-spacing: ${style.letterSpacing}`;
               gap: "2px",
               zIndex: 10003
             }, children: [
-              /* @__PURE__ */ jsx4("div", { style: { fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 8px 4px" }, children: "\u0406\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u0438" }),
-              /* @__PURE__ */ jsxs3(
-                "button",
-                {
-                  type: "button",
-                  onClick: () => {
-                    setTool((t) => t === "measure" ? "pin" : "measure");
-                    setShowKebab(false);
-                  },
-                  style: {
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "7px 10px",
-                    borderRadius: "8px",
-                    background: tool === "measure" ? "rgba(255,255,255,0.15)" : "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: tool === "measure" ? "white" : "rgba(255,255,255,0.65)",
-                    fontSize: "12px",
-                    fontWeight: "500",
-                    textAlign: "left",
-                    width: "100%",
-                    transition: "all 0.1s"
-                  },
-                  onMouseEnter: (e) => {
-                    if (tool !== "measure") {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                      e.currentTarget.style.color = "white";
-                    }
-                  },
-                  onMouseLeave: (e) => {
-                    if (tool !== "measure") {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "rgba(255,255,255,0.65)";
-                    }
-                  },
-                  children: [
-                    /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                      /* @__PURE__ */ jsx4("rect", { x: "1", y: "8", width: "22", height: "8", rx: "1" }),
-                      /* @__PURE__ */ jsx4("line", { x1: "5", y1: "12", x2: "5", y2: "16" }),
-                      /* @__PURE__ */ jsx4("line", { x1: "9", y1: "12", x2: "9", y2: "14" }),
-                      /* @__PURE__ */ jsx4("line", { x1: "13", y1: "12", x2: "13", y2: "16" }),
-                      /* @__PURE__ */ jsx4("line", { x1: "17", y1: "12", x2: "17", y2: "14" })
-                    ] }),
-                    /* @__PURE__ */ jsx4("span", { children: "\u041B\u0456\u043D\u0456\u0439\u043A\u0430" }),
-                    /* @__PURE__ */ jsx4("kbd", { style: { marginLeft: "auto", fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)", borderRadius: "3px", padding: "1px 4px", flexShrink: 0 }, children: "6" })
-                  ]
-                }
-              ),
-              hasEyeDropper && /* @__PURE__ */ jsxs3(
-                "button",
-                {
-                  type: "button",
-                  onClick: async () => {
-                    setShowKebab(false);
-                    try {
-                      const eyeDropper = new window.EyeDropper();
-                      const result = await eyeDropper.open();
-                      const hex = result.sRGBHex.toUpperCase();
-                      navigator.clipboard.writeText(hex).catch(() => {
-                      });
-                      window.dispatchEvent(new CustomEvent("buggy-bag:toast", { detail: { msg: `\u041A\u043E\u043B\u0456\u0440 ${hex} \u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E`, ok: true, color: hex } }));
-                      setLastCopiedColor(hex);
-                      setTool("pin");
-                    } catch (e) {
-                    }
-                  },
-                  style: {
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "7px 10px",
-                    borderRadius: "8px",
-                    background: tool === "eyedropper" ? "rgba(255,255,255,0.15)" : "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: tool === "eyedropper" ? "white" : "rgba(255,255,255,0.65)",
-                    fontSize: "12px",
-                    fontWeight: "500",
-                    textAlign: "left",
-                    width: "100%",
-                    transition: "all 0.1s"
-                  },
-                  onMouseEnter: (e) => {
-                    if (tool !== "eyedropper") {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                      e.currentTarget.style.color = "white";
-                    }
-                  },
-                  onMouseLeave: (e) => {
-                    if (tool !== "eyedropper") {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "rgba(255,255,255,0.65)";
-                    }
-                  },
-                  children: [
-                    /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                      /* @__PURE__ */ jsx4("path", { d: "m2 22 1-1h3l9-9" }),
-                      /* @__PURE__ */ jsx4("path", { d: "M3 21v-3l9-9" }),
-                      /* @__PURE__ */ jsx4("path", { d: "m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" })
-                    ] }),
-                    /* @__PURE__ */ jsx4("span", { children: "\u041F\u0456\u043F\u0435\u0442\u043A\u0430" }),
-                    /* @__PURE__ */ jsx4("kbd", { style: { marginLeft: "auto", fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)", borderRadius: "3px", padding: "1px 4px", flexShrink: 0 }, children: "5" })
-                  ]
-                }
-              ),
-              /* @__PURE__ */ jsx4("div", { style: { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 6px" } }),
               /* @__PURE__ */ jsx4("div", { style: { fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 8px 4px" }, children: "Debug" }),
               [
                 {
@@ -31159,17 +31009,6 @@ Letter-spacing: ${style.letterSpacing}`;
                     /* @__PURE__ */ jsx4("polyline", { points: "8 6 2 12 8 18" })
                   ] }),
                   hotkey: "Alt+C"
-                },
-                {
-                  id: "zoom",
-                  label: "\u041B\u0443\u043F\u0430",
-                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                    /* @__PURE__ */ jsx4("circle", { cx: "11", cy: "11", r: "8" }),
-                    /* @__PURE__ */ jsx4("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }),
-                    /* @__PURE__ */ jsx4("line", { x1: "11", y1: "8", x2: "11", y2: "14" }),
-                    /* @__PURE__ */ jsx4("line", { x1: "8", y1: "11", x2: "14", y2: "11" })
-                  ] }),
-                  hotkey: "Alt+L"
                 },
                 {
                   id: "typography",
