@@ -378,7 +378,7 @@ function patchDom() {
   // Track significant clicks (buttons and links)
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
-    if (!target) return;
+    if (!target || typeof target.closest !== 'function') return;
 
     const el = target.closest('button, a, [role="button"]') as HTMLElement | null;
     if (!el) return;
@@ -410,7 +410,7 @@ function patchFormEvents() {
   // Track form field changes (field name only, not value — privacy)
   document.addEventListener('change', (e) => {
     const target = e.target as HTMLElement;
-    if (!target || target.closest('[data-buggy-bag]')) return;
+    if (!target || typeof target.closest !== 'function' || target.closest('[data-buggy-bag]')) return;
 
     const tag = target.tagName.toLowerCase();
     if (!['input', 'select', 'textarea'].includes(tag)) return;
@@ -442,7 +442,7 @@ function patchFormEvents() {
   // Track focus events on form fields (helps trace user flow)
   document.addEventListener('focus', (e) => {
     const target = e.target as HTMLElement;
-    if (!target || target.closest('[data-buggy-bag]')) return;
+    if (!target || typeof target.closest !== 'function' || target.closest('[data-buggy-bag]')) return;
 
     const tag = target.tagName.toLowerCase();
     if (!['input', 'select', 'textarea'].includes(tag)) return;

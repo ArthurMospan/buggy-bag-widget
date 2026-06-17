@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { GodModeGuard } from '../guard';
 import { CaptureMode } from './CaptureMode';
 import { initCollector } from '../lib/collector';
+import { detectFavicon } from '../lib/favicon';
 import type { SubmitBugPayload, DrawTool } from '../types';
 import widgetStyles from '../styles.gen';
 
@@ -355,18 +356,24 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
     // ── Check presence and kill switch ──
     if (apiKey) {
       const pingUrl = apiEndpoint ? apiEndpoint.replace('/bugs/submit', '/ping') : `${portalUrl}/api/ping`;
-      fetch(pingUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey }),
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok && data.is_active === false) {
-          setIsDisabled(true);
-        }
-      })
-      .catch(() => {});
+      detectFavicon().then(favicon => {
+        fetch(pingUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            api_key: apiKey,
+            favicon_url: favicon.url,
+            favicon_color: favicon.color
+          }),
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok && data.is_active === false) {
+            setIsDisabled(true);
+          }
+        })
+        .catch(() => {});
+      });
     }
 
     if (isDisabled) return;

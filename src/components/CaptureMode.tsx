@@ -205,21 +205,31 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
   const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null);
   const [codeWinPos, setCodeWinPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 440 : 800, y: 24 });
   const [bugWinPos, setBugWinPos] = useState({ x: 24, y: 24 });
+  const [lastCopiedColor, setLastCopiedColor] = useState<string | null>(null);
   const dragRef = useRef<'code' | 'bug' | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const kebabRef = useRef<HTMLDivElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const glowRef = useRef<HTMLDivElement>(null);
-  const techContextRef = useRef(collectTechContext());
   const hostRef = useRef<HTMLDivElement>(null);
   const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const h = typeof window !== 'undefined' ? window.innerHeight : 800;
 
   const handleShapeComplete = useCallback(async (shape: DrawShape) => {
-
-    // Enrich pin shapes with DOM context at the exact placement point
-    const enrichedShape = shape.type === 'pin'
-      ? { ...shape, elementContext: getPinElementContext(shape.x, shape.y) ?? undefined }
+    // Compute anchor point per shape type so every annotation carries DOM context
+    let anchorX: number | undefined;
+    let anchorY: number | undefined;
+    if (shape.type === 'pin') {
+      anchorX = shape.x; anchorY = shape.y;
+    } else if (shape.type === 'rect') {
+      anchorX = shape.x + (shape.width ?? 0) / 2;
+      anchorY = shape.y + (shape.height ?? 0) / 2;
+    } else if ((shape.type === 'arrow' || shape.type === 'measure') && shape.points) {
+      anchorX = (shape.points[0] + shape.points[2]) / 2;
+      anchorY = (shape.points[1] + shape.points[3]) / 2;
+    }
+    const enrichedShape = anchorX !== undefined && anchorY !== undefined
+      ? { ...shape, elementContext: getPinElementContext(anchorX, anchorY) ?? undefined }
       : shape;
 
     setShapes(prev => {
@@ -342,6 +352,9 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         width: window.innerWidth,
         height: window.innerHeight,
         pixelRatio: 1,
+        // Skip the widget host — html-to-image can't serialize Shadow DOM
+        // and will throw or produce a corrupt blank image if it tries
+        filter: (node: HTMLElement) => node.id !== 'buggy-bag-host',
       });
 
       if (konvaDataUrl) {
@@ -386,7 +399,34 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       window.dispatchEvent(new CustomEvent('buggy-bag:draft-changed'));
     } catch {}
 
-    onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(' | ') || 'Без опису', tech_context: techContextRef.current });
+    // Fresh snapshot at send time — captures everything that happened during drawing.
+    // Resolve the DOM element under the last shape's anchor point so tech_context.component is populated.
+    let lastElement: HTMLElement | null = null;
+    if (shapes.length > 0) {
+      const last = shapes[shapes.length - 1];
+      let ax: number | undefined;
+      let ay: number | undefined;
+      if (last.type === 'pin') {
+        ax = last.x; ay = last.y;
+      } else if (last.type === 'rect') {
+        ax = last.x + (last.width ?? 0) / 2;
+        ay = last.y + (last.height ?? 0) / 2;
+      } else if ((last.type === 'arrow' || last.type === 'measure') && last.points) {
+        ax = (last.points[0] + last.points[2]) / 2;
+        ay = (last.points[1] + last.points[3]) / 2;
+      }
+      if (ax !== undefined && ay !== undefined) {
+        const els = document.elementsFromPoint(ax, ay);
+        lastElement = (els.find(el =>
+          !(el as HTMLElement).closest?.('[data-buggy-bag]') &&
+          el !== document.documentElement &&
+          el !== document.body
+        ) as HTMLElement) ?? null;
+      }
+    }
+    const freshTechContext = collectTechContext(lastElement);
+
+    onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(' | ') || 'Без опису', tech_context: freshTechContext });
   }, [shapes, annotations, apiKey, onSend, sending]);
 
   const handleCloseRequest = useCallback(() => {

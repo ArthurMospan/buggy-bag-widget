@@ -49,7 +49,7 @@ interface DrawShape {
     height?: number;
     points?: [number, number, number, number];
     pinNumber?: number;
-    /** DOM context captured when pin was placed — only set for 'pin' type */
+    /** DOM context captured at the shape's anchor point — set for pin, rect, arrow, and measure types */
     elementContext?: PinElementContext;
 }
 interface NetworkRequest {

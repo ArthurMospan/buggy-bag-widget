@@ -29704,7 +29704,7 @@ function patchDom() {
   });
   document.addEventListener("click", (e) => {
     const target = e.target;
-    if (!target) return;
+    if (!target || typeof target.closest !== "function") return;
     const el = target.closest('button, a, [role="button"]');
     if (!el) return;
     if (el.closest("[data-buggy-bag]")) return;
@@ -29722,7 +29722,7 @@ function patchFormEvents() {
   formPatched = true;
   document.addEventListener("change", (e) => {
     const target = e.target;
-    if (!target || target.closest("[data-buggy-bag]")) return;
+    if (!target || typeof target.closest !== "function" || target.closest("[data-buggy-bag]")) return;
     const tag = target.tagName.toLowerCase();
     if (!["input", "select", "textarea"].includes(tag)) return;
     const name = target.getAttribute("name") || target.getAttribute("id") || target.getAttribute("aria-label") || tag;
@@ -29744,7 +29744,7 @@ function patchFormEvents() {
   }, { capture: true, passive: true });
   document.addEventListener("focus", (e) => {
     const target = e.target;
-    if (!target || target.closest("[data-buggy-bag]")) return;
+    if (!target || typeof target.closest !== "function" || target.closest("[data-buggy-bag]")) return;
     const tag = target.tagName.toLowerCase();
     if (!["input", "select", "textarea"].includes(tag)) return;
     const name = target.getAttribute("name") || target.getAttribute("id") || target.getAttribute("aria-label") || target.getAttribute("placeholder") || tag;
@@ -30257,17 +30257,29 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const [hoveredRect, setHoveredRect] = useState4(null);
   const [codeWinPos, setCodeWinPos] = useState4({ x: typeof window !== "undefined" ? window.innerWidth - 440 : 800, y: 24 });
   const [bugWinPos, setBugWinPos] = useState4({ x: 24, y: 24 });
+  const [lastCopiedColor, setLastCopiedColor] = useState4(null);
   const dragRef = useRef4(null);
   const dragOffsetRef = useRef4({ x: 0, y: 0 });
   const kebabRef = useRef4(null);
   const [isCapturing, setIsCapturing] = useState4(false);
   const glowRef = useRef4(null);
-  const techContextRef = useRef4(collectTechContext());
   const hostRef = useRef4(null);
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
   const h = typeof window !== "undefined" ? window.innerHeight : 800;
   const handleShapeComplete = useCallback2(async (shape) => {
-    const enrichedShape = shape.type === "pin" ? { ...shape, elementContext: getPinElementContext(shape.x, shape.y) ?? void 0 } : shape;
+    let anchorX;
+    let anchorY;
+    if (shape.type === "pin") {
+      anchorX = shape.x;
+      anchorY = shape.y;
+    } else if (shape.type === "rect") {
+      anchorX = shape.x + (shape.width ?? 0) / 2;
+      anchorY = shape.y + (shape.height ?? 0) / 2;
+    } else if ((shape.type === "arrow" || shape.type === "measure") && shape.points) {
+      anchorX = (shape.points[0] + shape.points[2]) / 2;
+      anchorY = (shape.points[1] + shape.points[3]) / 2;
+    }
+    const enrichedShape = anchorX !== void 0 && anchorY !== void 0 ? { ...shape, elementContext: getPinElementContext(anchorX, anchorY) ?? void 0 } : shape;
     setShapes((prev) => {
       const next = [...prev, enrichedShape];
       try {
@@ -30379,7 +30391,10 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
       const pageDataUrl = await toPng(document.body, {
         width: window.innerWidth,
         height: window.innerHeight,
-        pixelRatio: 1
+        pixelRatio: 1,
+        // Skip the widget host — html-to-image can't serialize Shadow DOM
+        // and will throw or produce a corrupt blank image if it tries
+        filter: (node) => node.id !== "buggy-bag-host"
       });
       if (konvaDataUrl) {
         const composite = document.createElement("canvas");
@@ -30422,7 +30437,30 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
       window.dispatchEvent(new CustomEvent("buggy-bag:draft-changed"));
     } catch {
     }
-    onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443", tech_context: techContextRef.current });
+    let lastElement = null;
+    if (shapes.length > 0) {
+      const last = shapes[shapes.length - 1];
+      let ax;
+      let ay;
+      if (last.type === "pin") {
+        ax = last.x;
+        ay = last.y;
+      } else if (last.type === "rect") {
+        ax = last.x + (last.width ?? 0) / 2;
+        ay = last.y + (last.height ?? 0) / 2;
+      } else if ((last.type === "arrow" || last.type === "measure") && last.points) {
+        ax = (last.points[0] + last.points[2]) / 2;
+        ay = (last.points[1] + last.points[3]) / 2;
+      }
+      if (ax !== void 0 && ay !== void 0) {
+        const els = document.elementsFromPoint(ax, ay);
+        lastElement = els.find(
+          (el) => !el.closest?.("[data-buggy-bag]") && el !== document.documentElement && el !== document.body
+        ) ?? null;
+      }
+    }
+    const freshTechContext = collectTechContext(lastElement);
+    onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443", tech_context: freshTechContext });
   }, [shapes, annotations, apiKey, onSend, sending]);
   const handleCloseRequest = useCallback2(() => {
     if (shapes.length > 0) {
@@ -31175,6 +31213,79 @@ Letter-spacing: ${style.letterSpacing}`;
   );
 }
 
+// src/lib/favicon.ts
+var FAVICON_SELECTORS = [
+  'link[rel="icon"]',
+  'link[rel="shortcut icon"]',
+  'link[rel="apple-touch-icon"]',
+  'link[rel="apple-touch-icon-precomposed"]'
+];
+function findFaviconUrl() {
+  if (typeof document === "undefined") return null;
+  for (const selector of FAVICON_SELECTORS) {
+    const el = document.querySelector(selector);
+    if (el?.href) return el.href;
+  }
+  try {
+    return `${window.location.origin}/favicon.ico`;
+  } catch {
+    return null;
+  }
+}
+function extractDominantColor(img) {
+  try {
+    const size = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, size, size);
+    const { data } = ctx.getImageData(0, 0, size, size);
+    const counts = /* @__PURE__ */ new Map();
+    let best = null;
+    let bestCount = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+      if (a < 128) continue;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if (max === 0 || (max - min) / max < 0.2) continue;
+      if (max < 40) continue;
+      const key = `${Math.round(r / 32) * 32},${Math.round(g / 32) * 32},${Math.round(b / 32) * 32}`;
+      const count = (counts.get(key) ?? 0) + 1;
+      counts.set(key, count);
+      if (count > bestCount) {
+        bestCount = count;
+        best = `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+      }
+    }
+    return best;
+  } catch {
+    return null;
+  }
+}
+function detectFavicon() {
+  return new Promise((resolve) => {
+    const url = findFaviconUrl();
+    if (!url || typeof Image === "undefined") {
+      resolve({ url: null, color: null });
+      return;
+    }
+    const img = new Image();
+    const timeout = setTimeout(() => resolve({ url, color: null }), 2500);
+    img.onload = () => {
+      clearTimeout(timeout);
+      resolve({ url, color: extractDominantColor(img) });
+    };
+    img.onerror = () => {
+      clearTimeout(timeout);
+      resolve({ url: null, color: null });
+    };
+    img.src = url;
+  });
+}
+
 // src/styles.gen.ts
 var styles = '.container {\r\n    width: 100%\n}\r\n@media (min-width: 640px) {\r\n    .container {\r\n        max-width: 640px\n    }\n}\r\n@media (min-width: 768px) {\r\n    .container {\r\n        max-width: 768px\n    }\n}\r\n@media (min-width: 1024px) {\r\n    .container {\r\n        max-width: 1024px\n    }\n}\r\n@media (min-width: 1280px) {\r\n    .container {\r\n        max-width: 1280px\n    }\n}\r\n@media (min-width: 1536px) {\r\n    .container {\r\n        max-width: 1536px\n    }\n}\r\n.sr-only {\r\n    position: absolute;\r\n    width: 1px;\r\n    height: 1px;\r\n    padding: 0;\r\n    margin: -1px;\r\n    overflow: hidden;\r\n    clip: rect(0, 0, 0, 0);\r\n    white-space: nowrap;\r\n    border-width: 0\n}\r\n.pointer-events-none {\r\n    pointer-events: none\n}\r\n.visible {\r\n    visibility: visible\n}\r\n.static {\r\n    position: static\n}\r\n.fixed {\r\n    position: fixed\n}\r\n.absolute {\r\n    position: absolute\n}\r\n.relative {\r\n    position: relative\n}\r\n.inset-0 {\r\n    inset: 0px\n}\r\n.-right-1 {\r\n    right: -0.25rem\n}\r\n.-top-1 {\r\n    top: -0.25rem\n}\r\n.bottom-24 {\r\n    bottom: 6rem\n}\r\n.bottom-6 {\r\n    bottom: 1.5rem\n}\r\n.left-1 {\r\n    left: 0.25rem\n}\r\n.right-6 {\r\n    right: 1.5rem\n}\r\n.top-1 {\r\n    top: 0.25rem\n}\r\n.top-4 {\r\n    top: 1rem\n}\r\n.z-\\[9998\\] {\r\n    z-index: 9998\n}\r\n.mx-1 {\r\n    margin-left: 0.25rem;\r\n    margin-right: 0.25rem\n}\r\n.mx-4 {\r\n    margin-left: 1rem;\r\n    margin-right: 1rem\n}\r\n.mx-auto {\r\n    margin-left: auto;\r\n    margin-right: auto\n}\r\n.mb-1 {\r\n    margin-bottom: 0.25rem\n}\r\n.mb-2 {\r\n    margin-bottom: 0.5rem\n}\r\n.mb-3 {\r\n    margin-bottom: 0.75rem\n}\r\n.mb-4 {\r\n    margin-bottom: 1rem\n}\r\n.mb-6 {\r\n    margin-bottom: 1.5rem\n}\r\n.ml-1 {\r\n    margin-left: 0.25rem\n}\r\n.mt-0 {\r\n    margin-top: 0px\n}\r\n.mt-1 {\r\n    margin-top: 0.25rem\n}\r\n.mt-2 {\r\n    margin-top: 0.5rem\n}\r\n.mt-6 {\r\n    margin-top: 1.5rem\n}\r\n.line-clamp-2 {\r\n    overflow: hidden;\r\n    display: -webkit-box;\r\n    -webkit-box-orient: vertical;\r\n    -webkit-line-clamp: 2\n}\r\n.block {\r\n    display: block\n}\r\n.inline-block {\r\n    display: inline-block\n}\r\n.flex {\r\n    display: flex\n}\r\n.inline-flex {\r\n    display: inline-flex\n}\r\n.hidden {\r\n    display: none\n}\r\n.h-10 {\r\n    height: 2.5rem\n}\r\n.h-12 {\r\n    height: 3rem\n}\r\n.h-6 {\r\n    height: 1.5rem\n}\r\n.h-\\[28px\\] {\r\n    height: 28px\n}\r\n.h-\\[32px\\] {\r\n    height: 32px\n}\r\n.h-\\[36px\\] {\r\n    height: 36px\n}\r\n.h-full {\r\n    height: 100%\n}\r\n.max-h-\\[calc\\(100vh-200px\\)\\] {\r\n    max-height: calc(100vh - 200px)\n}\r\n.w-10 {\r\n    width: 2.5rem\n}\r\n.w-12 {\r\n    width: 3rem\n}\r\n.w-\\[32px\\] {\r\n    width: 32px\n}\r\n.w-full {\r\n    width: 100%\n}\r\n.w-px {\r\n    width: 1px\n}\r\n.min-w-0 {\r\n    min-width: 0px\n}\r\n.max-w-\\[1200px\\] {\r\n    max-width: 1200px\n}\r\n.max-w-\\[480px\\] {\r\n    max-width: 480px\n}\r\n.max-w-\\[640px\\] {\r\n    max-width: 640px\n}\r\n.max-w-\\[900px\\] {\r\n    max-width: 900px\n}\r\n.flex-1 {\r\n    flex: 1 1 0%\n}\r\n.flex-shrink {\r\n    flex-shrink: 1\n}\r\n.shrink-0 {\r\n    flex-shrink: 0\n}\r\n.-translate-x-1 {\r\n    --tw-translate-x: -0.25rem;\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.-translate-y-1 {\r\n    --tw-translate-y: -0.25rem;\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.transform {\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n@keyframes pulse {\r\n    50% {\r\n        opacity: .5\n    }\n}\r\n.animate-pulse {\r\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\r\n@keyframes spin {\r\n    to {\r\n        transform: rotate(360deg)\n    }\n}\r\n.animate-spin {\r\n    animation: spin 1s linear infinite\n}\r\n.cursor-default {\r\n    cursor: default\n}\r\n.select-none {\r\n    -webkit-user-select: none;\r\n       -moz-user-select: none;\r\n            user-select: none\n}\r\n.resize-none {\r\n    resize: none\n}\r\n.resize {\r\n    resize: both\n}\r\n.flex-col {\r\n    flex-direction: column\n}\r\n.flex-wrap {\r\n    flex-wrap: wrap\n}\r\n.items-start {\r\n    align-items: flex-start\n}\r\n.items-end {\r\n    align-items: flex-end\n}\r\n.items-center {\r\n    align-items: center\n}\r\n.justify-center {\r\n    justify-content: center\n}\r\n.justify-between {\r\n    justify-content: space-between\n}\r\n.gap-1 {\r\n    gap: 0.25rem\n}\r\n.gap-2 {\r\n    gap: 0.5rem\n}\r\n.gap-3 {\r\n    gap: 0.75rem\n}\r\n.gap-4 {\r\n    gap: 1rem\n}\r\n.gap-\\[6px\\] {\r\n    gap: 6px\n}\r\n.self-start {\r\n    align-self: flex-start\n}\r\n.overflow-hidden {\r\n    overflow: hidden\n}\r\n.overflow-y-auto {\r\n    overflow-y: auto\n}\r\n.truncate {\r\n    overflow: hidden;\r\n    text-overflow: ellipsis;\r\n    white-space: nowrap\n}\r\n.break-all {\r\n    word-break: break-all\n}\r\n.rounded {\r\n    border-radius: 0.25rem\n}\r\n.rounded-\\[10px\\] {\r\n    border-radius: 10px\n}\r\n.rounded-\\[16px\\] {\r\n    border-radius: 16px\n}\r\n.rounded-\\[24px\\] {\r\n    border-radius: 24px\n}\r\n.rounded-\\[8px\\] {\r\n    border-radius: 8px\n}\r\n.rounded-full {\r\n    border-radius: 9999px\n}\r\n.border {\r\n    border-width: 1px\n}\r\n.border-2 {\r\n    border-width: 2px\n}\r\n.border-b {\r\n    border-bottom-width: 1px\n}\r\n.border-t {\r\n    border-top-width: 1px\n}\r\n.border-\\[\\#f0f0f0\\] {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\r\n.border-red-500 {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\r\n.border-transparent {\r\n    border-color: transparent\n}\r\n.border-white {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\r\n.bg-\\[\\#1f1f1f\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#ef4444\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f0f0f0\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f4f4f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f5f5f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-amber-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black\\/40 {\r\n    background-color: rgb(0 0 0 / 0.4)\n}\r\n.bg-indigo-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(99 102 241 / var(--tw-bg-opacity, 1))\n}\r\n.bg-red-50 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\r\n.bg-red-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-transparent {\r\n    background-color: transparent\n}\r\n.bg-white {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\r\n.object-contain {\r\n    -o-object-fit: contain;\r\n       object-fit: contain\n}\r\n.object-cover {\r\n    -o-object-fit: cover;\r\n       object-fit: cover\n}\r\n.p-0 {\r\n    padding: 0px\n}\r\n.p-1 {\r\n    padding: 0.25rem\n}\r\n.p-3 {\r\n    padding: 0.75rem\n}\r\n.p-4 {\r\n    padding: 1rem\n}\r\n.p-\\[12px\\] {\r\n    padding: 12px\n}\r\n.p-\\[16px\\] {\r\n    padding: 16px\n}\r\n.p-\\[20px\\] {\r\n    padding: 20px\n}\r\n.p-\\[24px\\] {\r\n    padding: 24px\n}\r\n.px-1 {\r\n    padding-left: 0.25rem;\r\n    padding-right: 0.25rem\n}\r\n.px-2 {\r\n    padding-left: 0.5rem;\r\n    padding-right: 0.5rem\n}\r\n.px-3 {\r\n    padding-left: 0.75rem;\r\n    padding-right: 0.75rem\n}\r\n.px-4 {\r\n    padding-left: 1rem;\r\n    padding-right: 1rem\n}\r\n.px-6 {\r\n    padding-left: 1.5rem;\r\n    padding-right: 1.5rem\n}\r\n.px-\\[12px\\] {\r\n    padding-left: 12px;\r\n    padding-right: 12px\n}\r\n.px-\\[16px\\] {\r\n    padding-left: 16px;\r\n    padding-right: 16px\n}\r\n.px-\\[18px\\] {\r\n    padding-left: 18px;\r\n    padding-right: 18px\n}\r\n.py-0 {\r\n    padding-top: 0px;\r\n    padding-bottom: 0px\n}\r\n.py-12 {\r\n    padding-top: 3rem;\r\n    padding-bottom: 3rem\n}\r\n.py-2 {\r\n    padding-top: 0.5rem;\r\n    padding-bottom: 0.5rem\n}\r\n.py-3 {\r\n    padding-top: 0.75rem;\r\n    padding-bottom: 0.75rem\n}\r\n.py-5 {\r\n    padding-top: 1.25rem;\r\n    padding-bottom: 1.25rem\n}\r\n.py-8 {\r\n    padding-top: 2rem;\r\n    padding-bottom: 2rem\n}\r\n.pb-2 {\r\n    padding-bottom: 0.5rem\n}\r\n.pb-3 {\r\n    padding-bottom: 0.75rem\n}\r\n.pb-4 {\r\n    padding-bottom: 1rem\n}\r\n.pb-6 {\r\n    padding-bottom: 1.5rem\n}\r\n.pt-12 {\r\n    padding-top: 3rem\n}\r\n.pt-3 {\r\n    padding-top: 0.75rem\n}\r\n.pt-4 {\r\n    padding-top: 1rem\n}\r\n.pt-6 {\r\n    padding-top: 1.5rem\n}\r\n.text-center {\r\n    text-align: center\n}\r\n.font-mono {\r\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\r\n.text-\\[12px\\] {\r\n    font-size: 12px\n}\r\n.text-\\[13px\\] {\r\n    font-size: 13px\n}\r\n.text-\\[18px\\] {\r\n    font-size: 18px\n}\r\n.font-bold {\r\n    font-weight: 700\n}\r\n.font-semibold {\r\n    font-weight: 600\n}\r\n.uppercase {\r\n    text-transform: uppercase\n}\r\n.italic {\r\n    font-style: italic\n}\r\n.leading-none {\r\n    line-height: 1\n}\r\n.leading-relaxed {\r\n    line-height: 1.625\n}\r\n.leading-snug {\r\n    line-height: 1.375\n}\r\n.tracking-wider {\r\n    letter-spacing: 0.05em\n}\r\n.text-\\[\\#1f1f1f\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.text-\\[\\#9a9a9a\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\r\n.text-amber-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(252 211 77 / var(--tw-text-opacity, 1))\n}\r\n.text-indigo-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(165 180 252 / var(--tw-text-opacity, 1))\n}\r\n.text-red-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(252 165 165 / var(--tw-text-opacity, 1))\n}\r\n.text-white {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\r\n.opacity-60 {\r\n    opacity: 0.6\n}\r\n.shadow {\r\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\r\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\r\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-lg {\r\n    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-sm {\r\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\r\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.outline-none {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.outline {\r\n    outline-style: solid\n}\r\n.ring {\r\n    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\r\n    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);\r\n    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)\n}\r\n.blur {\r\n    --tw-blur: blur(8px);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.invert {\r\n    --tw-invert: invert(100%);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.filter {\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.backdrop-blur-sm {\r\n    --tw-backdrop-blur: blur(4px);\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.backdrop-filter {\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.transition {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-all {\r\n    transition-property: all;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-colors {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.duration-150 {\r\n    transition-duration: 150ms\n}\r\n.ease-in-out {\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)\n}\r\n.ease-out {\r\n    transition-timing-function: cubic-bezier(0, 0, 0.2, 1)\n}\r\n.hover\\:bg-\\[\\#303030\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#dc2626\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.focus\\:outline-none:focus {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.disabled\\:cursor-not-allowed:disabled {\r\n    cursor: not-allowed\n}\r\n.disabled\\:opacity-50:disabled {\r\n    opacity: 0.5\n}\r\n';
 var styles_gen_default = styles;
@@ -31517,15 +31628,21 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }) {
   useEffect5(() => {
     if (apiKey) {
       const pingUrl = apiEndpoint ? apiEndpoint.replace("/bugs/submit", "/ping") : `${portalUrl}/api/ping`;
-      fetch(pingUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: apiKey })
-      }).then((r) => r.json()).then((data) => {
-        if (data.ok && data.is_active === false) {
-          setIsDisabled(true);
-        }
-      }).catch(() => {
+      detectFavicon().then((favicon) => {
+        fetch(pingUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: apiKey,
+            favicon_url: favicon.url,
+            favicon_color: favicon.color
+          })
+        }).then((r) => r.json()).then((data) => {
+          if (data.ok && data.is_active === false) {
+            setIsDisabled(true);
+          }
+        }).catch(() => {
+        });
       });
     }
     if (isDisabled) return;

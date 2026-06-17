@@ -42,7 +42,7 @@ export interface DrawShape {
   height?: number;
   points?: [number, number, number, number]; // arrow: [x1, y1, x2, y2]
   pinNumber?: number;
-  /** DOM context captured when pin was placed — only set for 'pin' type */
+  /** DOM context captured at the shape's anchor point — set for pin, rect, arrow, and measure types */
   elementContext?: PinElementContext;
 }
 
