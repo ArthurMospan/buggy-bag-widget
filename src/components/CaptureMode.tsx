@@ -4,6 +4,7 @@ import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditRe
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
+import { capturePageScreenshot } from '../lib/screenshot';
 
 interface CaptureModeProps {
   initialTool: DrawTool;
@@ -397,6 +398,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
   const [sending, setSending]   = useState(false);
   const [cursor, setCursor]     = useState<{ x: number; y: number } | null>(null);
   const [showKebab, setShowKebab] = useState(false);
+  const [responsiveSize, setResponsiveSize] = useState({w: 390, h: 844, name: 'Phone'});
   const [hoveredShapeId, setHoveredShapeId] = useState<string | null>(null);
   const [activeDebug, setActiveDebug] = useState<Set<DebugOverlay>>(new Set());
   const [autoBugResults, setAutoBugResults] = useState<{ issues: AutoBugResult[], categoryCounts: Record<string, number> } | null>(null);
@@ -410,6 +412,21 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
   const [codeWinPos, setCodeWinPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 440 : 800, y: 24 });
   const [bugWinPos, setBugWinPos] = useState({ x: 24, y: 24 });
   const [auditWinPos, setAuditWinPos] = useState({ x: 24, y: typeof window !== 'undefined' ? window.innerHeight - 480 : 400 });
+  // Below this width the floating, draggable 420px-wide panels (inspector,
+  // auto-bug results, design audit) no longer fit — switch them to a
+  // full-width bottom sheet instead. Matters for the Адаптивність mockup
+  // (narrow iframe, real mouse) and for a manually-shrunk desktop browser;
+  // real touch devices never reach this toolbar (see MobileCaptureMode).
+  const [isNarrowViewport, setIsNarrowViewport] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  useEffect(() => {
+    const onResize = () => setIsNarrowViewport(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  // True if this CaptureMode instance is already running inside an iframe —
+  // i.e. it IS the Адаптивність mockup (or some other embed). Never offer
+  // the "Адаптивність" toggle in that case, or it could nest iframes forever.
+  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
   const [auditHoveredElements, setAuditHoveredElements] = useState<HTMLElement[]>([]);
   const [lastCopiedColor, setLastCopiedColor] = useState<string | null>(null);
   const dragRef = useRef<'code' | 'bug' | 'audit' | null>(null);
@@ -533,71 +550,12 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     // Give React time to hide the toolbar UI before we snapshot anything
     await new Promise(r => setTimeout(r, 80));
 
-    const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
-
-    // ── Step 1: capture Konva scene canvas BEFORE hiding the host ──────────
     // Konva renders two <canvas> per Layer: [0]=scene (visible), [1]=hit (transparent).
-    // We always want the first one (scene canvas).
-    let konvaDataUrl: string | null = null;
-    if (host?.shadowRoot) {
-      const canvas = host.shadowRoot.querySelector('canvas');
-      if (canvas) {
-        try { konvaDataUrl = canvas.toDataURL('image/png'); } catch { /* tainted */ }
-      }
-    }
+    // We always want the first one (scene canvas) — grab it before the host hides.
+    const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
+    const annotationCanvas = host?.shadowRoot?.querySelector('canvas') ?? null;
 
-    // ── Step 2: hide the widget so html-to-image only captures the page ────
-    if (host) host.style.opacity = '0';
-
-    let imageUrl = '';
-    try {
-      // Capture the host page without skipFonts so web fonts render correctly.
-      // html-to-image fetches @font-face rules; Google Fonts & same-origin fonts
-      // work fine. CORS-restricted fonts fall back gracefully.
-      const pageDataUrl = await toPng(document.body, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        pixelRatio: 1,
-        // Skip the widget host — html-to-image can't serialize Shadow DOM
-        // and will throw or produce a corrupt blank image if it tries
-        filter: (node: HTMLElement) => node.id !== 'buggy-bag-host',
-      });
-
-      if (konvaDataUrl) {
-        // ── Step 3: composite page + Konva annotations via Canvas 2D API ───
-        // This is the reliable path: html-to-image never touches <canvas> elements,
-        // and we control the compositing precisely with pixel dimensions.
-        const composite = document.createElement('canvas');
-        composite.width = window.innerWidth;
-        composite.height = window.innerHeight;
-        const ctx = composite.getContext('2d');
-        if (ctx) {
-          // Draw the page screenshot first
-          await new Promise<void>(resolve => {
-            const img = new Image();
-            img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
-            img.onerror = () => resolve();
-            img.src = pageDataUrl;
-          });
-          // Draw annotations (arrows, rects, pins) on top
-          await new Promise<void>(resolve => {
-            const img = new Image();
-            img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
-            img.onerror = () => resolve();
-            img.src = konvaDataUrl!;
-          });
-          imageUrl = composite.toDataURL('image/png');
-        } else {
-          imageUrl = pageDataUrl;
-        }
-      } else {
-        imageUrl = pageDataUrl;
-      }
-    } catch (e) {
-      console.warn('[BuggyBag] screenshot failed', e);
-    }
-
-    if (host) host.style.opacity = '';
+    const imageUrl = await capturePageScreenshot(annotationCanvas);
 
     setIsCapturing(false);
     try { 
@@ -704,6 +662,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         document.body.style.filter = '';
         document.body.style.cursor = '';
         setAutoBugResults(null);
+        setDesignAuditResult(null);
       }
     };
     window.addEventListener('buggy-bag:escape', handleEsc);
@@ -717,6 +676,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     window.addEventListener('beforeunload', h);
     return () => window.removeEventListener('beforeunload', h);
   }, [shapes]);
+
   // Toggle debug overlay
   const toggleDebug = useCallback((overlay: DebugOverlay) => {
     setActiveDebug(prev => {
@@ -762,17 +722,18 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         if (e.key === '5') { e.preventDefault(); setTool('measure'); }
       }
       if (e.altKey) {
-        if (e.key.toLowerCase() === 'i') { e.preventDefault(); toggleDebug('invert'); }
-        if (e.key.toLowerCase() === 's') { e.preventDefault(); toggleDebug('spacing'); }
-        if (e.key.toLowerCase() === 'a') { e.preventDefault(); toggleDebug('auto-bugs'); }
-        if (e.key.toLowerCase() === 'd') { e.preventDefault(); toggleDebug('design-audit'); }
-        if (e.key.toLowerCase() === 'c') { e.preventDefault(); toggleDebug('show-code'); }
-        if (e.key.toLowerCase() === 'l') { e.preventDefault(); toggleDebug('zoom'); }
+        if (e.code === 'KeyI') { e.preventDefault(); toggleDebug('invert'); }
+        if (e.code === 'KeyS') { e.preventDefault(); toggleDebug('spacing'); }
+        if (e.code === 'KeyA') { e.preventDefault(); toggleDebug('auto-bugs'); }
+        if (e.code === 'KeyD') { e.preventDefault(); toggleDebug('design-audit'); }
+        if (e.code === 'KeyC') { e.preventDefault(); toggleDebug('show-code'); }
+        if (e.code === 'KeyL') { e.preventDefault(); toggleDebug('zoom'); }
+        if (e.code === 'KeyM' && !isInIframe) { e.preventDefault(); toggleDebug('responsive'); }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [pendingShape, showExitConfirm, shapes, handleSend, toggleDebug]);
+  }, [pendingShape, showExitConfirm, shapes, handleSend, toggleDebug, isInIframe]);
 
   // Debug overlays cleanup on unmount
   useEffect(() => {
@@ -940,6 +901,10 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
           0%, 100% { opacity: 1; }
           50% { opacity: 0.55; }
         }
+        .bb-scroll-tabs::-webkit-scrollbar { height: 4px; }
+        .bb-scroll-tabs::-webkit-scrollbar-track { background: transparent; }
+        .bb-scroll-tabs::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        .bb-scroll-tabs::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
       `}</style>
       
       {/* DevTools Element Highlighter */}
@@ -985,17 +950,20 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       {/* DevTools Live Inspector window (Under Canvas) */}
       {activeDebug.has('show-code') && (
         <div id="buggy-bag-code-window" data-buggy-bag="true" style={{
-          position: 'fixed', top: codeWinPos.y + 'px', left: codeWinPos.x + 'px',
-          width: '420px', maxHeight: 'calc(100vh - 48px)',
+          position: 'fixed',
+          ...(isNarrowViewport
+            ? { left: 0, right: 0, bottom: 0, top: 'auto' as const, width: 'auto' }
+            : { top: codeWinPos.y + 'px', left: codeWinPos.x + 'px', width: '420px' }),
+          maxHeight: isNarrowViewport ? '70vh' : 'calc(100vh - 48px)',
           background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(56,189,248,0.3)',
-          borderRadius: '16px', padding: '0',
+          borderRadius: isNarrowViewport ? '16px 16px 0 0' : '16px', padding: '0',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
           fontFamily: 'monospace', overflow: 'hidden', display: pendingShape ? 'none' : 'flex', flexDirection: 'column',
-          zIndex: 10001,
+          zIndex: 10015,
         }}>
-          {/* Header (Draggable) */}
-          <div onMouseDown={e => startDrag(e, 'code')} style={{
-            padding: '16px 20px', cursor: 'grab', background: 'rgba(255,255,255,0.03)',
+          {/* Header (Draggable on desktop; fixed bottom-sheet on narrow viewports) */}
+          <div onMouseDown={isNarrowViewport ? undefined : (e => startDrag(e, 'code'))} style={{
+            padding: '16px 20px', cursor: isNarrowViewport ? 'default' : 'grab', background: 'rgba(255,255,255,0.03)',
             borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(56,189,248,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
@@ -1013,9 +981,9 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             </button>
           </div>
           
-          <div style={{ padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '16px' }}>
-            <button type="button" onClick={() => setInspectorTab('code')} style={{ padding: '12px 0', background: 'none', border: 'none', borderBottom: inspectorTab === 'code' ? '2px solid #38bdf8' : '2px solid transparent', color: inspectorTab === 'code' ? '#38bdf8' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>Код</button>
-            <button type="button" onClick={() => setInspectorTab('styles')} style={{ padding: '12px 0', background: 'none', border: 'none', borderBottom: inspectorTab === 'styles' ? '2px solid #38bdf8' : '2px solid transparent', color: inspectorTab === 'styles' ? '#38bdf8' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>Стилі</button>
+          <div className="bb-scroll-tabs" style={{ display: 'flex', flexWrap: 'wrap', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '8px' }}>
+            <button type="button" onClick={() => setInspectorTab('code')} style={{ padding: '6px 12px', background: inspectorTab === 'code' ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.03)', border: 'none', borderRadius: '999px', color: inspectorTab === 'code' ? '#38bdf8' : 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>Код</button>
+            <button type="button" onClick={() => setInspectorTab('styles')} style={{ padding: '6px 12px', background: inspectorTab === 'styles' ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.03)', border: 'none', borderRadius: '999px', color: inspectorTab === 'styles' ? '#38bdf8' : 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>Стилі</button>
           </div>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
             {inspectorTab === 'code' && (
@@ -1036,20 +1004,23 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       {/* Auto-bug results panel (Under Canvas) */}
       {autoBugResults && (
         <div id="buggy-bag-autobug-window" data-buggy-bag="true" style={{
-          position: 'fixed', top: bugWinPos.y + 'px', left: bugWinPos.x + 'px',
-          width: '420px', maxHeight: 'calc(100vh - 48px)',
-          background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(139,92,246,0.3)',
-          borderRadius: '16px', padding: '0',
+          position: 'fixed',
+          ...(isNarrowViewport
+            ? { left: 0, right: 0, bottom: 0, top: 'auto' as const, width: 'auto' }
+            : { top: bugWinPos.y + 'px', left: bugWinPos.x + 'px', width: '420px' }),
+          maxHeight: isNarrowViewport ? '70vh' : 'calc(100vh - 48px)',
+          background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(244,63,94,0.3)',
+          borderRadius: isNarrowViewport ? '16px 16px 0 0' : '16px', padding: '0',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
           fontFamily: 'monospace', overflow: 'hidden', display: pendingShape ? 'none' : 'flex', flexDirection: 'column',
-          zIndex: 10001,
+          zIndex: 10015,
         }}>
-          {/* Header (Draggable) */}
-          <div onMouseDown={e => startDrag(e, 'bug')} style={{
-            padding: '16px 20px', cursor: 'grab', background: 'rgba(255,255,255,0.03)',
+          {/* Header (Draggable on desktop; fixed bottom-sheet on narrow viewports) */}
+          <div onMouseDown={isNarrowViewport ? undefined : (e => startDrag(e, 'bug'))} style={{
+            padding: '16px 20px', cursor: isNarrowViewport ? 'default' : 'grab', background: 'rgba(255,255,255,0.03)',
             borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(139,92,246,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(244,63,94,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
               Автопошук багів
             </div>
             <div style={{ display: 'flex', gap: '6px' }}>
@@ -1076,14 +1047,14 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             </div>
           </div>
           
-          <div style={{ display: 'flex', overflowX: 'auto', padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '16px' }}>
+          <div className="bb-scroll-tabs" style={{ display: 'flex', flexWrap: 'wrap', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '8px' }}>
             {(['visual', 'network', 'a11y', 'console', 'other'] as const).map(cat => {
-              const title = cat === 'visual' ? 'Візуальні 🎨' : cat === 'network' ? 'Мережеві 🌐' : cat === 'a11y' ? 'Доступність ♿' : cat === 'console' ? 'Консоль 🖥' : 'HTML 🏗';
+              const title = cat === 'visual' ? 'Візуальні' : cat === 'network' ? 'Мережеві' : cat === 'a11y' ? 'Доступність' : cat === 'console' ? 'Консоль' : 'HTML';
               const count = autoBugResults.categoryCounts[cat] || 0;
               const isActive = autoBugTab === cat;
               return (
-                <button key={cat} type="button" onClick={() => setAutoBugTab(cat)} style={{ padding: '12px 0', background: 'none', border: 'none', borderBottom: isActive ? '2px solid #8b5cf6' : '2px solid transparent', color: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {title} {count > 0 && <span style={{ background: isActive ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '10px', fontSize: '9px' }}>{count}</span>}
+                <button key={cat} type="button" onClick={() => setAutoBugTab(cat)} style={{ padding: '6px 12px', background: isActive ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.03)', border: 'none', borderRadius: '999px', color: isActive ? '#f43f5e' : 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {title} {count > 0 && <span style={{ background: isActive ? 'rgba(244,63,94,0.2)' : 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '10px', fontSize: '9px', color: isActive ? '#f43f5e' : 'inherit' }}>{count}</span>}
                 </button>
               );
             })}
@@ -1103,11 +1074,13 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
                             key={i} 
                             onClick={() => handleBugClick(b)} 
                             style={{ 
-                              marginBottom: '8px', cursor: 'pointer', textDecoration: 'underline',
-                              color: 'rgba(255,255,255,0.8)', padding: '2px 0'
+                              marginBottom: '8px', cursor: 'pointer',
+                              color: 'rgba(255,255,255,0.85)', padding: '10px 12px',
+                              background: 'rgba(255,255,255,0.05)', borderRadius: '8px',
+                              transition: 'all 0.2s', border: '1px solid rgba(255,255,255,0.05)'
                             }}
-                            onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; e.currentTarget.style.color = '#fff'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.85)'; }}
                           >
                             {b.message}
                           </div>
@@ -1144,19 +1117,22 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       )}
 
       {/* Design Audit panel */}
-      {designAuditResult && (
+      {activeDebug.has('design-audit') && designAuditResult && (
         <div id="buggy-bag-design-audit-window" data-buggy-bag="true" style={{
-          position: 'fixed', top: auditWinPos.y + 'px', left: auditWinPos.x + 'px',
-          width: '420px', maxHeight: 'calc(100vh - 48px)',
+          position: 'fixed',
+          ...(isNarrowViewport
+            ? { left: 0, right: 0, bottom: 0, top: 'auto' as const, width: 'auto' }
+            : { top: auditWinPos.y + 'px', left: auditWinPos.x + 'px', width: '420px' }),
+          maxHeight: isNarrowViewport ? '70vh' : 'calc(100vh - 48px)',
           background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(16,185,129,0.3)',
-          borderRadius: '16px', padding: '0',
+          borderRadius: isNarrowViewport ? '16px 16px 0 0' : '16px', padding: '0',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
           fontFamily: 'monospace', overflow: 'hidden', display: pendingShape ? 'none' : 'flex', flexDirection: 'column',
-          zIndex: 10005,
+          zIndex: 10015,
         }}>
           {/* Header */}
-          <div onMouseDown={e => startDrag(e, 'audit')} style={{
-            padding: '16px 20px', cursor: 'grab', background: 'rgba(255,255,255,0.03)',
+          <div onMouseDown={isNarrowViewport ? undefined : (e => startDrag(e, 'audit'))} style={{
+            padding: '16px 20px', cursor: isNarrowViewport ? 'default' : 'grab', background: 'rgba(255,255,255,0.03)',
             borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(16,185,129,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
@@ -1186,7 +1162,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             </div>
           </div>
           
-          <div style={{ display: 'flex', overflowX: 'auto', padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '16px' }}>
+          <div className="bb-scroll-tabs" style={{ display: 'flex', flexWrap: 'wrap', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '8px' }}>
             {([
               { id: 'fonts', label: 'Шрифти', data: designAuditResult.fonts },
               { id: 'fontSizes', label: 'Розміри шрифтів', data: designAuditResult.fontSizes },
@@ -1194,11 +1170,14 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
               { id: 'spacings', label: 'Відступи', data: designAuditResult.spacings },
               { id: 'borderRadii', label: 'Border-radius', data: designAuditResult.borderRadii },
               { id: 'shadows', label: 'Тіні', data: designAuditResult.shadows }
-            ] as const).map(tab => (
-              <button key={tab.id} type="button" onClick={() => setAuditTab(tab.id)} style={{ padding: '12px 0', background: 'none', border: 'none', borderBottom: auditTab === tab.id ? '2px solid #10b981' : '2px solid transparent', color: auditTab === tab.id ? '#10b981' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {tab.label} <span style={{ background: auditTab === tab.id ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '10px', fontSize: '9px' }}>{tab.data.length}</span>
-              </button>
-            ))}
+            ] as const).map(tab => {
+              const isActive = auditTab === tab.id;
+              return (
+                <button key={tab.id} type="button" onClick={() => setAuditTab(tab.id)} style={{ padding: '6px 12px', background: isActive ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)', border: 'none', borderRadius: '999px', color: isActive ? '#10b981' : 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {tab.label} <span style={{ background: isActive ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '10px', fontSize: '9px', color: isActive ? '#10b981' : 'inherit' }}>{tab.data.length}</span>
+                </button>
+              );
+            })}
           </div>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
             {(designAuditResult.fonts.length > 8 || designAuditResult.colors.length > 20 || designAuditResult.spacings.length > 15) && (
@@ -1352,12 +1331,12 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             </ToolBtn>
             {showKebab && (
               <div data-buggy-bag="true" style={{
-                position: 'absolute', bottom: '44px', right: 0,
+                position: 'absolute', bottom: '44px',
                 background: 'rgba(20,20,22,0.96)', border: '1px solid rgba(255,255,255,0.12)',
                 backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
-                borderRadius: '12px', padding: '6px', minWidth: '220px',
+                borderRadius: '12px', padding: '6px', width: '242px', right: '-8px',
                 display: 'flex', flexDirection: 'column', gap: '2px',
-                zIndex: 10003,
+                zIndex: 10030,
               }}>
                 {/* ── Інспектор ── */}
                 <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 8px 4px' }}>Інспектор</div>
@@ -1477,6 +1456,40 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
                   </button>
                 ))}
 
+                {/* ── Адаптивність — mobile preview in a self-iframe. Hidden when this
+                     CaptureMode is already running inside an iframe, so the mockup
+                     can never nest itself. ── */}
+                {!isInIframe && (
+                  <>
+                    <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '8px 8px 4px' }}>Перегляд</div>
+                    <button type="button" aria-label="Адаптивність" onClick={() => toggleDebug('responsive')} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '7px 10px', borderRadius: '8px',
+                      background: activeDebug.has('responsive') ? 'rgba(255,255,255,0.07)' : 'transparent',
+                      border: 'none', cursor: 'pointer',
+                      color: activeDebug.has('responsive') ? 'white' : 'rgba(255,255,255,0.65)',
+                      fontSize: '12px', fontWeight: '500', textAlign: 'left', width: '100%', transition: 'all 0.1s',
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+                      <span>Адаптивність</span>
+                      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <kbd style={{ fontSize: '9px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', padding: '1px 4px', flexShrink: 0 }}>Alt+M</kbd>
+                        <span style={{
+                          width: '28px', height: '16px', borderRadius: '8px',
+                          background: activeDebug.has('responsive') ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.12)',
+                          position: 'relative', display: 'inline-block', transition: 'background 0.2s', flexShrink: 0,
+                        }}>
+                          <span style={{
+                            position: 'absolute', top: '2px', left: activeDebug.has('responsive') ? '14px' : '2px',
+                            width: '12px', height: '12px', borderRadius: '50%', background: 'white',
+                            transition: 'left 0.2s', display: 'block',
+                          }} />
+                        </span>
+                      </span>
+                    </button>
+                  </>
+                )}
+
                 {/* Portal link */}
                 {portalUrl && (
                   <>
@@ -1556,6 +1569,73 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
                 Скасувати
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Адаптивність — mobile preview mockup. Loads the current page fresh
+          inside a same-origin iframe sized like a phone. Inside that iframe
+          isRealMobileDevice() correctly stays false (no real touch points),
+          so the full CaptureMode toolbar mounts there too — now using the
+          bottom-sheet panel layout (isNarrowViewport) instead of MobileCaptureMode.
+          The kebab entry that opens this is hidden whenever isInIframe is true,
+          so the mockup can never nest itself. */}
+      {activeDebug.has('responsive') && (
+        <div
+          data-buggy-bag="true"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10020,
+            background: 'rgba(10,10,12,0.92)', backdropFilter: 'blur(4px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px',
+          }}
+          onClick={() => toggleDebug('responsive')}
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); toggleDebug('responsive'); }}
+            style={{
+              position: 'absolute', top: '24px', right: '24px',
+              padding: '8px 16px', borderRadius: '999px', background: 'rgba(255,255,255,0.1)',
+              color: 'white', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer', zIndex: 10,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+          >
+            ✕ Закрити
+          </button>
+
+          <div style={{ position: 'absolute', left: '24px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '12px' }} onClick={e => e.stopPropagation()}>
+            {[
+              { name: 'Phone', w: 390, h: 844, icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> },
+              { name: 'Tablet', w: 820, h: 1180, icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> },
+              { name: 'Laptop', w: 1280, h: 800, icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg> }
+            ].map(sz => (
+              <button key={sz.name} onClick={() => setResponsiveSize(sz)} style={{
+                padding: '12px 16px', borderRadius: '12px', background: responsiveSize.name === sz.name ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.05)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', transition: 'all 0.2s', fontWeight: '600',
+              }}>
+                <span style={{ fontSize: '16px' }}>{sz.icon}</span>
+                {sz.name}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.55)', letterSpacing: '0.02em' }}>
+            Адаптивний перегляд · {responsiveSize.w}×{responsiveSize.h}
+          </div>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: `${responsiveSize.w}px`, height: `${responsiveSize.h}px`, maxHeight: 'calc(100vh - 90px)', maxWidth: 'calc(100vw - 180px)',
+              borderRadius: '40px', outline: '8px solid #1c1c1e', outlineOffset: '-8px',
+              overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.6)', background: '#000',
+              flexShrink: 0, transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            <iframe
+              src={window.location.href}
+              title="Адаптивний перегляд"
+              style={{ width: '100%', height: '100%', border: 'none' }}
+            />
           </div>
         </div>
       )}

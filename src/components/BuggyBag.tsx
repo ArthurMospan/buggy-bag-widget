@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GodModeGuard } from '../guard';
 import { CaptureMode } from './CaptureMode';
+import { MobileCaptureMode } from './MobileCaptureMode';
 import { initCollector } from '../lib/collector';
 import { detectFavicon } from '../lib/favicon';
+import { isRealMobileDevice } from '../lib/device';
 import type { SubmitBugPayload, DrawTool } from '../types';
 import widgetStyles from '../styles.gen';
 
@@ -48,6 +50,7 @@ const toolsList: { tool: DrawTool; icon: React.ReactNode; title: string; hotkey:
 
 function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   const [activeTool, setActiveTool] = useState<DrawTool | null>(null);
+  const [mobileCapture, setMobileCapture] = useState(false);
   const [toast, setToast] = useState<{ msg?: string; ok: boolean; isBugReport?: boolean } | null>(null);
   const [projectUrl, setProjectUrl] = useState<string | null>(null);
   const [draftCount, setDraftCount] = useState(0);
@@ -82,6 +85,17 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   const handleBugBtnClick = () => {
     if (activeTool) {
       window.dispatchEvent(new CustomEvent('buggy-bag:request-close'));
+      return;
+    }
+    if (mobileCapture) {
+      setMobileCapture(false);
+      return;
+    }
+
+    // Real phone/tablet (touch + narrow viewport, NOT the Адаптивність desktop
+    // mockup) → minimal pin-only flow instead of the full mouse-driven toolbar.
+    if (isRealMobileDevice()) {
+      setMobileCapture(true);
       return;
     }
 
@@ -155,6 +169,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
 
   const handleSend = async (payload: SubmitBugPayload) => {
     setActiveTool(null);
+    setMobileCapture(false);
     fireConfetti();
     const targetEndpoint = apiEndpoint || (portalUrl ? `${portalUrl}/api/bugs/submit` : null);
     if (!targetEndpoint || !apiKey) { showSuccessToast(null); return; }
@@ -189,8 +204,8 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
 
   return (
     <>
-      {/* Bug button — shown only when capture mode is NOT active */}
-      {!activeTool && (
+      {/* Bug button — shown only when no capture mode is active */}
+      {!activeTool && !mobileCapture && (
         <div data-buggy-bag="true" style={{ position: 'fixed', bottom: '12px', right: '12px', zIndex: 9997, fontFamily: 'system-ui, sans-serif' }}>
           {draftConflict && (
             <div style={{
@@ -265,6 +280,16 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
           portalUrl={portalUrl}
           onSend={handleSend}
           onCancel={() => setActiveTool(null)}
+        />
+      )}
+
+      {/* Real-mobile minimal flow: pin + description only */}
+      {mobileCapture && (
+        <MobileCaptureMode
+          apiKey={apiKey ?? ''}
+          portalUrl={portalUrl}
+          onSend={handleSend}
+          onCancel={() => setMobileCapture(false)}
         />
       )}
 

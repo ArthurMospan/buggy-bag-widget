@@ -1,6 +1,6 @@
 export type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure' | 'eraser';
 export type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type DebugOverlay = 'invert' | 'spacing' | 'show-code' | 'zoom' | 'auto-bugs' | 'design-audit';
+export type DebugOverlay = 'invert' | 'spacing' | 'show-code' | 'zoom' | 'auto-bugs' | 'design-audit' | 'responsive';
 
 /**
  * DOM context captured when a pin is placed on a specific element.
