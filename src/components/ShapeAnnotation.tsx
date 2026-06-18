@@ -126,30 +126,28 @@ export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClip
   };
 
   return (
-    <div
-      style={{
-        position: 'absolute', left: x, top: y,
-        width: W, zIndex: 10002,
-        background: '#1c1c1e',
-        borderRadius: '14px',
-        border: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
-        padding: '12px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        transition: 'opacity 0.15s',
-      }}
-      onClick={e => e.stopPropagation()}
-    >
-      <div style={{ fontSize: '10px', fontWeight: '700', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>
-        Що тут не так?
-      </div>
+      <div
+        style={{
+          position: 'absolute', left: x, top: y,
+          width: W, zIndex: 10002,
+          background: 'rgba(28,28,30,0.85)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '14px',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+          padding: '12px',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          transition: 'opacity 0.15s',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
 
       <textarea
         ref={textareaRef}
         value={text + (interim ? ' ' + interim : '')}
         onChange={e => { setText(e.target.value); setInterim(''); }}
         onKeyDown={handleKeyDown}
-        placeholder={listening ? '🎤 Говоріть...' : 'Опишіть проблему... (Ctrl+Enter щоб OK)'}
+        placeholder={listening ? '🎤 Говоріть...' : 'Опишіть проблему... (Ctrl+Enter, щоб Відправити)'}
         rows={3}
         autoFocus
         style={{
@@ -207,16 +205,21 @@ export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClip
             )}
           </button>
         ) : (
-          <div title="Голосовий ввід доступний тільки в Chrome" style={{
-            width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
-            background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'not-allowed',
-          }}>
+          <button
+            type="button"
+            onClick={() => setMicError('Голосовий ввід доступний тільки в Chrome/Edge/Safari')}
+            title="Голосовий ввід доступний тільки в Chrome"
+            style={{
+              width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
+              background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'not-allowed', border: '1px solid transparent', padding: 0
+            }}
+          >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
             </svg>
-          </div>
+          </button>
         )}
 
         {/* Delete */}

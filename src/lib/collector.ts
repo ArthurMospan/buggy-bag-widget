@@ -266,6 +266,12 @@ function patchConsole() {
   levels.forEach(level => {
     const original = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
+      const isCssRulesError = args.some(a => 
+        (typeof a === 'string' && a.includes('cssRules')) || 
+        (a instanceof Error && a.message.includes('cssRules'))
+      );
+      if (isCssRulesError) return;
+
       original(...args);
       const message = args
         .map(a => {

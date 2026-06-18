@@ -350,9 +350,12 @@ export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {})
 }
 
 function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
-  const [isDisabled, setIsDisabled] = useState(false);
+  const [isProjectActive, setIsProjectActive] = useState<boolean | null>(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const bbParam = params.get('bb');
+
     // ── Check presence and kill switch ──
     if (apiKey) {
       const pingUrl = apiEndpoint ? apiEndpoint.replace('/bugs/submit', '/ping') : `${portalUrl}/api/ping`;
@@ -363,28 +366,38 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
           body: JSON.stringify({ 
             api_key: apiKey,
             favicon_url: favicon.url,
-            favicon_color: favicon.color
+            favicon_color: favicon.color,
+            bb_param: bbParam || undefined
           }),
         })
         .then(r => r.json())
         .then(data => {
-          if (data.ok && data.is_active === false) {
-            setIsDisabled(true);
+          if (data.ok) {
+            if (data.grant_access) {
+              localStorage.setItem('BUGGY_BAG_ACCESS', 'active');
+              params.delete('bb');
+              const searchStr = params.toString() ? '?' + params.toString() : '';
+              window.history.replaceState({}, '', window.location.pathname + searchStr);
+            }
+            if (data.is_active === false) {
+              setIsProjectActive(false);
+            } else {
+              setIsProjectActive(true);
+            }
+          } else {
+            setIsProjectActive(true);
           }
         })
-        .catch(() => {});
+        .catch(() => setIsProjectActive(true));
       });
+    } else {
+      setIsProjectActive(true);
     }
+  }, [apiEndpoint, apiKey, portalUrl]);
 
-    if (isDisabled) return;
+  useEffect(() => {
+    if (isProjectActive !== true) return;
 
-    // ── URL param ?bb=on — runs BEFORE guard, in main document context ──
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('bb') === 'on') {
-      localStorage.setItem('BUGGY_BAG_ACCESS', 'active');
-      params.delete('bb');
-      window.history.replaceState({}, '', window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
-    }
 
     // ── Voice bridge for Shadow DOM SpeechRecognition ──
     let _active = false;
@@ -506,9 +519,7 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
       host.remove();
       setTimeout(() => root.unmount(), 0);
     };
-  }, [isDisabled, apiEndpoint, apiKey, portalUrl]);
-
-  if (isDisabled) return null;
+  }, [isProjectActive, apiEndpoint, apiKey, portalUrl]);
 
   return null;
 }

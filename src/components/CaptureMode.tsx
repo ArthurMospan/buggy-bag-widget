@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { toPng } from 'html-to-image';
-import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay } from '../types';
+import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditResult, AutoBugResult } from '../types';
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
@@ -74,41 +74,232 @@ function disableSpacingOverlay() {
   document.getElementById(SPACING_STYLE_ID)?.remove();
 }
 
-function runAutoBugScan(): string[] {
-  const issues: string[] = [];
-  // Broken images
-  document.querySelectorAll('img').forEach((img, i) => {
-    if (img.naturalWidth === 0 && img.complete) {
-      issues.push(`🖼 Broken image: ${img.src.slice(0, 60) || `img[${i}]`}`);
-    }
+function getLuminance(r: number, g: number, b: number) {
+  const a = [r, g, b].map((v) => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
   });
-  // Overflow issues
+  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.722;
+}
+
+function getContrast(rgb1: number[], rgb2: number[]) {
+  const l1 = getLuminance(rgb1[0], rgb1[1], rgb1[2]);
+  const l2 = getLuminance(rgb2[0], rgb2[1], rgb2[2]);
+  const brightest = Math.max(l1, l2);
+  const darkest = Math.min(l1, l2);
+  return (brightest + 0.05) / (darkest + 0.05);
+}
+
+function parseRgb(str: string) {
+  const match = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : null;
+}
+
+function runAutoBugScan(): AutoBugResult[] {
+  const issues: AutoBugResult[] = [];
+  let counts: Record<string, number> = {};
+  const addIssue = (cat: string, type: AutoBugResult['category'], msg: string) => {
+    counts[cat] = (counts[cat] || 0) + 1;
+    if (counts[cat] <= 5) issues.push({ category: type, message: msg });
+  };
+
+  // 1. Broken images & 8. Missing width/height & missing alt
+  document.querySelectorAll('img').forEach((img, i) => {
+    if ((img as HTMLElement).dataset?.buggyBag) return;
+    if (img.naturalWidth === 0 && img.complete) addIssue('broken-img', 'visual', `🖼 Бите зображення: ${img.src.slice(0, 60)}`);
+    if (!img.hasAttribute('width') && !img.hasAttribute('height')) addIssue('missing-dims', 'visual', `📐 Зображення без width/height: ${img.src.slice(0, 40)}`);
+    if (!img.hasAttribute('alt')) addIssue('missing-alt', 'a11y', `♿ Зображення без alt: ${img.src.slice(0, 40)}`);
+  });
+
+  const ids = new Map<string, number>();
+  
   document.querySelectorAll('*').forEach(el => {
-    if ((el as HTMLElement).dataset?.buggyBag) return;
+    if ((el as HTMLElement).closest?.('[data-buggy-bag]')) return;
+    const tag = el.tagName.toLowerCase();
+    const cls = (el as HTMLElement).className?.toString?.().slice?.(0, 30) ?? '';
+    const label = `<${tag}${cls ? ` class="${cls}"` : ''}>`;
+    
+    // 5. Duplicate IDs
+    if (el.id) {
+      ids.set(el.id, (ids.get(el.id) || 0) + 1);
+      if (ids.get(el.id) === 2) addIssue('duplicate-id', 'other', `🆔 Дублікат ID: #${el.id}`);
+    }
+
     const s = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    
+    // Overflow issues
     if (s.overflow === 'hidden' || s.overflowX === 'hidden' || s.overflowY === 'hidden') {
       if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) {
-        const tag = el.tagName.toLowerCase();
-        const cls = (el as HTMLElement).className?.toString?.().slice?.(0, 30) ?? '';
-        issues.push(`📏 Overflow hidden with scroll: <${tag} class="${cls}">`);
+        addIssue('overflow', 'visual', `📏 Overflow hidden зі скролом: ${label}`);
+      }
+    }
+    
+    // 9. Visually truncated text
+    if ((s.whiteSpace === 'nowrap' || s.textOverflow === 'ellipsis') && el.scrollWidth > el.clientWidth + 2) {
+      addIssue('truncated-text', 'visual', `✂ Текст обрізається: ${label}`);
+    }
+
+    // 12. Elements out of viewport horizontally
+    if (rect.right > window.innerWidth + 5 && rect.width > 0) {
+      addIssue('out-of-bounds', 'visual', `↔ Елемент виходить за межі екрану по горизонталі: ${label}`);
+    }
+
+    // Interactive elements analysis
+    if (tag === 'a' || tag === 'button' || el.hasAttribute('onclick') || el.getAttribute('role') === 'button') {
+      // 2. Too small tap targets
+      if (rect.width > 0 && rect.height > 0 && (rect.width < 24 || rect.height < 24)) {
+        addIssue('small-tap', 'a11y', `👆 Замала клікабельна зона (${Math.round(rect.width)}x${Math.round(rect.height)}): ${label}`);
+      }
+      
+      // 10. Empty buttons/links
+      if (tag === 'a' || tag === 'button' || el.getAttribute('role') === 'button') {
+        const text = el.textContent?.trim() || '';
+        const hasGraphics = el.querySelector('img, svg');
+        const hasAria = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
+        if (!text && !hasGraphics && !hasAria) {
+          addIssue('empty-btn', 'a11y', `👻 Порожній клікабельний елемент (без тексту/іконок/aria): ${label}`);
+        }
+      }
+    }
+
+    // 3. Broken links
+    if (tag === 'a') {
+      const href = el.getAttribute('href');
+      if (href === '#' || href === 'javascript:void(0)' || href === '') {
+        addIssue('broken-link', 'other', `🔗 Пусте/заглушкове посилання: ${label}`);
+      }
+    }
+
+    // 4. Form inputs without labels
+    if (['input', 'textarea', 'select'].includes(tag)) {
+      const type = el.getAttribute('type');
+      if (type !== 'hidden' && type !== 'submit' && type !== 'button') {
+        const hasAria = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title');
+        const hasIdLabel = el.id ? document.querySelector(`label[for="${el.id}"]`) : null;
+        const insideLabel = el.closest('label');
+        if (!hasAria && !hasIdLabel && !insideLabel) {
+          addIssue('missing-label', 'a11y', `📝 Form input без label/aria-label: ${label}`);
+        }
+      }
+    }
+
+    // 1. Text contrast < WCAG AA
+    if (el.childNodes.length > 0 && Array.from(el.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent?.trim().length! > 0)) {
+      const fg = parseRgb(s.color);
+      let bgEl: Element | null = el;
+      let bgStr = '';
+      while (bgEl) {
+        const bgS = window.getComputedStyle(bgEl);
+        if (bgS.backgroundColor && bgS.backgroundColor !== 'rgba(0, 0, 0, 0)' && bgS.backgroundColor !== 'transparent') {
+          bgStr = bgS.backgroundColor;
+          break;
+        }
+        bgEl = bgEl.parentElement;
+      }
+      const bg = bgStr ? parseRgb(bgStr) : [255,255,255]; // fallback to white
+      if (fg && bg) {
+        const contrast = getContrast(fg, bg);
+        const isLarge = parseInt(s.fontSize) >= 18 || (parseInt(s.fontSize) >= 14 && parseInt(s.fontWeight) >= 700);
+        const req = isLarge ? 3 : 4.5;
+        if (contrast < req) {
+          addIssue('contrast', 'visual', `🎨 Поганий контраст тексту (${contrast.toFixed(1)}:1 < ${req}:1): ${label}`);
+        }
+      }
+    }
+    
+    // 11. Mixed content
+    if (window.location.protocol === 'https:') {
+      const src = el.getAttribute('src') || el.getAttribute('href') || '';
+      if (src.startsWith('http://')) {
+        addIssue('mixed-content', 'network', `🔓 Mixed content (HTTP на HTTPS): ${label}`);
       }
     }
   });
-  // Console errors (collected by collector)
+
   try {
     const ctx = (window as any).__BUGGY_BAG_CONTEXT__;
+    // 6. Console warnings and errors
     if (ctx?.consoleErrors?.length) {
-      ctx.consoleErrors.slice(0, 5).forEach((e: any) => {
-        issues.push(`❌ Console error: ${String(e.message).slice(0, 80)}`);
+      ctx.consoleErrors.forEach((e: any) => {
+        addIssue(e.level === 'warn' ? 'console-warn' : 'console-error', 'other', `${e.level === 'warn' ? '⚠️' : '❌'} Console ${e.level}: ${String(e.message).slice(0, 80)}`);
+      });
+    }
+    // 7. Slow network requests
+    if (ctx?.networkRequests?.length) {
+      ctx.networkRequests.forEach((req: any) => {
+        if (req.durationMs > 2000) {
+          addIssue('slow-network', 'network', `🐢 Повільний запит (>2s, ${Math.round(req.durationMs)}ms): ${req.method} ${req.url.slice(0, 50)}`);
+        }
       });
     }
   } catch {}
-  // Missing alt on images
-  document.querySelectorAll('img:not([alt])').forEach((img, i) => {
-    if (i < 3) issues.push(`♿ Missing alt: ${(img as HTMLImageElement).src.slice(0, 50)}`);
-  });
-  if (issues.length === 0) issues.push('✅ Проблем не знайдено!');
+
   return issues;
+}
+
+function runDesignAudit(): DesignAuditResult {
+  const fonts = new Map<string, { count: number; elements: HTMLElement[] }>();
+  const fontSizes = new Map<string, { count: number; elements: HTMLElement[] }>();
+  const colors = new Map<string, { count: number; elements: HTMLElement[] }>();
+  const spacings = new Map<string, { count: number; elements: HTMLElement[] }>();
+  const borderRadii = new Map<string, { count: number; elements: HTMLElement[] }>();
+
+  const normalizeColor = (str: string) => str.replace(/\s+/g, '').toLowerCase();
+
+  const addMetric = (map: Map<string, { count: number; elements: HTMLElement[] }>, key: string, el: HTMLElement) => {
+    if (!map.has(key)) map.set(key, { count: 0, elements: [] });
+    const item = map.get(key)!;
+    item.count += 1;
+    if (item.elements.length < 50) item.elements.push(el); // Limit to 50 for performance
+  };
+
+  document.querySelectorAll('*').forEach(el => {
+    if ((el as HTMLElement).closest?.('[data-buggy-bag]')) return;
+    const htmlEl = el as HTMLElement;
+    if (htmlEl.offsetParent === null && htmlEl !== document.body && htmlEl !== document.documentElement) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const s = window.getComputedStyle(el);
+
+    const ff = s.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+    if (ff) addMetric(fonts, ff, htmlEl);
+    if (s.fontSize) addMetric(fontSizes, s.fontSize, htmlEl);
+
+    if (s.color && s.color !== 'rgba(0,0,0,0)' && s.color !== 'transparent') {
+      addMetric(colors, normalizeColor(s.color), htmlEl);
+    }
+    if (s.backgroundColor && s.backgroundColor !== 'rgba(0,0,0,0)' && s.backgroundColor !== 'transparent') {
+      addMetric(colors, normalizeColor(s.backgroundColor), htmlEl);
+    }
+
+    const pushSpacing = (val: string) => {
+      if (val && val !== '0px' && val !== 'normal') addMetric(spacings, val, htmlEl);
+    };
+    pushSpacing(s.marginTop); pushSpacing(s.marginBottom); pushSpacing(s.marginLeft); pushSpacing(s.marginRight);
+    pushSpacing(s.paddingTop); pushSpacing(s.paddingBottom); pushSpacing(s.paddingLeft); pushSpacing(s.paddingRight);
+    pushSpacing(s.gap);
+
+    if (s.borderRadius && s.borderRadius !== '0px') {
+      addMetric(borderRadii, s.borderRadius, htmlEl);
+    }
+  });
+
+  const sortAndLimit = (map: Map<string, { count: number; elements: HTMLElement[] }>) => {
+    return Array.from(map.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 20)
+      .map(([value, item]) => ({ value, count: item.count, elements: item.elements }));
+  };
+
+  return {
+    fonts: sortAndLimit(fonts),
+    fontSizes: sortAndLimit(fontSizes),
+    colors: sortAndLimit(colors),
+    spacings: sortAndLimit(spacings),
+    borderRadii: sortAndLimit(borderRadii),
+  };
 }
 
 let _zoomActive = false;
@@ -199,14 +390,17 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
   const [showKebab, setShowKebab] = useState(false);
   const [hoveredShapeId, setHoveredShapeId] = useState<string | null>(null);
   const [activeDebug, setActiveDebug] = useState<Set<DebugOverlay>>(new Set());
-  const [autoBugResults, setAutoBugResults] = useState<string[] | null>(null);
+  const [autoBugResults, setAutoBugResults] = useState<AutoBugResult[] | null>(null);
+  const [designAuditResult, setDesignAuditResult] = useState<DesignAuditResult | null>(null);
   const [hoveredCode, setHoveredCode] = useState<string>('');
   const [hoveredStyle, setHoveredStyle] = useState<string>('');
   const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null);
   const [codeWinPos, setCodeWinPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 440 : 800, y: 24 });
   const [bugWinPos, setBugWinPos] = useState({ x: 24, y: 24 });
+  const [auditWinPos, setAuditWinPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 440 : 800, y: 400 });
+  const [auditHoveredElements, setAuditHoveredElements] = useState<HTMLElement[]>([]);
   const [lastCopiedColor, setLastCopiedColor] = useState<string | null>(null);
-  const dragRef = useRef<'code' | 'bug' | null>(null);
+  const dragRef = useRef<'code' | 'bug' | 'audit' | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const kebabRef = useRef<HTMLDivElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -425,9 +619,10 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       }
     }
     const freshTechContext = collectTechContext(lastElement);
+    if (designAuditResult) freshTechContext.designAudit = designAuditResult;
 
     onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(' | ') || 'Без опису', tech_context: freshTechContext });
-  }, [shapes, annotations, apiKey, onSend, sending]);
+  }, [shapes, annotations, apiKey, onSend, sending, designAuditResult]);
 
   const handleCloseRequest = useCallback(() => {
     if (shapes.length > 0) { setShowExitConfirm(true); } 
@@ -496,6 +691,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         if (overlay === 'zoom') disableZoom();
         if (overlay === 'invert') document.body.style.filter = '';
         if (overlay === 'auto-bugs') setAutoBugResults(null);
+        if (overlay === 'design-audit') setDesignAuditResult(null);
         if (overlay === 'show-code') document.body.style.cursor = '';
       } else {
         next.add(overlay);
@@ -503,6 +699,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         if (overlay === 'zoom') enableZoom();
         if (overlay === 'invert') document.body.style.filter = 'invert(1) hue-rotate(180deg)';
         if (overlay === 'auto-bugs') { setAutoBugResults(runAutoBugScan()); }
+        if (overlay === 'design-audit') { setDesignAuditResult(runDesignAudit()); }
         if (overlay === 'show-code') document.body.style.cursor = 'crosshair';
       }
       return next;
@@ -532,6 +729,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         if (e.key.toLowerCase() === 'i') { e.preventDefault(); toggleDebug('invert'); }
         if (e.key.toLowerCase() === 's') { e.preventDefault(); toggleDebug('spacing'); }
         if (e.key.toLowerCase() === 'a') { e.preventDefault(); toggleDebug('auto-bugs'); }
+        if (e.key.toLowerCase() === 'd') { e.preventDefault(); toggleDebug('design-audit'); }
         if (e.key.toLowerCase() === 'c') { e.preventDefault(); toggleDebug('show-code'); }
         if (e.key.toLowerCase() === 'l') { e.preventDefault(); toggleDebug('zoom'); }
         if (e.key.toLowerCase() === 't') { e.preventDefault(); toggleDebug('typography'); }
@@ -593,6 +791,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     const onMove = (e: MouseEvent) => {
       if (dragRef.current === 'code') setCodeWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
       else if (dragRef.current === 'bug') setBugWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
+      else if (dragRef.current === 'audit') setAuditWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
     };
     const onUp = () => { dragRef.current = null; };
     window.addEventListener('mousemove', onMove);
@@ -600,10 +799,20 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, []);
 
-  const startDrag = (e: React.MouseEvent, type: 'code' | 'bug') => {
+  const startDrag = (e: React.MouseEvent, type: 'code' | 'bug' | 'audit') => {
     dragRef.current = type;
     const rect = (e.currentTarget as HTMLElement).closest('[data-buggy-bag]')?.getBoundingClientRect();
     if (rect) dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const highlightHtml = (str: string) => {
+    return str
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/(&lt;\/?)([a-zA-Z0-9\-]+)(.*?)(&gt;)/g, (match, p1, p2, p3, p4) => {
+        const highlightedAttrs = p3.replace(/([a-zA-Z0-9\-]+)="([^"]*)"/g, '<span style="color:#e2cb6b">$1</span>=<span style="color:#a3be8c">"$2"</span>');
+        return `${p1}<span style="color:#88c0d0">${p2}</span>${highlightedAttrs}${p4}`;
+      })
+      .replace(/(\/\*.*?\*\/)/g, '<span style="color:#616e88">$1</span>');
   };
 
   // Live Inspector logic
@@ -624,7 +833,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         }
         const breadcrumb = path.slice(-4).join(' > ');
         const html = formatNode(target, 0, 2);
-        setHoveredCode(`/* ${breadcrumb} */\n\n${html}`);
+        setHoveredCode(highlightHtml(`/* ${breadcrumb} */\n\n${html}`));
       }
       if (activeDebug.has('typography')) {
         const style = window.getComputedStyle(target);
@@ -636,6 +845,33 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       setHoveredRect(null);
     }
   }, [cursor, activeDebug, formatNode]);
+
+  const handleAuditClick = useCallback((category: string, value: string, count: number, elements: HTMLElement[] = []) => {
+    let x = typeof window !== 'undefined' ? window.innerWidth / 2 : 500;
+    let y = typeof window !== 'undefined' ? window.innerHeight / 2 : 500;
+
+    if (elements.length > 0 && elements[0]) {
+      const rect = elements[0].getBoundingClientRect();
+      x = rect.left + rect.width / 2;
+      y = rect.top + rect.height / 2;
+    }
+
+    const id = 'shape-' + Date.now();
+    const shape: DrawShape = {
+      id,
+      type: 'pin',
+      x,
+      y,
+      pinNumber: shapes.filter(s => s.type === 'pin').length + 1
+    };
+
+    setShapes(p => [...p, shape]);
+    setAnnotations(p => ({ ...p, [id]: `Аудит (${category}): ${value} використовується ${count} разів.` }));
+    setPendingShape({ shape, isNew: true });
+    
+    // Close the audit window so the user can interact with the newly created pin's popup
+    toggleDebug('design-audit');
+  }, [shapes, toggleDebug]);
 
   const divider = <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.12)', margin: '0 2px' }} />;
 
@@ -662,6 +898,20 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
           pointerEvents: 'none', zIndex: 9999, transition: 'all 0.1s ease-out'
         }} />
       )}
+      
+      {/* Design Audit Element Highlighter */}
+      {auditHoveredElements.map((el, i) => {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return null;
+        return (
+          <div key={i} style={{
+            position: 'fixed', top: r.top, left: r.left,
+            width: r.width, height: r.height,
+            background: 'rgba(16, 185, 129, 0.2)', border: '2px solid rgba(16, 185, 129, 0.8)',
+            pointerEvents: 'none', zIndex: 9999, transition: 'all 0.1s ease-out'
+          }} />
+        );
+      })}
       <div
         ref={glowRef}
         style={{
@@ -684,7 +934,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         <div id="buggy-bag-code-window" data-buggy-bag="true" style={{
           position: 'fixed', top: codeWinPos.y + 'px', left: codeWinPos.x + 'px',
           width: '420px', maxHeight: 'calc(100vh - 48px)',
-          background: 'rgba(22,22,26,0.95)', border: '1px solid rgba(56,189,248,0.3)',
+          background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(56,189,248,0.3)',
           borderRadius: '16px', padding: '0',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
           fontFamily: 'monospace', overflow: 'hidden', display: 'flex', flexDirection: 'column',
@@ -705,15 +955,18 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.8)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
-            >✕</button>
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
           
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
           {activeDebug.has('show-code') && (
             <div style={{ flex: '1 1 auto' }}>
-              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '1.5' }}>
-                {hoveredCode}
-              </div>
+              <div 
+                style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '1.5' }}
+                dangerouslySetInnerHTML={{ __html: hoveredCode }} 
+              />
             </div>
           )}
           {activeDebug.has('typography') && (
@@ -735,7 +988,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         <div id="buggy-bag-autobug-window" data-buggy-bag="true" style={{
           position: 'fixed', top: bugWinPos.y + 'px', left: bugWinPos.x + 'px',
           width: '420px', maxHeight: 'calc(100vh - 48px)',
-          background: 'rgba(22,22,26,0.95)', border: '1px solid rgba(139,92,246,0.3)',
+          background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(139,92,246,0.3)',
           borderRadius: '16px', padding: '0',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
           fontFamily: 'monospace', overflow: 'hidden', display: 'flex', flexDirection: 'column',
@@ -756,13 +1009,142 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.8)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
-            >✕</button>
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
           
           <div style={{ padding: '20px', fontSize: '11px', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '1.5', overflowY: 'auto' }}>
-            {autoBugResults.map((r, i) => (
-              <div key={i}>{r}</div>
-            ))}
+            {['visual', 'network', 'a11y', 'other'].map(cat => {
+              const catBugs = autoBugResults.filter(b => b.category === cat);
+              const title = cat === 'visual' ? 'Візуальні баги 🎨' : cat === 'network' ? 'Мережеві помилки 🌐' : cat === 'a11y' ? 'Доступність ♿' : 'Інше 🔧';
+              return (
+                <div key={cat} style={{ marginBottom: '16px' }}>
+                  <div style={{ fontWeight: 'bold', color: 'rgba(255,255,255,0.9)', marginBottom: '8px' }}>{title}</div>
+                  {catBugs.length > 0 
+                    ? catBugs.map((b, i) => <div key={i} style={{ marginBottom: '4px' }}>{b.message}</div>)
+                    : <div style={{ color: '#10b981' }}>Відсутні</div>
+                  }
+                </div>
+              );
+            })}
+            
+            {autoBugResults.length > 0 && (
+              <button 
+                onClick={() => {
+                  const text = autoBugResults.map(b => b.message).join(' | ');
+                  const id = 'shape-' + Date.now();
+                  setShapes(prev => [...prev, { id, type: 'pin', x: window.innerWidth/2, y: window.innerHeight/2, pinNumber: prev.filter(s=>s.type==='pin').length + 1 }]);
+                  setAnnotations(prev => ({ ...prev, [id]: 'Авто-пошук:\n' + text }));
+                  toggleDebug('auto-bugs');
+                }}
+                style={{ 
+                  marginTop: '16px', background: '#8b5cf6', color: 'white', border: 'none', 
+                  padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', 
+                  width: '100%', fontWeight: 'bold', transition: 'background 0.2s' 
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#7c3aed')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#8b5cf6')}
+              >
+                Додати в звіт
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Design Audit panel */}
+      {designAuditResult && (
+        <div id="buggy-bag-design-audit-window" data-buggy-bag="true" style={{
+          position: 'fixed', top: auditWinPos.y + 'px', left: auditWinPos.x + 'px',
+          width: '420px', maxHeight: 'calc(100vh - 48px)',
+          background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(16,185,129,0.3)',
+          borderRadius: '16px', padding: '0',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
+          fontFamily: 'monospace', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          zIndex: 10005,
+        }}>
+          {/* Header */}
+          <div onMouseDown={e => startDrag(e, 'audit')} style={{
+            padding: '16px 20px', cursor: 'grab', background: 'rgba(255,255,255,0.03)',
+            borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+          }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(16,185,129,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              Дизайн-аудит
+            </div>
+            <button type="button" onClick={() => toggleDebug('design-audit')} style={{
+              background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+              width: '20px', height: '20px', cursor: 'pointer', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.8)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+            {(designAuditResult.fonts.length > 8 || designAuditResult.colors.length > 20 || designAuditResult.spacings.length > 15) && (
+              <div style={{ padding: '10px', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', color: '#fbbf24', fontSize: '11px', lineHeight: '1.4' }}>
+                ⚠️ Забагато значень! Рекомендуємо звести до дизайн-системи.
+              </div>
+            )}
+            
+            <div onMouseLeave={() => setAuditHoveredElements([])}>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Шрифти ({designAuditResult.fonts.length})</span>
+                <span style={{ color: designAuditResult.fonts.length > 5 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 5</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {designAuditResult.fonts.map((f, i) => <div key={i} onClick={() => handleAuditClick('Шрифт', f.value, f.count, f.elements)} onMouseEnter={() => setAuditHoveredElements(f.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{f.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{f.count}</span></div>)}
+              </div>
+            </div>
+
+            <div onMouseLeave={() => setAuditHoveredElements([])}>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Розміри шрифтів ({designAuditResult.fontSizes.length})</span>
+                <span style={{ color: designAuditResult.fontSizes.length > 8 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 8</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {designAuditResult.fontSizes.map((f, i) => <div key={i} onClick={() => handleAuditClick('Розмір шрифту', f.value, f.count, f.elements)} onMouseEnter={() => setAuditHoveredElements(f.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{f.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{f.count}</span></div>)}
+              </div>
+            </div>
+
+            <div onMouseLeave={() => setAuditHoveredElements([])}>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Кольори ({designAuditResult.colors.length})</span>
+                <span style={{ color: designAuditResult.colors.length > 15 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 15</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {designAuditResult.colors.map((c, i) => (
+                  <div key={i} onClick={() => handleAuditClick('Колір', c.value, c.count, c.elements)} onMouseEnter={() => setAuditHoveredElements(c.elements || [])} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '2px 6px 2px 4px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: c.value, border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <span>{c.value}</span> <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{c.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div onMouseLeave={() => setAuditHoveredElements([])}>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Відступи ({designAuditResult.spacings.length})</span>
+                <span style={{ color: designAuditResult.spacings.length > 10 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 10</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {designAuditResult.spacings.map((s, i) => <div key={i} onClick={() => handleAuditClick('Відступ', s.value, s.count, s.elements)} onMouseEnter={() => setAuditHoveredElements(s.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{s.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{s.count}</span></div>)}
+              </div>
+            </div>
+
+            <div onMouseLeave={() => setAuditHoveredElements([])}>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Border-radius ({designAuditResult.borderRadii.length})</span>
+                <span style={{ color: designAuditResult.borderRadii.length > 5 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 5</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {designAuditResult.borderRadii.map((b, i) => <div key={i} onClick={() => handleAuditClick('Border-radius', b.value, b.count, b.elements)} onMouseEnter={() => setAuditHoveredElements(b.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{b.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{b.count}</span></div>)}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -916,6 +1298,11 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
                     id: 'typography' as DebugOverlay, label: 'Шрифти',
                     icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>,
                     hotkey: 'Alt+T'
+                  },
+                  {
+                    id: 'design-audit' as DebugOverlay, label: 'Дизайн-аудит',
+                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
+                    hotkey: 'Alt+D'
                   },
                 ] as const).map(({ id, label, icon, hotkey }) => (
                   <button key={id} type="button" onClick={() => toggleDebug(id)} style={{

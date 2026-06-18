@@ -1,6 +1,6 @@
 export type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure' | 'eraser';
 export type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type DebugOverlay = 'invert' | 'spacing' | 'show-code' | 'zoom' | 'auto-bugs' | 'typography';
+export type DebugOverlay = 'invert' | 'spacing' | 'show-code' | 'zoom' | 'auto-bugs' | 'typography' | 'design-audit';
 
 /**
  * DOM context captured when a pin is placed on a specific element.
@@ -82,6 +82,19 @@ export interface ComponentInfo {
   lineNumber?: number; // source line number (dev builds only)
 }
 
+export interface AutoBugResult {
+  category: 'network' | 'visual' | 'a11y' | 'other';
+  message: string;
+}
+
+export interface DesignAuditResult {
+  fonts: { value: string; count: number; elements?: HTMLElement[] }[];
+  fontSizes: { value: string; count: number; elements?: HTMLElement[] }[];
+  colors: { value: string; count: number; elements?: HTMLElement[] }[];
+  spacings: { value: string; count: number; elements?: HTMLElement[] }[];
+  borderRadii: { value: string; count: number; elements?: HTMLElement[] }[];
+}
+
 export interface TechContext {
   route: string;
   viewport: string;           // e.g. "1440x900"
@@ -94,6 +107,7 @@ export interface TechContext {
   consoleErrors: ConsoleEntry[];
   eventLog: EventLogEntry[];  // last 5min of interactions
   autoSeverity: BugSeverity;
+  designAudit?: DesignAuditResult | null;
 }
 
 // What the widget sends to /api/bugs/submit

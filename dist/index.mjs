@@ -1979,7 +1979,7 @@ var require_Node = __commonJS({
       "transformsEnabledChange.konva"
     ].join(SPACE);
     var idCounter = 1;
-    var Node = class _Node {
+    var Node2 = class _Node {
       constructor(config) {
         this._id = idCounter++;
         this.eventListeners = {};
@@ -3279,11 +3279,11 @@ var require_Node = __commonJS({
         return no;
       }
     };
-    exports.Node = Node;
-    Node.prototype.nodeType = "Node";
-    Node.prototype._attrsAffectingSize = [];
-    Node.prototype.eventListeners = {};
-    Node.prototype.on.call(Node.prototype, TRANSFORM_CHANGE_STR, function() {
+    exports.Node = Node2;
+    Node2.prototype.nodeType = "Node";
+    Node2.prototype._attrsAffectingSize = [];
+    Node2.prototype.eventListeners = {};
+    Node2.prototype.on.call(Node2.prototype, TRANSFORM_CHANGE_STR, function() {
       if (this._batchingTransformChange) {
         this._needClearTransformCache = true;
         return;
@@ -3291,50 +3291,50 @@ var require_Node = __commonJS({
       this._clearCache(TRANSFORM);
       this._clearSelfAndDescendantCache(ABSOLUTE_TRANSFORM);
     });
-    Node.prototype.on.call(Node.prototype, "visibleChange.konva", function() {
+    Node2.prototype.on.call(Node2.prototype, "visibleChange.konva", function() {
       this._clearSelfAndDescendantCache(VISIBLE);
     });
-    Node.prototype.on.call(Node.prototype, "listeningChange.konva", function() {
+    Node2.prototype.on.call(Node2.prototype, "listeningChange.konva", function() {
       this._clearSelfAndDescendantCache(LISTENING);
     });
-    Node.prototype.on.call(Node.prototype, "opacityChange.konva", function() {
+    Node2.prototype.on.call(Node2.prototype, "opacityChange.konva", function() {
       this._clearSelfAndDescendantCache(ABSOLUTE_OPACITY);
     });
     var addGetterSetter = Factory_1.Factory.addGetterSetter;
-    addGetterSetter(Node, "zIndex");
-    addGetterSetter(Node, "absolutePosition");
-    addGetterSetter(Node, "position");
-    addGetterSetter(Node, "x", 0, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "y", 0, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "globalCompositeOperation", "source-over", (0, Validators_1.getStringValidator)());
-    addGetterSetter(Node, "opacity", 1, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "name", "", (0, Validators_1.getStringValidator)());
-    addGetterSetter(Node, "id", "", (0, Validators_1.getStringValidator)());
-    addGetterSetter(Node, "rotation", 0, (0, Validators_1.getNumberValidator)());
-    Factory_1.Factory.addComponentsGetterSetter(Node, "scale", ["x", "y"]);
-    addGetterSetter(Node, "scaleX", 1, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "scaleY", 1, (0, Validators_1.getNumberValidator)());
-    Factory_1.Factory.addComponentsGetterSetter(Node, "skew", ["x", "y"]);
-    addGetterSetter(Node, "skewX", 0, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "skewY", 0, (0, Validators_1.getNumberValidator)());
-    Factory_1.Factory.addComponentsGetterSetter(Node, "offset", ["x", "y"]);
-    addGetterSetter(Node, "offsetX", 0, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "offsetY", 0, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "dragDistance", void 0, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "width", 0, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "height", 0, (0, Validators_1.getNumberValidator)());
-    addGetterSetter(Node, "listening", true, (0, Validators_1.getBooleanValidator)());
-    addGetterSetter(Node, "preventDefault", true, (0, Validators_1.getBooleanValidator)());
-    addGetterSetter(Node, "filters", void 0, function(val) {
+    addGetterSetter(Node2, "zIndex");
+    addGetterSetter(Node2, "absolutePosition");
+    addGetterSetter(Node2, "position");
+    addGetterSetter(Node2, "x", 0, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "y", 0, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "globalCompositeOperation", "source-over", (0, Validators_1.getStringValidator)());
+    addGetterSetter(Node2, "opacity", 1, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "name", "", (0, Validators_1.getStringValidator)());
+    addGetterSetter(Node2, "id", "", (0, Validators_1.getStringValidator)());
+    addGetterSetter(Node2, "rotation", 0, (0, Validators_1.getNumberValidator)());
+    Factory_1.Factory.addComponentsGetterSetter(Node2, "scale", ["x", "y"]);
+    addGetterSetter(Node2, "scaleX", 1, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "scaleY", 1, (0, Validators_1.getNumberValidator)());
+    Factory_1.Factory.addComponentsGetterSetter(Node2, "skew", ["x", "y"]);
+    addGetterSetter(Node2, "skewX", 0, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "skewY", 0, (0, Validators_1.getNumberValidator)());
+    Factory_1.Factory.addComponentsGetterSetter(Node2, "offset", ["x", "y"]);
+    addGetterSetter(Node2, "offsetX", 0, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "offsetY", 0, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "dragDistance", void 0, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "width", 0, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "height", 0, (0, Validators_1.getNumberValidator)());
+    addGetterSetter(Node2, "listening", true, (0, Validators_1.getBooleanValidator)());
+    addGetterSetter(Node2, "preventDefault", true, (0, Validators_1.getBooleanValidator)());
+    addGetterSetter(Node2, "filters", void 0, function(val) {
       this._filterUpToDate = false;
       return val;
     });
-    addGetterSetter(Node, "visible", true, (0, Validators_1.getBooleanValidator)());
-    addGetterSetter(Node, "transformsEnabled", "all", (0, Validators_1.getStringValidator)());
-    addGetterSetter(Node, "size");
-    addGetterSetter(Node, "dragBoundFunc");
-    addGetterSetter(Node, "draggable", false, (0, Validators_1.getBooleanValidator)());
-    Factory_1.Factory.backCompat(Node, {
+    addGetterSetter(Node2, "visible", true, (0, Validators_1.getBooleanValidator)());
+    addGetterSetter(Node2, "transformsEnabled", "all", (0, Validators_1.getStringValidator)());
+    addGetterSetter(Node2, "size");
+    addGetterSetter(Node2, "dragBoundFunc");
+    addGetterSetter(Node2, "draggable", false, (0, Validators_1.getBooleanValidator)());
+    Factory_1.Factory.backCompat(Node2, {
       rotateDeg: "rotate",
       setRotationDeg: "setRotation",
       getRotationDeg: "getRotation"
@@ -29283,7 +29283,8 @@ function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHi
         top: y,
         width: W,
         zIndex: 10002,
-        background: "#1c1c1e",
+        background: "rgba(28,28,30,0.85)",
+        backdropFilter: "blur(10px)",
         borderRadius: "14px",
         border: "1px solid rgba(255,255,255,0.12)",
         boxShadow: "0 12px 40px rgba(0,0,0,0.4)",
@@ -29293,7 +29294,6 @@ function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHi
       },
       onClick: (e) => e.stopPropagation(),
       children: [
-        /* @__PURE__ */ jsx3("div", { style: { fontSize: "10px", fontWeight: "700", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }, children: "\u0429\u043E \u0442\u0443\u0442 \u043D\u0435 \u0442\u0430\u043A?" }),
         /* @__PURE__ */ jsx3(
           "textarea",
           {
@@ -29304,7 +29304,7 @@ function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHi
               setInterim("");
             },
             onKeyDown: handleKeyDown,
-            placeholder: listening ? "\u{1F3A4} \u0413\u043E\u0432\u043E\u0440\u0456\u0442\u044C..." : "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u0443... (Ctrl+Enter \u0449\u043E\u0431 OK)",
+            placeholder: listening ? "\u{1F3A4} \u0413\u043E\u0432\u043E\u0440\u0456\u0442\u044C..." : "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u0443... (Ctrl+Enter, \u0449\u043E\u0431 \u0412\u0456\u0434\u043F\u0440\u0430\u0432\u0438\u0442\u0438)",
             rows: 3,
             autoFocus: true,
             style: {
@@ -29368,21 +29368,32 @@ function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHi
                 /* @__PURE__ */ jsx3("line", { x1: "12", y1: "19", x2: "12", y2: "22" })
               ] })
             }
-          ) : /* @__PURE__ */ jsx3("div", { title: "\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u0438\u0439 \u0432\u0432\u0456\u0434 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u0442\u0456\u043B\u044C\u043A\u0438 \u0432 Chrome", style: {
-            width: "32px",
-            height: "32px",
-            borderRadius: "8px",
-            flexShrink: 0,
-            background: "rgba(255,255,255,0.04)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "not-allowed"
-          }, children: /* @__PURE__ */ jsxs2("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "rgba(255,255,255,0.2)", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-            /* @__PURE__ */ jsx3("path", { d: "M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" }),
-            /* @__PURE__ */ jsx3("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
-            /* @__PURE__ */ jsx3("line", { x1: "12", y1: "19", x2: "12", y2: "22" })
-          ] }) }),
+          ) : /* @__PURE__ */ jsx3(
+            "button",
+            {
+              type: "button",
+              onClick: () => setMicError("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u0438\u0439 \u0432\u0432\u0456\u0434 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u0442\u0456\u043B\u044C\u043A\u0438 \u0432 Chrome/Edge/Safari"),
+              title: "\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u0438\u0439 \u0432\u0432\u0456\u0434 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u0442\u0456\u043B\u044C\u043A\u0438 \u0432 Chrome",
+              style: {
+                width: "32px",
+                height: "32px",
+                borderRadius: "8px",
+                flexShrink: 0,
+                background: "rgba(255,255,255,0.04)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "not-allowed",
+                border: "1px solid transparent",
+                padding: 0
+              },
+              children: /* @__PURE__ */ jsxs2("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "rgba(255,255,255,0.2)", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                /* @__PURE__ */ jsx3("path", { d: "M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" }),
+                /* @__PURE__ */ jsx3("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+                /* @__PURE__ */ jsx3("line", { x1: "12", y1: "19", x2: "12", y2: "22" })
+              ] })
+            }
+          ),
           onDelete && /* @__PURE__ */ jsx3(
             "button",
             {
@@ -29621,6 +29632,10 @@ function patchConsole() {
   levels.forEach((level) => {
     const original = console[level].bind(console);
     console[level] = (...args) => {
+      const isCssRulesError = args.some(
+        (a) => typeof a === "string" && a.includes("cssRules") || a instanceof Error && a.message.includes("cssRules")
+      );
+      if (isCssRulesError) return;
       original(...args);
       const message = args.map((a) => {
         if (typeof a === "string") return a;
@@ -30132,38 +30147,192 @@ function enableSpacingOverlay() {
 function disableSpacingOverlay() {
   document.getElementById(SPACING_STYLE_ID)?.remove();
 }
+function getLuminance(r, g, b) {
+  const a = [r, g, b].map((v) => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.722;
+}
+function getContrast(rgb1, rgb2) {
+  const l1 = getLuminance(rgb1[0], rgb1[1], rgb1[2]);
+  const l2 = getLuminance(rgb2[0], rgb2[1], rgb2[2]);
+  const brightest = Math.max(l1, l2);
+  const darkest = Math.min(l1, l2);
+  return (brightest + 0.05) / (darkest + 0.05);
+}
+function parseRgb(str) {
+  const match = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : null;
+}
 function runAutoBugScan() {
   const issues = [];
+  let counts = {};
+  const addIssue = (cat, type, msg) => {
+    counts[cat] = (counts[cat] || 0) + 1;
+    if (counts[cat] <= 5) issues.push({ category: type, message: msg });
+  };
   document.querySelectorAll("img").forEach((img, i) => {
-    if (img.naturalWidth === 0 && img.complete) {
-      issues.push(`\u{1F5BC} Broken image: ${img.src.slice(0, 60) || `img[${i}]`}`);
-    }
+    if (img.dataset?.buggyBag) return;
+    if (img.naturalWidth === 0 && img.complete) addIssue("broken-img", "visual", `\u{1F5BC} \u0411\u0438\u0442\u0435 \u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F: ${img.src.slice(0, 60)}`);
+    if (!img.hasAttribute("width") && !img.hasAttribute("height")) addIssue("missing-dims", "visual", `\u{1F4D0} \u0417\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0431\u0435\u0437 width/height: ${img.src.slice(0, 40)}`);
+    if (!img.hasAttribute("alt")) addIssue("missing-alt", "a11y", `\u267F \u0417\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0431\u0435\u0437 alt: ${img.src.slice(0, 40)}`);
   });
+  const ids = /* @__PURE__ */ new Map();
   document.querySelectorAll("*").forEach((el) => {
-    if (el.dataset?.buggyBag) return;
+    if (el.closest?.("[data-buggy-bag]")) return;
+    const tag = el.tagName.toLowerCase();
+    const cls = el.className?.toString?.().slice?.(0, 30) ?? "";
+    const label = `<${tag}${cls ? ` class="${cls}"` : ""}>`;
+    if (el.id) {
+      ids.set(el.id, (ids.get(el.id) || 0) + 1);
+      if (ids.get(el.id) === 2) addIssue("duplicate-id", "other", `\u{1F194} \u0414\u0443\u0431\u043B\u0456\u043A\u0430\u0442 ID: #${el.id}`);
+    }
     const s = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
     if (s.overflow === "hidden" || s.overflowX === "hidden" || s.overflowY === "hidden") {
       if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) {
-        const tag = el.tagName.toLowerCase();
-        const cls = el.className?.toString?.().slice?.(0, 30) ?? "";
-        issues.push(`\u{1F4CF} Overflow hidden with scroll: <${tag} class="${cls}">`);
+        addIssue("overflow", "visual", `\u{1F4CF} Overflow hidden \u0437\u0456 \u0441\u043A\u0440\u043E\u043B\u043E\u043C: ${label}`);
+      }
+    }
+    if ((s.whiteSpace === "nowrap" || s.textOverflow === "ellipsis") && el.scrollWidth > el.clientWidth + 2) {
+      addIssue("truncated-text", "visual", `\u2702 \u0422\u0435\u043A\u0441\u0442 \u043E\u0431\u0440\u0456\u0437\u0430\u0454\u0442\u044C\u0441\u044F: ${label}`);
+    }
+    if (rect.right > window.innerWidth + 5 && rect.width > 0) {
+      addIssue("out-of-bounds", "visual", `\u2194 \u0415\u043B\u0435\u043C\u0435\u043D\u0442 \u0432\u0438\u0445\u043E\u0434\u0438\u0442\u044C \u0437\u0430 \u043C\u0435\u0436\u0456 \u0435\u043A\u0440\u0430\u043D\u0443 \u043F\u043E \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u0430\u043B\u0456: ${label}`);
+    }
+    if (tag === "a" || tag === "button" || el.hasAttribute("onclick") || el.getAttribute("role") === "button") {
+      if (rect.width > 0 && rect.height > 0 && (rect.width < 24 || rect.height < 24)) {
+        addIssue("small-tap", "a11y", `\u{1F446} \u0417\u0430\u043C\u0430\u043B\u0430 \u043A\u043B\u0456\u043A\u0430\u0431\u0435\u043B\u044C\u043D\u0430 \u0437\u043E\u043D\u0430 (${Math.round(rect.width)}x${Math.round(rect.height)}): ${label}`);
+      }
+      if (tag === "a" || tag === "button" || el.getAttribute("role") === "button") {
+        const text = el.textContent?.trim() || "";
+        const hasGraphics = el.querySelector("img, svg");
+        const hasAria = el.getAttribute("aria-label") || el.getAttribute("aria-labelledby");
+        if (!text && !hasGraphics && !hasAria) {
+          addIssue("empty-btn", "a11y", `\u{1F47B} \u041F\u043E\u0440\u043E\u0436\u043D\u0456\u0439 \u043A\u043B\u0456\u043A\u0430\u0431\u0435\u043B\u044C\u043D\u0438\u0439 \u0435\u043B\u0435\u043C\u0435\u043D\u0442 (\u0431\u0435\u0437 \u0442\u0435\u043A\u0441\u0442\u0443/\u0456\u043A\u043E\u043D\u043E\u043A/aria): ${label}`);
+        }
+      }
+    }
+    if (tag === "a") {
+      const href = el.getAttribute("href");
+      if (href === "#" || href === "javascript:void(0)" || href === "") {
+        addIssue("broken-link", "other", `\u{1F517} \u041F\u0443\u0441\u0442\u0435/\u0437\u0430\u0433\u043B\u0443\u0448\u043A\u043E\u0432\u0435 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F: ${label}`);
+      }
+    }
+    if (["input", "textarea", "select"].includes(tag)) {
+      const type = el.getAttribute("type");
+      if (type !== "hidden" && type !== "submit" && type !== "button") {
+        const hasAria = el.getAttribute("aria-label") || el.getAttribute("aria-labelledby") || el.getAttribute("title");
+        const hasIdLabel = el.id ? document.querySelector(`label[for="${el.id}"]`) : null;
+        const insideLabel = el.closest("label");
+        if (!hasAria && !hasIdLabel && !insideLabel) {
+          addIssue("missing-label", "a11y", `\u{1F4DD} Form input \u0431\u0435\u0437 label/aria-label: ${label}`);
+        }
+      }
+    }
+    if (el.childNodes.length > 0 && Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim().length > 0)) {
+      const fg = parseRgb(s.color);
+      let bgEl = el;
+      let bgStr = "";
+      while (bgEl) {
+        const bgS = window.getComputedStyle(bgEl);
+        if (bgS.backgroundColor && bgS.backgroundColor !== "rgba(0, 0, 0, 0)" && bgS.backgroundColor !== "transparent") {
+          bgStr = bgS.backgroundColor;
+          break;
+        }
+        bgEl = bgEl.parentElement;
+      }
+      const bg = bgStr ? parseRgb(bgStr) : [255, 255, 255];
+      if (fg && bg) {
+        const contrast = getContrast(fg, bg);
+        const isLarge = parseInt(s.fontSize) >= 18 || parseInt(s.fontSize) >= 14 && parseInt(s.fontWeight) >= 700;
+        const req = isLarge ? 3 : 4.5;
+        if (contrast < req) {
+          addIssue("contrast", "visual", `\u{1F3A8} \u041F\u043E\u0433\u0430\u043D\u0438\u0439 \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442 \u0442\u0435\u043A\u0441\u0442\u0443 (${contrast.toFixed(1)}:1 < ${req}:1): ${label}`);
+        }
+      }
+    }
+    if (window.location.protocol === "https:") {
+      const src = el.getAttribute("src") || el.getAttribute("href") || "";
+      if (src.startsWith("http://")) {
+        addIssue("mixed-content", "network", `\u{1F513} Mixed content (HTTP \u043D\u0430 HTTPS): ${label}`);
       }
     }
   });
   try {
     const ctx = window.__BUGGY_BAG_CONTEXT__;
     if (ctx?.consoleErrors?.length) {
-      ctx.consoleErrors.slice(0, 5).forEach((e) => {
-        issues.push(`\u274C Console error: ${String(e.message).slice(0, 80)}`);
+      ctx.consoleErrors.forEach((e) => {
+        addIssue(e.level === "warn" ? "console-warn" : "console-error", "other", `${e.level === "warn" ? "\u26A0\uFE0F" : "\u274C"} Console ${e.level}: ${String(e.message).slice(0, 80)}`);
+      });
+    }
+    if (ctx?.networkRequests?.length) {
+      ctx.networkRequests.forEach((req) => {
+        if (req.durationMs > 2e3) {
+          addIssue("slow-network", "network", `\u{1F422} \u041F\u043E\u0432\u0456\u043B\u044C\u043D\u0438\u0439 \u0437\u0430\u043F\u0438\u0442 (>2s, ${Math.round(req.durationMs)}ms): ${req.method} ${req.url.slice(0, 50)}`);
+        }
       });
     }
   } catch {
   }
-  document.querySelectorAll("img:not([alt])").forEach((img, i) => {
-    if (i < 3) issues.push(`\u267F Missing alt: ${img.src.slice(0, 50)}`);
-  });
-  if (issues.length === 0) issues.push("\u2705 \u041F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E!");
   return issues;
+}
+function runDesignAudit() {
+  const fonts = /* @__PURE__ */ new Map();
+  const fontSizes = /* @__PURE__ */ new Map();
+  const colors = /* @__PURE__ */ new Map();
+  const spacings = /* @__PURE__ */ new Map();
+  const borderRadii = /* @__PURE__ */ new Map();
+  const normalizeColor = (str) => str.replace(/\s+/g, "").toLowerCase();
+  const addMetric = (map, key, el) => {
+    if (!map.has(key)) map.set(key, { count: 0, elements: [] });
+    const item = map.get(key);
+    item.count += 1;
+    if (item.elements.length < 50) item.elements.push(el);
+  };
+  document.querySelectorAll("*").forEach((el) => {
+    if (el.closest?.("[data-buggy-bag]")) return;
+    const htmlEl = el;
+    if (htmlEl.offsetParent === null && htmlEl !== document.body && htmlEl !== document.documentElement) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const s = window.getComputedStyle(el);
+    const ff = s.fontFamily.split(",")[0].replace(/['"]/g, "").trim();
+    if (ff) addMetric(fonts, ff, htmlEl);
+    if (s.fontSize) addMetric(fontSizes, s.fontSize, htmlEl);
+    if (s.color && s.color !== "rgba(0,0,0,0)" && s.color !== "transparent") {
+      addMetric(colors, normalizeColor(s.color), htmlEl);
+    }
+    if (s.backgroundColor && s.backgroundColor !== "rgba(0,0,0,0)" && s.backgroundColor !== "transparent") {
+      addMetric(colors, normalizeColor(s.backgroundColor), htmlEl);
+    }
+    const pushSpacing = (val) => {
+      if (val && val !== "0px" && val !== "normal") addMetric(spacings, val, htmlEl);
+    };
+    pushSpacing(s.marginTop);
+    pushSpacing(s.marginBottom);
+    pushSpacing(s.marginLeft);
+    pushSpacing(s.marginRight);
+    pushSpacing(s.paddingTop);
+    pushSpacing(s.paddingBottom);
+    pushSpacing(s.paddingLeft);
+    pushSpacing(s.paddingRight);
+    pushSpacing(s.gap);
+    if (s.borderRadius && s.borderRadius !== "0px") {
+      addMetric(borderRadii, s.borderRadius, htmlEl);
+    }
+  });
+  const sortAndLimit = (map) => {
+    return Array.from(map.entries()).sort((a, b) => b[1].count - a[1].count).slice(0, 20).map(([value, item]) => ({ value, count: item.count, elements: item.elements }));
+  };
+  return {
+    fonts: sortAndLimit(fonts),
+    fontSizes: sortAndLimit(fontSizes),
+    colors: sortAndLimit(colors),
+    spacings: sortAndLimit(spacings),
+    borderRadii: sortAndLimit(borderRadii)
+  };
 }
 var _zoomActive = false;
 var _zoomEl = null;
@@ -30252,11 +30421,14 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const [hoveredShapeId, setHoveredShapeId] = useState4(null);
   const [activeDebug, setActiveDebug] = useState4(/* @__PURE__ */ new Set());
   const [autoBugResults, setAutoBugResults] = useState4(null);
+  const [designAuditResult, setDesignAuditResult] = useState4(null);
   const [hoveredCode, setHoveredCode] = useState4("");
   const [hoveredStyle, setHoveredStyle] = useState4("");
   const [hoveredRect, setHoveredRect] = useState4(null);
   const [codeWinPos, setCodeWinPos] = useState4({ x: typeof window !== "undefined" ? window.innerWidth - 440 : 800, y: 24 });
   const [bugWinPos, setBugWinPos] = useState4({ x: 24, y: 24 });
+  const [auditWinPos, setAuditWinPos] = useState4({ x: typeof window !== "undefined" ? window.innerWidth - 440 : 800, y: 400 });
+  const [auditHoveredElements, setAuditHoveredElements] = useState4([]);
   const [lastCopiedColor, setLastCopiedColor] = useState4(null);
   const dragRef = useRef4(null);
   const dragOffsetRef = useRef4({ x: 0, y: 0 });
@@ -30460,8 +30632,9 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
       }
     }
     const freshTechContext = collectTechContext(lastElement);
+    if (designAuditResult) freshTechContext.designAudit = designAuditResult;
     onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443", tech_context: freshTechContext });
-  }, [shapes, annotations, apiKey, onSend, sending]);
+  }, [shapes, annotations, apiKey, onSend, sending, designAuditResult]);
   const handleCloseRequest = useCallback2(() => {
     if (shapes.length > 0) {
       setShowExitConfirm(true);
@@ -30529,6 +30702,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
         if (overlay === "zoom") disableZoom();
         if (overlay === "invert") document.body.style.filter = "";
         if (overlay === "auto-bugs") setAutoBugResults(null);
+        if (overlay === "design-audit") setDesignAuditResult(null);
         if (overlay === "show-code") document.body.style.cursor = "";
       } else {
         next.add(overlay);
@@ -30537,6 +30711,9 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
         if (overlay === "invert") document.body.style.filter = "invert(1) hue-rotate(180deg)";
         if (overlay === "auto-bugs") {
           setAutoBugResults(runAutoBugScan());
+        }
+        if (overlay === "design-audit") {
+          setDesignAuditResult(runDesignAudit());
         }
         if (overlay === "show-code") document.body.style.cursor = "crosshair";
       }
@@ -30589,6 +30766,10 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
         if (e.key.toLowerCase() === "a") {
           e.preventDefault();
           toggleDebug("auto-bugs");
+        }
+        if (e.key.toLowerCase() === "d") {
+          e.preventDefault();
+          toggleDebug("design-audit");
         }
         if (e.key.toLowerCase() === "c") {
           e.preventDefault();
@@ -30649,6 +30830,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
     const onMove = (e) => {
       if (dragRef.current === "code") setCodeWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
       else if (dragRef.current === "bug") setBugWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
+      else if (dragRef.current === "audit") setAuditWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
     };
     const onUp = () => {
       dragRef.current = null;
@@ -30664,6 +30846,12 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
     dragRef.current = type;
     const rect = e.currentTarget.closest("[data-buggy-bag]")?.getBoundingClientRect();
     if (rect) dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+  const highlightHtml = (str) => {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/(&lt;\/?)([a-zA-Z0-9\-]+)(.*?)(&gt;)/g, (match, p1, p2, p3, p4) => {
+      const highlightedAttrs = p3.replace(/([a-zA-Z0-9\-]+)="([^"]*)"/g, '<span style="color:#e2cb6b">$1</span>=<span style="color:#a3be8c">"$2"</span>');
+      return `${p1}<span style="color:#88c0d0">${p2}</span>${highlightedAttrs}${p4}`;
+    }).replace(/(\/\*.*?\*\/)/g, '<span style="color:#616e88">$1</span>');
   };
   useEffect4(() => {
     if (!activeDebug.has("show-code") && !activeDebug.has("typography") || !cursor) return;
@@ -30682,9 +30870,9 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
         }
         const breadcrumb = path.slice(-4).join(" > ");
         const html = formatNode(target, 0, 2);
-        setHoveredCode(`/* ${breadcrumb} */
+        setHoveredCode(highlightHtml(`/* ${breadcrumb} */
 
-${html}`);
+${html}`));
       }
       if (activeDebug.has("typography")) {
         const style = window.getComputedStyle(target);
@@ -30701,6 +30889,27 @@ Letter-spacing: ${style.letterSpacing}`;
       setHoveredRect(null);
     }
   }, [cursor, activeDebug, formatNode]);
+  const handleAuditClick = useCallback2((category, value, count, elements = []) => {
+    let x = typeof window !== "undefined" ? window.innerWidth / 2 : 500;
+    let y = typeof window !== "undefined" ? window.innerHeight / 2 : 500;
+    if (elements.length > 0 && elements[0]) {
+      const rect = elements[0].getBoundingClientRect();
+      x = rect.left + rect.width / 2;
+      y = rect.top + rect.height / 2;
+    }
+    const id = "shape-" + Date.now();
+    const shape = {
+      id,
+      type: "pin",
+      x,
+      y,
+      pinNumber: shapes.filter((s) => s.type === "pin").length + 1
+    };
+    setShapes((p) => [...p, shape]);
+    setAnnotations((p) => ({ ...p, [id]: `\u0410\u0443\u0434\u0438\u0442 (${category}): ${value} \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F ${count} \u0440\u0430\u0437\u0456\u0432.` }));
+    setPendingShape({ shape, isNew: true });
+    toggleDebug("design-audit");
+  }, [shapes, toggleDebug]);
   const divider = /* @__PURE__ */ jsx4("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } });
   return /* @__PURE__ */ jsxs3(
     "div",
@@ -30727,6 +30936,22 @@ Letter-spacing: ${style.letterSpacing}`;
           zIndex: 9999,
           transition: "all 0.1s ease-out"
         } }),
+        auditHoveredElements.map((el, i) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return null;
+          return /* @__PURE__ */ jsx4("div", { style: {
+            position: "fixed",
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+            background: "rgba(16, 185, 129, 0.2)",
+            border: "2px solid rgba(16, 185, 129, 0.8)",
+            pointerEvents: "none",
+            zIndex: 9999,
+            transition: "all 0.1s ease-out"
+          } }, i);
+        }),
         /* @__PURE__ */ jsx4(
           "div",
           {
@@ -30752,7 +30977,7 @@ Letter-spacing: ${style.letterSpacing}`;
           left: codeWinPos.x + "px",
           width: "420px",
           maxHeight: "calc(100vh - 48px)",
-          background: "rgba(22,22,26,0.95)",
+          background: "rgba(22,22,26,0.75)",
           border: "1px solid rgba(56,189,248,0.3)",
           borderRadius: "16px",
           padding: "0",
@@ -30803,12 +31028,21 @@ Letter-spacing: ${style.letterSpacing}`;
                 onMouseLeave: (e) => {
                   e.currentTarget.style.background = "rgba(255,255,255,0.1)";
                 },
-                children: "\u2715"
+                children: /* @__PURE__ */ jsxs3("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                  /* @__PURE__ */ jsx4("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+                  /* @__PURE__ */ jsx4("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
+                ] })
               }
             )
           ] }),
           /* @__PURE__ */ jsxs3("div", { style: { padding: "20px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }, children: [
-            activeDebug.has("show-code") && /* @__PURE__ */ jsx4("div", { style: { flex: "1 1 auto" }, children: /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5" }, children: hoveredCode }) }),
+            activeDebug.has("show-code") && /* @__PURE__ */ jsx4("div", { style: { flex: "1 1 auto" }, children: /* @__PURE__ */ jsx4(
+              "div",
+              {
+                style: { fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5" },
+                dangerouslySetInnerHTML: { __html: hoveredCode }
+              }
+            ) }),
             activeDebug.has("typography") && /* @__PURE__ */ jsxs3("div", { style: { flex: "0 0 auto" }, children: [
               /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(56,189,248,0.9)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }, children: "\u0421\u0442\u0438\u043B\u0456" }),
               /* @__PURE__ */ jsx4("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.9)", whiteSpace: "pre-wrap", lineHeight: "1.6" }, children: hoveredStyle })
@@ -30821,7 +31055,7 @@ Letter-spacing: ${style.letterSpacing}`;
           left: bugWinPos.x + "px",
           width: "420px",
           maxHeight: "calc(100vh - 48px)",
-          background: "rgba(22,22,26,0.95)",
+          background: "rgba(22,22,26,0.75)",
           border: "1px solid rgba(139,92,246,0.3)",
           borderRadius: "16px",
           padding: "0",
@@ -30867,11 +31101,204 @@ Letter-spacing: ${style.letterSpacing}`;
                 onMouseLeave: (e) => {
                   e.currentTarget.style.background = "rgba(255,255,255,0.1)";
                 },
-                children: "\u2715"
+                children: /* @__PURE__ */ jsxs3("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                  /* @__PURE__ */ jsx4("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+                  /* @__PURE__ */ jsx4("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
+                ] })
               }
             )
           ] }),
-          /* @__PURE__ */ jsx4("div", { style: { padding: "20px", fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5", overflowY: "auto" }, children: autoBugResults.map((r, i) => /* @__PURE__ */ jsx4("div", { children: r }, i)) })
+          /* @__PURE__ */ jsxs3("div", { style: { padding: "20px", fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5", overflowY: "auto" }, children: [
+            ["visual", "network", "a11y", "other"].map((cat) => {
+              const catBugs = autoBugResults.filter((b) => b.category === cat);
+              const title = cat === "visual" ? "\u0412\u0456\u0437\u0443\u0430\u043B\u044C\u043D\u0456 \u0431\u0430\u0433\u0438 \u{1F3A8}" : cat === "network" ? "\u041C\u0435\u0440\u0435\u0436\u0435\u0432\u0456 \u043F\u043E\u043C\u0438\u043B\u043A\u0438 \u{1F310}" : cat === "a11y" ? "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u0456\u0441\u0442\u044C \u267F" : "\u0406\u043D\u0448\u0435 \u{1F527}";
+              return /* @__PURE__ */ jsxs3("div", { style: { marginBottom: "16px" }, children: [
+                /* @__PURE__ */ jsx4("div", { style: { fontWeight: "bold", color: "rgba(255,255,255,0.9)", marginBottom: "8px" }, children: title }),
+                catBugs.length > 0 ? catBugs.map((b, i) => /* @__PURE__ */ jsx4("div", { style: { marginBottom: "4px" }, children: b.message }, i)) : /* @__PURE__ */ jsx4("div", { style: { color: "#10b981" }, children: "\u0412\u0456\u0434\u0441\u0443\u0442\u043D\u0456" })
+              ] }, cat);
+            }),
+            autoBugResults.length > 0 && /* @__PURE__ */ jsx4(
+              "button",
+              {
+                onClick: () => {
+                  const text = autoBugResults.map((b) => b.message).join(" | ");
+                  const id = "shape-" + Date.now();
+                  setShapes((prev) => [...prev, { id, type: "pin", x: window.innerWidth / 2, y: window.innerHeight / 2, pinNumber: prev.filter((s) => s.type === "pin").length + 1 }]);
+                  setAnnotations((prev) => ({ ...prev, [id]: "\u0410\u0432\u0442\u043E-\u043F\u043E\u0448\u0443\u043A:\n" + text }));
+                  toggleDebug("auto-bugs");
+                },
+                style: {
+                  marginTop: "16px",
+                  background: "#8b5cf6",
+                  color: "white",
+                  border: "none",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  width: "100%",
+                  fontWeight: "bold",
+                  transition: "background 0.2s"
+                },
+                onMouseEnter: (e) => e.currentTarget.style.background = "#7c3aed",
+                onMouseLeave: (e) => e.currentTarget.style.background = "#8b5cf6",
+                children: "\u0414\u043E\u0434\u0430\u0442\u0438 \u0432 \u0437\u0432\u0456\u0442"
+              }
+            )
+          ] })
+        ] }),
+        designAuditResult && /* @__PURE__ */ jsxs3("div", { id: "buggy-bag-design-audit-window", "data-buggy-bag": "true", style: {
+          position: "fixed",
+          top: auditWinPos.y + "px",
+          left: auditWinPos.x + "px",
+          width: "420px",
+          maxHeight: "calc(100vh - 48px)",
+          background: "rgba(22,22,26,0.75)",
+          border: "1px solid rgba(16,185,129,0.3)",
+          borderRadius: "16px",
+          padding: "0",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          backdropFilter: "blur(10px)",
+          fontFamily: "monospace",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          zIndex: 10005
+        }, children: [
+          /* @__PURE__ */ jsxs3("div", { onMouseDown: (e) => startDrag(e, "audit"), style: {
+            padding: "16px 20px",
+            cursor: "grab",
+            background: "rgba(255,255,255,0.03)",
+            borderBottom: "1px solid rgba(255,255,255,0.05)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }, children: [
+            /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(16,185,129,0.9)", textTransform: "uppercase", letterSpacing: "0.07em" }, children: "\u0414\u0438\u0437\u0430\u0439\u043D-\u0430\u0443\u0434\u0438\u0442" }),
+            /* @__PURE__ */ jsx4(
+              "button",
+              {
+                type: "button",
+                onClick: () => toggleDebug("design-audit"),
+                style: {
+                  background: "rgba(255,255,255,0.1)",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "20px",
+                  height: "20px",
+                  cursor: "pointer",
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.15s"
+                },
+                onMouseEnter: (e) => {
+                  e.currentTarget.style.background = "rgba(239,68,68,0.8)";
+                },
+                onMouseLeave: (e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                },
+                children: /* @__PURE__ */ jsxs3("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                  /* @__PURE__ */ jsx4("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+                  /* @__PURE__ */ jsx4("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
+                ] })
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxs3("div", { style: { padding: "20px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }, children: [
+            (designAuditResult.fonts.length > 8 || designAuditResult.colors.length > 20 || designAuditResult.spacings.length > 15) && /* @__PURE__ */ jsx4("div", { style: { padding: "10px", background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "8px", color: "#fbbf24", fontSize: "11px", lineHeight: "1.4" }, children: "\u26A0\uFE0F \u0417\u0430\u0431\u0430\u0433\u0430\u0442\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u044C! \u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0454\u043C\u043E \u0437\u0432\u0435\u0441\u0442\u0438 \u0434\u043E \u0434\u0438\u0437\u0430\u0439\u043D-\u0441\u0438\u0441\u0442\u0435\u043C\u0438." }),
+            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
+              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
+                /* @__PURE__ */ jsxs3("span", { children: [
+                  "\u0428\u0440\u0438\u0444\u0442\u0438 (",
+                  designAuditResult.fonts.length,
+                  ")"
+                ] }),
+                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.fonts.length > 5 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 5" })
+              ] }),
+              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.fonts.map((f, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0428\u0440\u0438\u0444\u0442", f.value, f.count, f.elements), onMouseEnter: () => setAuditHoveredElements(f.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                f.value,
+                " ",
+                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                  "\xD7",
+                  f.count
+                ] })
+              ] }, i)) })
+            ] }),
+            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
+              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
+                /* @__PURE__ */ jsxs3("span", { children: [
+                  "\u0420\u043E\u0437\u043C\u0456\u0440\u0438 \u0448\u0440\u0438\u0444\u0442\u0456\u0432 (",
+                  designAuditResult.fontSizes.length,
+                  ")"
+                ] }),
+                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.fontSizes.length > 8 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 8" })
+              ] }),
+              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.fontSizes.map((f, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0420\u043E\u0437\u043C\u0456\u0440 \u0448\u0440\u0438\u0444\u0442\u0443", f.value, f.count, f.elements), onMouseEnter: () => setAuditHoveredElements(f.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                f.value,
+                " ",
+                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                  "\xD7",
+                  f.count
+                ] })
+              ] }, i)) })
+            ] }),
+            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
+              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
+                /* @__PURE__ */ jsxs3("span", { children: [
+                  "\u041A\u043E\u043B\u044C\u043E\u0440\u0438 (",
+                  designAuditResult.colors.length,
+                  ")"
+                ] }),
+                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.colors.length > 15 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 15" })
+              ] }),
+              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.colors.map((c, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u041A\u043E\u043B\u0456\u0440", c.value, c.count, c.elements), onMouseEnter: () => setAuditHoveredElements(c.elements || []), style: { display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,255,255,0.05)", padding: "2px 6px 2px 4px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                /* @__PURE__ */ jsx4("div", { style: { width: "12px", height: "12px", borderRadius: "2px", background: c.value, border: "1px solid rgba(255,255,255,0.1)" } }),
+                /* @__PURE__ */ jsx4("span", { children: c.value }),
+                " ",
+                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                  "\xD7",
+                  c.count
+                ] })
+              ] }, i)) })
+            ] }),
+            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
+              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
+                /* @__PURE__ */ jsxs3("span", { children: [
+                  "\u0412\u0456\u0434\u0441\u0442\u0443\u043F\u0438 (",
+                  designAuditResult.spacings.length,
+                  ")"
+                ] }),
+                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.spacings.length > 10 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 10" })
+              ] }),
+              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.spacings.map((s, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0412\u0456\u0434\u0441\u0442\u0443\u043F", s.value, s.count, s.elements), onMouseEnter: () => setAuditHoveredElements(s.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                s.value,
+                " ",
+                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                  "\xD7",
+                  s.count
+                ] })
+              ] }, i)) })
+            ] }),
+            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
+              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
+                /* @__PURE__ */ jsxs3("span", { children: [
+                  "Border-radius (",
+                  designAuditResult.borderRadii.length,
+                  ")"
+                ] }),
+                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.borderRadii.length > 5 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 5" })
+              ] }),
+              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.borderRadii.map((b, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("Border-radius", b.value, b.count, b.elements), onMouseEnter: () => setAuditHoveredElements(b.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                b.value,
+                " ",
+                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                  "\xD7",
+                  b.count
+                ] })
+              ] }, i)) })
+            ] })
+          ] })
         ] }),
         !showExitConfirm && /* @__PURE__ */ jsx4(
           DrawingCanvas,
@@ -31057,6 +31484,15 @@ Letter-spacing: ${style.letterSpacing}`;
                     /* @__PURE__ */ jsx4("line", { x1: "12", y1: "4", x2: "12", y2: "20" })
                   ] }),
                   hotkey: "Alt+T"
+                },
+                {
+                  id: "design-audit",
+                  label: "\u0414\u0438\u0437\u0430\u0439\u043D-\u0430\u0443\u0434\u0438\u0442",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("path", { d: "M12 20h9" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" })
+                  ] }),
+                  hotkey: "Alt+D"
                 }
               ].map(({ id, label, icon, hotkey }) => /* @__PURE__ */ jsxs3("button", { type: "button", onClick: () => toggleDebug(id), style: {
                 display: "flex",
@@ -31624,8 +32060,10 @@ function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
   return /* @__PURE__ */ jsx5(ErrorBoundary, { children: /* @__PURE__ */ jsx5(BuggyBagWithHooks, { apiEndpoint, apiKey, portalUrl }) });
 }
 function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }) {
-  const [isDisabled, setIsDisabled] = useState5(false);
+  const [isProjectActive, setIsProjectActive] = useState5(null);
   useEffect5(() => {
+    const params = new URLSearchParams(window.location.search);
+    const bbParam = params.get("bb");
     if (apiKey) {
       const pingUrl = apiEndpoint ? apiEndpoint.replace("/bugs/submit", "/ping") : `${portalUrl}/api/ping`;
       detectFavicon().then((favicon) => {
@@ -31635,23 +32073,33 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }) {
           body: JSON.stringify({
             api_key: apiKey,
             favicon_url: favicon.url,
-            favicon_color: favicon.color
+            favicon_color: favicon.color,
+            bb_param: bbParam || void 0
           })
         }).then((r) => r.json()).then((data) => {
-          if (data.ok && data.is_active === false) {
-            setIsDisabled(true);
+          if (data.ok) {
+            if (data.grant_access) {
+              localStorage.setItem("BUGGY_BAG_ACCESS", "active");
+              params.delete("bb");
+              const searchStr = params.toString() ? "?" + params.toString() : "";
+              window.history.replaceState({}, "", window.location.pathname + searchStr);
+            }
+            if (data.is_active === false) {
+              setIsProjectActive(false);
+            } else {
+              setIsProjectActive(true);
+            }
+          } else {
+            setIsProjectActive(true);
           }
-        }).catch(() => {
-        });
+        }).catch(() => setIsProjectActive(true));
       });
+    } else {
+      setIsProjectActive(true);
     }
-    if (isDisabled) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("bb") === "on") {
-      localStorage.setItem("BUGGY_BAG_ACCESS", "active");
-      params.delete("bb");
-      window.history.replaceState({}, "", window.location.pathname + (params.toString() ? "?" + params.toString() : ""));
-    }
+  }, [apiEndpoint, apiKey, portalUrl]);
+  useEffect5(() => {
+    if (isProjectActive !== true) return;
     let _active = false;
     let _rec = null;
     const dispatchTranscript = (text, isFinal) => window.dispatchEvent(new CustomEvent("buggy-bag:transcript", { detail: { text, isFinal } }));
@@ -31763,8 +32211,7 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }) {
       host.remove();
       setTimeout(() => root.unmount(), 0);
     };
-  }, [isDisabled, apiEndpoint, apiKey, portalUrl]);
-  if (isDisabled) return null;
+  }, [isProjectActive, apiEndpoint, apiKey, portalUrl]);
   return null;
 }
 function isActive() {

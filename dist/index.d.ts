@@ -83,6 +83,33 @@ interface ComponentInfo {
     filePath?: string;
     lineNumber?: number;
 }
+interface DesignAuditResult {
+    fonts: {
+        value: string;
+        count: number;
+        elements?: HTMLElement[];
+    }[];
+    fontSizes: {
+        value: string;
+        count: number;
+        elements?: HTMLElement[];
+    }[];
+    colors: {
+        value: string;
+        count: number;
+        elements?: HTMLElement[];
+    }[];
+    spacings: {
+        value: string;
+        count: number;
+        elements?: HTMLElement[];
+    }[];
+    borderRadii: {
+        value: string;
+        count: number;
+        elements?: HTMLElement[];
+    }[];
+}
 interface TechContext {
     route: string;
     viewport: string;
@@ -98,6 +125,7 @@ interface TechContext {
     consoleErrors: ConsoleEntry[];
     eventLog: EventLogEntry[];
     autoSeverity: BugSeverity;
+    designAudit?: DesignAuditResult | null;
 }
 interface SubmitBugPayload {
     api_key: string;
