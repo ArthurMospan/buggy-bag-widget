@@ -109,6 +109,11 @@ interface DesignAuditResult {
         count: number;
         elements?: HTMLElement[];
     }[];
+    shadows: {
+        value: string;
+        count: number;
+        elements?: HTMLElement[];
+    }[];
 }
 interface TechContext {
     route: string;

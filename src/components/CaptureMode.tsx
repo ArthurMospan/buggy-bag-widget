@@ -20,6 +20,7 @@ function ToolBtn({ active, onClick, title, hotkey, children }: {
     <button
       type="button" onClick={onClick}
       title={hotkey ? `${title} (${hotkey})` : title}
+      aria-label={title}
       style={{
         width: '34px', height: '34px', borderRadius: '8px', position: 'relative',
         background: active ? 'rgba(255,255,255,0.15)' : 'transparent',
@@ -95,20 +96,23 @@ function parseRgb(str: string) {
   return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : null;
 }
 
-function runAutoBugScan(): AutoBugResult[] {
+function runAutoBugScan(): { issues: AutoBugResult[], categoryCounts: Record<string, number> } {
   const issues: AutoBugResult[] = [];
-  let counts: Record<string, number> = {};
-  const addIssue = (cat: string, type: AutoBugResult['category'], msg: string) => {
+  const counts: Record<string, number> = {};
+  const categoryCounts: Record<string, number> = {};
+  
+  const addIssue = (cat: string, type: AutoBugResult['category'], msg: string, element?: HTMLElement | Element) => {
     counts[cat] = (counts[cat] || 0) + 1;
-    if (counts[cat] <= 5) issues.push({ category: type, message: msg });
+    categoryCounts[type] = (categoryCounts[type] || 0) + 1;
+    if (type === 'network' || counts[cat] <= 5) issues.push({ category: type, message: msg, element: element as HTMLElement });
   };
 
   // 1. Broken images & 8. Missing width/height & missing alt
   document.querySelectorAll('img').forEach((img, i) => {
     if ((img as HTMLElement).dataset?.buggyBag) return;
-    if (img.naturalWidth === 0 && img.complete) addIssue('broken-img', 'visual', `🖼 Бите зображення: ${img.src.slice(0, 60)}`);
-    if (!img.hasAttribute('width') && !img.hasAttribute('height')) addIssue('missing-dims', 'visual', `📐 Зображення без width/height: ${img.src.slice(0, 40)}`);
-    if (!img.hasAttribute('alt')) addIssue('missing-alt', 'a11y', `♿ Зображення без alt: ${img.src.slice(0, 40)}`);
+    if (img.naturalWidth === 0 && img.complete) addIssue('broken-img', 'visual', `🖼 Бите зображення: ${img.src.slice(0, 60)}`, img);
+    if (!img.hasAttribute('width') && !img.hasAttribute('height')) addIssue('missing-dims', 'visual', `📐 Зображення без width/height: ${img.src.slice(0, 40)}`, img);
+    if (!img.hasAttribute('alt')) addIssue('missing-alt', 'a11y', `♿ Зображення без alt: ${img.src.slice(0, 40)}`, img);
   });
 
   const ids = new Map<string, number>();
@@ -122,7 +126,7 @@ function runAutoBugScan(): AutoBugResult[] {
     // 5. Duplicate IDs
     if (el.id) {
       ids.set(el.id, (ids.get(el.id) || 0) + 1);
-      if (ids.get(el.id) === 2) addIssue('duplicate-id', 'other', `🆔 Дублікат ID: #${el.id}`);
+      if (ids.get(el.id) === 2) addIssue('duplicate-id', 'other', `🆔 Дублікат ID: #${el.id}`, el);
     }
 
     const s = window.getComputedStyle(el);
@@ -131,25 +135,25 @@ function runAutoBugScan(): AutoBugResult[] {
     // Overflow issues
     if (s.overflow === 'hidden' || s.overflowX === 'hidden' || s.overflowY === 'hidden') {
       if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) {
-        addIssue('overflow', 'visual', `📏 Overflow hidden зі скролом: ${label}`);
+        addIssue('overflow', 'visual', `📏 Overflow hidden зі скролом: ${label}`, el);
       }
     }
     
     // 9. Visually truncated text
     if ((s.whiteSpace === 'nowrap' || s.textOverflow === 'ellipsis') && el.scrollWidth > el.clientWidth + 2) {
-      addIssue('truncated-text', 'visual', `✂ Текст обрізається: ${label}`);
+      addIssue('truncated-text', 'visual', `✂ Текст обрізається: ${label}`, el);
     }
 
     // 12. Elements out of viewport horizontally
     if (rect.right > window.innerWidth + 5 && rect.width > 0) {
-      addIssue('out-of-bounds', 'visual', `↔ Елемент виходить за межі екрану по горизонталі: ${label}`);
+      addIssue('out-of-bounds', 'visual', `↔ Елемент виходить за межі екрану по горизонталі: ${label}`, el);
     }
 
     // Interactive elements analysis
     if (tag === 'a' || tag === 'button' || el.hasAttribute('onclick') || el.getAttribute('role') === 'button') {
       // 2. Too small tap targets
       if (rect.width > 0 && rect.height > 0 && (rect.width < 24 || rect.height < 24)) {
-        addIssue('small-tap', 'a11y', `👆 Замала клікабельна зона (${Math.round(rect.width)}x${Math.round(rect.height)}): ${label}`);
+        addIssue('small-tap', 'a11y', `👆 Замала клікабельна зона (${Math.round(rect.width)}x${Math.round(rect.height)}): ${label}`, el);
       }
       
       // 10. Empty buttons/links
@@ -158,7 +162,7 @@ function runAutoBugScan(): AutoBugResult[] {
         const hasGraphics = el.querySelector('img, svg');
         const hasAria = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
         if (!text && !hasGraphics && !hasAria) {
-          addIssue('empty-btn', 'a11y', `👻 Порожній клікабельний елемент (без тексту/іконок/aria): ${label}`);
+          addIssue('empty-btn', 'a11y', `👻 Порожній клікабельний елемент (без тексту/іконок/aria): ${label}`, el);
         }
       }
     }
@@ -167,7 +171,7 @@ function runAutoBugScan(): AutoBugResult[] {
     if (tag === 'a') {
       const href = el.getAttribute('href');
       if (href === '#' || href === 'javascript:void(0)' || href === '') {
-        addIssue('broken-link', 'other', `🔗 Пусте/заглушкове посилання: ${label}`);
+        addIssue('broken-link', 'other', `🔗 Пусте/заглушкове посилання: ${label}`, el);
       }
     }
 
@@ -179,7 +183,7 @@ function runAutoBugScan(): AutoBugResult[] {
         const hasIdLabel = el.id ? document.querySelector(`label[for="${el.id}"]`) : null;
         const insideLabel = el.closest('label');
         if (!hasAria && !hasIdLabel && !insideLabel) {
-          addIssue('missing-label', 'a11y', `📝 Form input без label/aria-label: ${label}`);
+          addIssue('missing-label', 'a11y', `📝 Form input без label/aria-label: ${label}`, el);
         }
       }
     }
@@ -203,7 +207,7 @@ function runAutoBugScan(): AutoBugResult[] {
         const isLarge = parseInt(s.fontSize) >= 18 || (parseInt(s.fontSize) >= 14 && parseInt(s.fontWeight) >= 700);
         const req = isLarge ? 3 : 4.5;
         if (contrast < req) {
-          addIssue('contrast', 'visual', `🎨 Поганий контраст тексту (${contrast.toFixed(1)}:1 < ${req}:1): ${label}`);
+          addIssue('contrast', 'visual', `🎨 Низький контраст (${contrast.toFixed(1)}:1, потрібно ${req}:1): текст ${s.color} на фоні ${bgStr || 'rgb(255, 255, 255)'}`, el);
         }
       }
     }
@@ -212,7 +216,7 @@ function runAutoBugScan(): AutoBugResult[] {
     if (window.location.protocol === 'https:') {
       const src = el.getAttribute('src') || el.getAttribute('href') || '';
       if (src.startsWith('http://')) {
-        addIssue('mixed-content', 'network', `🔓 Mixed content (HTTP на HTTPS): ${label}`);
+        addIssue('mixed-content', 'network', `🔓 Mixed content (HTTP на HTTPS): ${label}`, el);
       }
     }
   });
@@ -222,7 +226,7 @@ function runAutoBugScan(): AutoBugResult[] {
     // 6. Console warnings and errors
     if (ctx?.consoleErrors?.length) {
       ctx.consoleErrors.forEach((e: any) => {
-        addIssue(e.level === 'warn' ? 'console-warn' : 'console-error', 'other', `${e.level === 'warn' ? '⚠️' : '❌'} Console ${e.level}: ${String(e.message).slice(0, 80)}`);
+        addIssue(e.level === 'warn' ? 'console-warn' : 'console-error', 'console', `${e.level === 'warn' ? '⚠️' : '❌'} Console ${e.level}: ${String(e.message).slice(0, 80)}`);
       });
     }
     // 7. Slow network requests
@@ -235,7 +239,7 @@ function runAutoBugScan(): AutoBugResult[] {
     }
   } catch {}
 
-  return issues;
+  return { issues, categoryCounts };
 }
 
 function runDesignAudit(): DesignAuditResult {
@@ -244,6 +248,7 @@ function runDesignAudit(): DesignAuditResult {
   const colors = new Map<string, { count: number; elements: HTMLElement[] }>();
   const spacings = new Map<string, { count: number; elements: HTMLElement[] }>();
   const borderRadii = new Map<string, { count: number; elements: HTMLElement[] }>();
+  const shadows = new Map<string, { count: number; elements: HTMLElement[] }>();
 
   const normalizeColor = (str: string) => str.replace(/\s+/g, '').toLowerCase();
 
@@ -284,6 +289,9 @@ function runDesignAudit(): DesignAuditResult {
     if (s.borderRadius && s.borderRadius !== '0px') {
       addMetric(borderRadii, s.borderRadius, htmlEl);
     }
+    if (s.boxShadow && s.boxShadow !== 'none') {
+      addMetric(shadows, s.boxShadow, htmlEl);
+    }
   });
 
   const sortAndLimit = (map: Map<string, { count: number; elements: HTMLElement[] }>) => {
@@ -299,6 +307,7 @@ function runDesignAudit(): DesignAuditResult {
     colors: sortAndLimit(colors),
     spacings: sortAndLimit(spacings),
     borderRadii: sortAndLimit(borderRadii),
+    shadows: sortAndLimit(shadows),
   };
 }
 
@@ -390,14 +399,17 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
   const [showKebab, setShowKebab] = useState(false);
   const [hoveredShapeId, setHoveredShapeId] = useState<string | null>(null);
   const [activeDebug, setActiveDebug] = useState<Set<DebugOverlay>>(new Set());
-  const [autoBugResults, setAutoBugResults] = useState<AutoBugResult[] | null>(null);
+  const [autoBugResults, setAutoBugResults] = useState<{ issues: AutoBugResult[], categoryCounts: Record<string, number> } | null>(null);
   const [designAuditResult, setDesignAuditResult] = useState<DesignAuditResult | null>(null);
   const [hoveredCode, setHoveredCode] = useState<string>('');
   const [hoveredStyle, setHoveredStyle] = useState<string>('');
   const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null);
+  const [inspectorTab, setInspectorTab] = useState<'code'|'styles'>('code');
+  const [auditTab, setAuditTab] = useState<string>('fonts');
+  const [autoBugTab, setAutoBugTab] = useState<AutoBugResult['category']>('visual');
   const [codeWinPos, setCodeWinPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 440 : 800, y: 24 });
   const [bugWinPos, setBugWinPos] = useState({ x: 24, y: 24 });
-  const [auditWinPos, setAuditWinPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 440 : 800, y: 400 });
+  const [auditWinPos, setAuditWinPos] = useState({ x: 24, y: typeof window !== 'undefined' ? window.innerHeight - 480 : 400 });
   const [auditHoveredElements, setAuditHoveredElements] = useState<HTMLElement[]>([]);
   const [lastCopiedColor, setLastCopiedColor] = useState<string | null>(null);
   const dragRef = useRef<'code' | 'bug' | 'audit' | null>(null);
@@ -619,7 +631,31 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       }
     }
     const freshTechContext = collectTechContext(lastElement);
-    if (designAuditResult) freshTechContext.designAudit = designAuditResult;
+    if (designAuditResult) {
+      const stripped = {
+        fonts: designAuditResult.fonts.map(({value,count}) => ({value,count})),
+        fontSizes: designAuditResult.fontSizes.map(({value,count}) => ({value,count})),
+        colors: designAuditResult.colors.map(({value,count}) => ({value,count})),
+        spacings: designAuditResult.spacings.map(({value,count}) => ({value,count})),
+        borderRadii: designAuditResult.borderRadii.map(({value,count}) => ({value,count})),
+        shadows: designAuditResult.shadows.map(({value,count}) => ({value,count})),
+      };
+      freshTechContext.designAudit = stripped;
+    }
+
+    if (autoBugResults) {
+      const issues = autoBugResults.issues;
+      const hasA11y = issues.some(i => i.category === 'a11y');
+      const countVisual = issues.filter(i => i.category === 'visual').length;
+      if (hasA11y || countVisual >= 3) {
+        const severities = ['low', 'medium', 'high', 'critical'];
+        const currentIdx = severities.indexOf(freshTechContext.autoSeverity);
+        const targetIdx = severities.indexOf('medium');
+        if (currentIdx !== -1 && currentIdx < targetIdx) {
+          freshTechContext.autoSeverity = 'medium';
+        }
+      }
+    }
 
     onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(' | ') || 'Без опису', tech_context: freshTechContext });
   }, [shapes, annotations, apiKey, onSend, sending, designAuditResult]);
@@ -732,7 +768,6 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         if (e.key.toLowerCase() === 'd') { e.preventDefault(); toggleDebug('design-audit'); }
         if (e.key.toLowerCase() === 'c') { e.preventDefault(); toggleDebug('show-code'); }
         if (e.key.toLowerCase() === 'l') { e.preventDefault(); toggleDebug('zoom'); }
-        if (e.key.toLowerCase() === 't') { e.preventDefault(); toggleDebug('typography'); }
       }
     };
     window.addEventListener('keydown', handler);
@@ -817,29 +852,26 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
 
   // Live Inspector logic
   useEffect(() => {
-    if (!activeDebug.has('show-code') && !activeDebug.has('typography') || !cursor) return;
+    if (!activeDebug.has('show-code') || !cursor) return;
     const els = document.elementsFromPoint(cursor.x, cursor.y);
     const target = els.find(el => !el.closest?.('[data-buggy-bag]'));
     if (target) {
-      if (activeDebug.has('show-code')) {
-        const path: string[] = [];
-        let curr: Element | null = target;
-        while (curr && curr.tagName !== 'HTML') {
-          let sel = curr.tagName.toLowerCase();
-          if (curr.id) sel += '#' + curr.id;
-          else if (curr.className && typeof curr.className === 'string') sel += '.' + curr.className.split(' ')[0];
-          path.unshift(sel);
-          curr = curr.parentElement;
-        }
-        const breadcrumb = path.slice(-4).join(' > ');
-        const html = formatNode(target, 0, 2);
-        setHoveredCode(highlightHtml(`/* ${breadcrumb} */\n\n${html}`));
+      const path: string[] = [];
+      let curr: Element | null = target;
+      while (curr && curr.tagName !== 'HTML') {
+        let sel = curr.tagName.toLowerCase();
+        if (curr.id) sel += '#' + curr.id;
+        else if (curr.className && typeof curr.className === 'string') sel += '.' + curr.className.split(' ')[0];
+        path.unshift(sel);
+        curr = curr.parentElement;
       }
-      if (activeDebug.has('typography')) {
-        const style = window.getComputedStyle(target);
-        const typ = `Шрифт: ${style.fontFamily}\nРозмір: ${style.fontSize}\nВага: ${style.fontWeight}\nКолір: ${style.color}\nВисота рядка: ${style.lineHeight}\nLetter-spacing: ${style.letterSpacing}`;
-        setHoveredStyle(typ);
-      }
+      const breadcrumb = path.slice(-4).join(' > ');
+      const html = formatNode(target, 0, 2);
+      setHoveredCode(highlightHtml(`/* ${breadcrumb} */\n\n${html}`));
+      
+      const style = window.getComputedStyle(target);
+      const typ = `Шрифт: ${style.fontFamily}\nРозмір: ${style.fontSize}\nВага: ${style.fontWeight}\nКолір: ${style.color}\nВисота рядка: ${style.lineHeight}\nLetter-spacing: ${style.letterSpacing}\n\nDisplay: ${style.display}\nPosition: ${style.position}\nMargin: ${style.margin}\nPadding: ${style.padding}\nBorder-width: ${style.borderWidth}\nWidth/Height: ${style.width} x ${style.height}`;
+      setHoveredStyle(typ);
       setHoveredRect(target.getBoundingClientRect());
     } else {
       setHoveredRect(null);
@@ -868,10 +900,31 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     setShapes(p => [...p, shape]);
     setAnnotations(p => ({ ...p, [id]: `Аудит (${category}): ${value} використовується ${count} разів.` }));
     setPendingShape({ shape, isNew: true });
-    
-    // Close the audit window so the user can interact with the newly created pin's popup
-    toggleDebug('design-audit');
-  }, [shapes, toggleDebug]);
+  }, [shapes]);
+
+  const handleBugClick = useCallback((issue: AutoBugResult) => {
+    let x = typeof window !== 'undefined' ? window.innerWidth / 2 : 500;
+    let y = typeof window !== 'undefined' ? window.innerHeight / 2 : 500;
+
+    if (issue.element) {
+      const rect = issue.element.getBoundingClientRect();
+      x = rect.left + rect.width / 2;
+      y = rect.top + rect.height / 2;
+    }
+
+    const id = 'shape-' + Date.now();
+    const shape: DrawShape = {
+      id,
+      type: 'pin',
+      x,
+      y,
+      pinNumber: shapes.filter(s => s.type === 'pin').length + 1
+    };
+
+    setShapes(p => [...p, shape]);
+    setAnnotations(p => ({ ...p, [id]: `Авто-пошук:\n${issue.message}` }));
+    setPendingShape({ shape, isNew: true });
+  }, [shapes]);
 
   const divider = <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.12)', margin: '0 2px' }} />;
 
@@ -890,7 +943,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       `}</style>
       
       {/* DevTools Element Highlighter */}
-      {(activeDebug.has('show-code') || activeDebug.has('typography')) && hoveredRect && (
+      {activeDebug.has('show-code') && hoveredRect && (
         <div id="buggy-bag-highlighter" style={{
           position: 'fixed', top: hoveredRect.top, left: hoveredRect.left,
           width: hoveredRect.width, height: hoveredRect.height,
@@ -930,15 +983,15 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
 
 
       {/* DevTools Live Inspector window (Under Canvas) */}
-      {(activeDebug.has('show-code') || activeDebug.has('typography')) && (
+      {activeDebug.has('show-code') && (
         <div id="buggy-bag-code-window" data-buggy-bag="true" style={{
           position: 'fixed', top: codeWinPos.y + 'px', left: codeWinPos.x + 'px',
           width: '420px', maxHeight: 'calc(100vh - 48px)',
           background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(56,189,248,0.3)',
           borderRadius: '16px', padding: '0',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
-          fontFamily: 'monospace', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          zIndex: 10005,
+          fontFamily: 'monospace', overflow: 'hidden', display: pendingShape ? 'none' : 'flex', flexDirection: 'column',
+          zIndex: 10001,
         }}>
           {/* Header (Draggable) */}
           <div onMouseDown={e => startDrag(e, 'code')} style={{
@@ -946,9 +999,9 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(56,189,248,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-              Live Inspector
+              Інспектор елементів
             </div>
-            <button type="button" onClick={() => setActiveDebug(prev => { const n = new Set(prev); n.delete('show-code'); n.delete('typography'); return n; })} style={{
+            <button type="button" onClick={() => setActiveDebug(prev => { const n = new Set(prev); n.delete('show-code'); return n; })} style={{
               background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
               width: '20px', height: '20px', cursor: 'pointer', color: 'white',
               display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
@@ -960,25 +1013,22 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             </button>
           </div>
           
+          <div style={{ padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '16px' }}>
+            <button type="button" onClick={() => setInspectorTab('code')} style={{ padding: '12px 0', background: 'none', border: 'none', borderBottom: inspectorTab === 'code' ? '2px solid #38bdf8' : '2px solid transparent', color: inspectorTab === 'code' ? '#38bdf8' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>Код</button>
+            <button type="button" onClick={() => setInspectorTab('styles')} style={{ padding: '12px 0', background: 'none', border: 'none', borderBottom: inspectorTab === 'styles' ? '2px solid #38bdf8' : '2px solid transparent', color: inspectorTab === 'styles' ? '#38bdf8' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>Стилі</button>
+          </div>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
-          {activeDebug.has('show-code') && (
-            <div style={{ flex: '1 1 auto' }}>
+            {inspectorTab === 'code' && (
               <div 
                 style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '1.5' }}
                 dangerouslySetInnerHTML={{ __html: hoveredCode }} 
               />
-            </div>
-          )}
-          {activeDebug.has('typography') && (
-            <div style={{ flex: '0 0 auto' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(56,189,248,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '12px' }}>
-                Стилі
-              </div>
+            )}
+            {inspectorTab === 'styles' && (
               <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.9)', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
                 {hoveredStyle}
               </div>
-            </div>
-          )}
+            )}
           </div>
         </div>
       )}
@@ -991,8 +1041,8 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
           background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(139,92,246,0.3)',
           borderRadius: '16px', padding: '0',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
-          fontFamily: 'monospace', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          zIndex: 10005,
+          fontFamily: 'monospace', overflow: 'hidden', display: pendingShape ? 'none' : 'flex', flexDirection: 'column',
+          zIndex: 10001,
         }}>
           {/* Header (Draggable) */}
           <div onMouseDown={e => startDrag(e, 'bug')} style={{
@@ -1000,55 +1050,95 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(139,92,246,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-              Результати аналізу
+              Автопошук багів
             </div>
-            <button type="button" onClick={() => toggleDebug('auto-bugs')} style={{
-              background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
-              width: '20px', height: '20px', cursor: 'pointer', color: 'white',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.8)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button type="button" onClick={() => setAutoBugResults(runAutoBugScan())} title="Перерахувати" style={{
+                background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+                width: '20px', height: '20px', cursor: 'pointer', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.2)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.92-10.26l3.08 2.69"/></svg>
+              </button>
+              <button type="button" onClick={() => toggleDebug('auto-bugs')} style={{
+                background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+                width: '20px', height: '20px', cursor: 'pointer', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.8)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
           </div>
           
-          <div style={{ padding: '20px', fontSize: '11px', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '1.5', overflowY: 'auto' }}>
-            {['visual', 'network', 'a11y', 'other'].map(cat => {
-              const catBugs = autoBugResults.filter(b => b.category === cat);
-              const title = cat === 'visual' ? 'Візуальні баги 🎨' : cat === 'network' ? 'Мережеві помилки 🌐' : cat === 'a11y' ? 'Доступність ♿' : 'Інше 🔧';
+          <div style={{ display: 'flex', overflowX: 'auto', padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '16px' }}>
+            {(['visual', 'network', 'a11y', 'console', 'other'] as const).map(cat => {
+              const title = cat === 'visual' ? 'Візуальні 🎨' : cat === 'network' ? 'Мережеві 🌐' : cat === 'a11y' ? 'Доступність ♿' : cat === 'console' ? 'Консоль 🖥' : 'HTML 🏗';
+              const count = autoBugResults.categoryCounts[cat] || 0;
+              const isActive = autoBugTab === cat;
               return (
-                <div key={cat} style={{ marginBottom: '16px' }}>
-                  <div style={{ fontWeight: 'bold', color: 'rgba(255,255,255,0.9)', marginBottom: '8px' }}>{title}</div>
+                <button key={cat} type="button" onClick={() => setAutoBugTab(cat)} style={{ padding: '12px 0', background: 'none', border: 'none', borderBottom: isActive ? '2px solid #8b5cf6' : '2px solid transparent', color: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {title} {count > 0 && <span style={{ background: isActive ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '10px', fontSize: '9px' }}>{count}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ padding: '20px', fontSize: '11px', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: '1.5', overflowY: 'auto' }}>
+            {(() => {
+              const catBugs = autoBugResults.issues.filter(b => b.category === autoBugTab);
+              const totalCount = autoBugResults.categoryCounts[autoBugTab] || 0;
+              const hiddenCount = totalCount - catBugs.length;
+              return (
+                <div>
                   {catBugs.length > 0 
-                    ? catBugs.map((b, i) => <div key={i} style={{ marginBottom: '4px' }}>{b.message}</div>)
+                    ? (
+                      <>
+                        {catBugs.map((b, i) => (
+                          <div 
+                            key={i} 
+                            onClick={() => handleBugClick(b)} 
+                            style={{ 
+                              marginBottom: '8px', cursor: 'pointer', textDecoration: 'underline',
+                              color: 'rgba(255,255,255,0.8)', padding: '2px 0'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
+                          >
+                            {b.message}
+                          </div>
+                        ))}
+                        {hiddenCount > 0 && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', marginTop: '4px' }}>...і ще {hiddenCount} подібних</div>}
+                        
+                        <button 
+                          onClick={() => {
+                            const text = catBugs.map(b => b.message).join(' | ');
+                            const id = 'shape-' + Date.now();
+                            setShapes(prev => [...prev, { id, type: 'pin', x: window.innerWidth/2, y: window.innerHeight/2, pinNumber: prev.filter(s=>s.type==='pin').length + 1 }]);
+                            setAnnotations(prev => ({ ...prev, [id]: `Авто-пошук (${autoBugTab}):\n` + text }));
+                            toggleDebug('auto-bugs');
+                          }}
+                          style={{ 
+                            marginTop: '16px', background: '#ffffff', color: '#18181b', border: 'none', 
+                            padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', 
+                            width: '100%', fontWeight: 'bold', transition: 'background 0.2s' 
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#e5e7eb')}
+                          onMouseLeave={e => (e.currentTarget.style.background = '#ffffff')}
+                        >
+                          Додати все
+                        </button>
+                      </>
+                    )
                     : <div style={{ color: '#10b981' }}>Відсутні</div>
                   }
                 </div>
               );
-            })}
-            
-            {autoBugResults.length > 0 && (
-              <button 
-                onClick={() => {
-                  const text = autoBugResults.map(b => b.message).join(' | ');
-                  const id = 'shape-' + Date.now();
-                  setShapes(prev => [...prev, { id, type: 'pin', x: window.innerWidth/2, y: window.innerHeight/2, pinNumber: prev.filter(s=>s.type==='pin').length + 1 }]);
-                  setAnnotations(prev => ({ ...prev, [id]: 'Авто-пошук:\n' + text }));
-                  toggleDebug('auto-bugs');
-                }}
-                style={{ 
-                  marginTop: '16px', background: '#8b5cf6', color: 'white', border: 'none', 
-                  padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', 
-                  width: '100%', fontWeight: 'bold', transition: 'background 0.2s' 
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#7c3aed')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#8b5cf6')}
-              >
-                Додати в звіт
-              </button>
-            )}
+            })()}
           </div>
         </div>
       )}
@@ -1061,7 +1151,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
           background: 'rgba(22,22,26,0.75)', border: '1px solid rgba(16,185,129,0.3)',
           borderRadius: '16px', padding: '0',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
-          fontFamily: 'monospace', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          fontFamily: 'monospace', overflow: 'hidden', display: pendingShape ? 'none' : 'flex', flexDirection: 'column',
           zIndex: 10005,
         }}>
           {/* Header */}
@@ -1072,78 +1162,78 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(16,185,129,0.9)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
               Дизайн-аудит
             </div>
-            <button type="button" onClick={() => toggleDebug('design-audit')} style={{
-              background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
-              width: '20px', height: '20px', cursor: 'pointer', color: 'white',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.8)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button type="button" onClick={() => setDesignAuditResult(runDesignAudit())} title="Перерахувати" style={{
+                background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+                width: '20px', height: '20px', cursor: 'pointer', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.2)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.92-10.26l3.08 2.69"/></svg>
+              </button>
+              <button type="button" onClick={() => toggleDebug('design-audit')} style={{
+                background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+                width: '20px', height: '20px', cursor: 'pointer', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.8)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
           </div>
           
+          <div style={{ display: 'flex', overflowX: 'auto', padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '16px' }}>
+            {([
+              { id: 'fonts', label: 'Шрифти', data: designAuditResult.fonts },
+              { id: 'fontSizes', label: 'Розміри шрифтів', data: designAuditResult.fontSizes },
+              { id: 'colors', label: 'Кольори', data: designAuditResult.colors },
+              { id: 'spacings', label: 'Відступи', data: designAuditResult.spacings },
+              { id: 'borderRadii', label: 'Border-radius', data: designAuditResult.borderRadii },
+              { id: 'shadows', label: 'Тіні', data: designAuditResult.shadows }
+            ] as const).map(tab => (
+              <button key={tab.id} type="button" onClick={() => setAuditTab(tab.id)} style={{ padding: '12px 0', background: 'none', border: 'none', borderBottom: auditTab === tab.id ? '2px solid #10b981' : '2px solid transparent', color: auditTab === tab.id ? '#10b981' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {tab.label} <span style={{ background: auditTab === tab.id ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '10px', fontSize: '9px' }}>{tab.data.length}</span>
+              </button>
+            ))}
+          </div>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
             {(designAuditResult.fonts.length > 8 || designAuditResult.colors.length > 20 || designAuditResult.spacings.length > 15) && (
               <div style={{ padding: '10px', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', color: '#fbbf24', fontSize: '11px', lineHeight: '1.4' }}>
                 ⚠️ Забагато значень! Рекомендуємо звести до дизайн-системи.
               </div>
             )}
-            
             <div onMouseLeave={() => setAuditHoveredElements([])}>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Шрифти ({designAuditResult.fonts.length})</span>
-                <span style={{ color: designAuditResult.fonts.length > 5 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 5</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {designAuditResult.fonts.map((f, i) => <div key={i} onClick={() => handleAuditClick('Шрифт', f.value, f.count, f.elements)} onMouseEnter={() => setAuditHoveredElements(f.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{f.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{f.count}</span></div>)}
-              </div>
-            </div>
-
-            <div onMouseLeave={() => setAuditHoveredElements([])}>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Розміри шрифтів ({designAuditResult.fontSizes.length})</span>
-                <span style={{ color: designAuditResult.fontSizes.length > 8 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 8</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {designAuditResult.fontSizes.map((f, i) => <div key={i} onClick={() => handleAuditClick('Розмір шрифту', f.value, f.count, f.elements)} onMouseEnter={() => setAuditHoveredElements(f.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{f.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{f.count}</span></div>)}
-              </div>
-            </div>
-
-            <div onMouseLeave={() => setAuditHoveredElements([])}>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Кольори ({designAuditResult.colors.length})</span>
-                <span style={{ color: designAuditResult.colors.length > 15 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 15</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {designAuditResult.colors.map((c, i) => (
-                  <div key={i} onClick={() => handleAuditClick('Колір', c.value, c.count, c.elements)} onMouseEnter={() => setAuditHoveredElements(c.elements || [])} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '2px 6px 2px 4px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: c.value, border: '1px solid rgba(255,255,255,0.1)' }} />
-                    <span>{c.value}</span> <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{c.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div onMouseLeave={() => setAuditHoveredElements([])}>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Відступи ({designAuditResult.spacings.length})</span>
-                <span style={{ color: designAuditResult.spacings.length > 10 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 10</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {designAuditResult.spacings.map((s, i) => <div key={i} onClick={() => handleAuditClick('Відступ', s.value, s.count, s.elements)} onMouseEnter={() => setAuditHoveredElements(s.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{s.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{s.count}</span></div>)}
-              </div>
-            </div>
-
-            <div onMouseLeave={() => setAuditHoveredElements([])}>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Border-radius ({designAuditResult.borderRadii.length})</span>
-                <span style={{ color: designAuditResult.borderRadii.length > 5 ? '#fbbf24' : '#10b981' }}>Рекомендовано: до 5</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {designAuditResult.borderRadii.map((b, i) => <div key={i} onClick={() => handleAuditClick('Border-radius', b.value, b.count, b.elements)} onMouseEnter={() => setAuditHoveredElements(b.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{b.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{b.count}</span></div>)}
-              </div>
+              {(() => {
+                const tabsConfig = [
+                  { id: 'fonts', label: 'Шрифти', data: designAuditResult.fonts, limit: 5, render: (f: any, i: number) => <div key={i} onClick={() => handleAuditClick('Шрифт', f.value, f.count, f.elements)} onMouseEnter={() => setAuditHoveredElements(f.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{f.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{f.count}</span></div> },
+                  { id: 'fontSizes', label: 'Розміри шрифтів', data: designAuditResult.fontSizes, limit: 8, render: (f: any, i: number) => <div key={i} onClick={() => handleAuditClick('Розмір шрифту', f.value, f.count, f.elements)} onMouseEnter={() => setAuditHoveredElements(f.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{f.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{f.count}</span></div> },
+                  { id: 'colors', label: 'Кольори', data: designAuditResult.colors, limit: 15, render: (c: any, i: number) => (
+                    <div key={i} onClick={() => handleAuditClick('Колір', c.value, c.count, c.elements)} onMouseEnter={() => setAuditHoveredElements(c.elements || [])} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '2px 6px 2px 4px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: c.value, border: '1px solid rgba(255,255,255,0.1)' }} />
+                      <span>{c.value}</span> <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{c.count}</span>
+                    </div>
+                  ) },
+                  { id: 'spacings', label: 'Відступи', data: designAuditResult.spacings, limit: 10, render: (s: any, i: number) => <div key={i} onClick={() => handleAuditClick('Відступ', s.value, s.count, s.elements)} onMouseEnter={() => setAuditHoveredElements(s.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{s.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{s.count}</span></div> },
+                  { id: 'borderRadii', label: 'Border-radius', data: designAuditResult.borderRadii, limit: 5, render: (b: any, i: number) => <div key={i} onClick={() => handleAuditClick('Border-radius', b.value, b.count, b.elements)} onMouseEnter={() => setAuditHoveredElements(b.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{b.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{b.count}</span></div> },
+                  { id: 'shadows', label: 'Тіні', data: designAuditResult.shadows, limit: 5, render: (s: any, i: number) => <div key={i} onClick={() => handleAuditClick('Тінь', s.value, s.count, s.elements)} onMouseEnter={() => setAuditHoveredElements(s.elements || [])} style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#e5e7eb', cursor: 'pointer' }}>{s.value} <span style={{ color: 'rgba(255,255,255,0.3)' }}>×{s.count}</span></div> }
+                ];
+                const activeCfg = tabsConfig.find(t => t.id === auditTab) || tabsConfig[0];
+                return (
+                  <>
+                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{activeCfg.label} ({activeCfg.data.length})</span>
+                      <span style={{ color: activeCfg.data.length > activeCfg.limit ? '#fbbf24' : '#10b981' }}>Рекомендовано: до {activeCfg.limit}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {activeCfg.data.map(activeCfg.render)}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1269,43 +1359,16 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
                 display: 'flex', flexDirection: 'column', gap: '2px',
                 zIndex: 10003,
               }}>
-                {/* ── Debug tools section ── */}
-                <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 8px 4px' }}>Debug</div>
-
+                {/* ── Інспектор ── */}
+                <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 8px 4px' }}>Інспектор</div>
                 {([
                   {
-                    id: 'invert' as DebugOverlay, label: 'Інверт кольорів',
-                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20z"/></svg>,
-                    hotkey: 'Alt+I'
-                  },
-                  {
-                    id: 'spacing' as DebugOverlay, label: 'Spacing overlay',
-                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 6H3"/><path d="M21 18H3"/><path d="M3 6v12"/><path d="M21 6v12"/></svg>,
-                    hotkey: 'Alt+S'
-                  },
-                  {
-                    id: 'auto-bugs' as DebugOverlay, label: 'Автопошук багів',
-                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2l1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg>,
-                    hotkey: 'Alt+A'
-                  },
-                  {
-                    id: 'show-code' as DebugOverlay, label: 'Показати код',
+                    id: 'show-code' as DebugOverlay, label: 'Інспектор елементів',
                     icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
                     hotkey: 'Alt+C'
-                  },
-
-                  {
-                    id: 'typography' as DebugOverlay, label: 'Шрифти',
-                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>,
-                    hotkey: 'Alt+T'
-                  },
-                  {
-                    id: 'design-audit' as DebugOverlay, label: 'Дизайн-аудит',
-                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
-                    hotkey: 'Alt+D'
-                  },
+                  }
                 ] as const).map(({ id, label, icon, hotkey }) => (
-                  <button key={id} type="button" onClick={() => toggleDebug(id)} style={{
+                  <button key={id} type="button" aria-label={label} onClick={() => toggleDebug(id)} style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
                     padding: '7px 10px', borderRadius: '8px',
                     background: activeDebug.has(id) ? 'rgba(255,255,255,0.07)' : 'transparent',
@@ -1317,7 +1380,88 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
                     <span>{label}</span>
                     <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <kbd style={{ fontSize: '9px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', padding: '1px 4px', flexShrink: 0 }}>{hotkey}</kbd>
-                      {/* Toggle switch */}
+                      <span style={{
+                        width: '28px', height: '16px', borderRadius: '8px',
+                        background: activeDebug.has(id) ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.12)',
+                        position: 'relative', display: 'inline-block', transition: 'background 0.2s', flexShrink: 0,
+                      }}>
+                        <span style={{
+                          position: 'absolute', top: '2px', left: activeDebug.has(id) ? '14px' : '2px',
+                          width: '12px', height: '12px', borderRadius: '50%', background: 'white',
+                          transition: 'left 0.2s', display: 'block',
+                        }} />
+                      </span>
+                    </span>
+                  </button>
+                ))}
+
+                {/* ── Аналіз ── */}
+                <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '8px 8px 4px' }}>Аналіз</div>
+                {([
+                  {
+                    id: 'auto-bugs' as DebugOverlay, label: 'Автопошук багів',
+                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2l1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg>,
+                    hotkey: 'Alt+A'
+                  },
+                  {
+                    id: 'design-audit' as DebugOverlay, label: 'Дизайн-аудит',
+                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
+                    hotkey: 'Alt+D'
+                  }
+                ] as const).map(({ id, label, icon, hotkey }) => (
+                  <button key={id} type="button" aria-label={label} onClick={() => toggleDebug(id)} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '7px 10px', borderRadius: '8px',
+                    background: activeDebug.has(id) ? 'rgba(255,255,255,0.07)' : 'transparent',
+                    border: 'none', cursor: 'pointer',
+                    color: activeDebug.has(id) ? 'white' : 'rgba(255,255,255,0.65)',
+                    fontSize: '12px', fontWeight: '500', textAlign: 'left', width: '100%', transition: 'all 0.1s',
+                  }}>
+                    {icon}
+                    <span>{label}</span>
+                    <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <kbd style={{ fontSize: '9px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', padding: '1px 4px', flexShrink: 0 }}>{hotkey}</kbd>
+                      <span style={{
+                        width: '28px', height: '16px', borderRadius: '8px',
+                        background: activeDebug.has(id) ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.12)',
+                        position: 'relative', display: 'inline-block', transition: 'background 0.2s', flexShrink: 0,
+                      }}>
+                        <span style={{
+                          position: 'absolute', top: '2px', left: activeDebug.has(id) ? '14px' : '2px',
+                          width: '12px', height: '12px', borderRadius: '50%', background: 'white',
+                          transition: 'left 0.2s', display: 'block',
+                        }} />
+                      </span>
+                    </span>
+                  </button>
+                ))}
+
+                {/* ── Огляд сторінки ── */}
+                <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '8px 8px 4px' }}>Огляд сторінки</div>
+                {([
+                  {
+                    id: 'invert' as DebugOverlay, label: 'Інверт кольорів',
+                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20z"/></svg>,
+                    hotkey: 'Alt+I'
+                  },
+                  {
+                    id: 'spacing' as DebugOverlay, label: 'Контур елементів',
+                    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 6H3"/><path d="M21 18H3"/><path d="M3 6v12"/><path d="M21 6v12"/></svg>,
+                    hotkey: 'Alt+S'
+                  }
+                ] as const).map(({ id, label, icon, hotkey }) => (
+                  <button key={id} type="button" aria-label={label} onClick={() => toggleDebug(id)} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '7px 10px', borderRadius: '8px',
+                    background: activeDebug.has(id) ? 'rgba(255,255,255,0.07)' : 'transparent',
+                    border: 'none', cursor: 'pointer',
+                    color: activeDebug.has(id) ? 'white' : 'rgba(255,255,255,0.65)',
+                    fontSize: '12px', fontWeight: '500', textAlign: 'left', width: '100%', transition: 'all 0.1s',
+                  }}>
+                    {icon}
+                    <span>{label}</span>
+                    <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <kbd style={{ fontSize: '9px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', padding: '1px 4px', flexShrink: 0 }}>{hotkey}</kbd>
                       <span style={{
                         width: '28px', height: '16px', borderRadius: '8px',
                         background: activeDebug.has(id) ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.12)',

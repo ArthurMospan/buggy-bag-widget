@@ -1,6 +1,6 @@
 export type DrawTool = 'rect' | 'arrow' | 'pin' | 'measure' | 'eraser';
 export type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type DebugOverlay = 'invert' | 'spacing' | 'show-code' | 'zoom' | 'auto-bugs' | 'typography' | 'design-audit';
+export type DebugOverlay = 'invert' | 'spacing' | 'show-code' | 'zoom' | 'auto-bugs' | 'design-audit';
 
 /**
  * DOM context captured when a pin is placed on a specific element.
@@ -83,8 +83,9 @@ export interface ComponentInfo {
 }
 
 export interface AutoBugResult {
-  category: 'network' | 'visual' | 'a11y' | 'other';
+  category: 'network' | 'visual' | 'a11y' | 'console' | 'other';
   message: string;
+  element?: HTMLElement;
 }
 
 export interface DesignAuditResult {
@@ -93,6 +94,7 @@ export interface DesignAuditResult {
   colors: { value: string; count: number; elements?: HTMLElement[] }[];
   spacings: { value: string; count: number; elements?: HTMLElement[] }[];
   borderRadii: { value: string; count: number; elements?: HTMLElement[] }[];
+  shadows: { value: string; count: number; elements?: HTMLElement[] }[];
 }
 
 export interface TechContext {

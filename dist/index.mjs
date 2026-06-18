@@ -30091,6 +30091,7 @@ function ToolBtn({ active, onClick, title, hotkey, children }) {
       type: "button",
       onClick,
       title: hotkey ? `${title} (${hotkey})` : title,
+      "aria-label": title,
       style: {
         width: "34px",
         height: "34px",
@@ -30167,16 +30168,18 @@ function parseRgb(str) {
 }
 function runAutoBugScan() {
   const issues = [];
-  let counts = {};
-  const addIssue = (cat, type, msg) => {
+  const counts = {};
+  const categoryCounts = {};
+  const addIssue = (cat, type, msg, element) => {
     counts[cat] = (counts[cat] || 0) + 1;
-    if (counts[cat] <= 5) issues.push({ category: type, message: msg });
+    categoryCounts[type] = (categoryCounts[type] || 0) + 1;
+    if (type === "network" || counts[cat] <= 5) issues.push({ category: type, message: msg, element });
   };
   document.querySelectorAll("img").forEach((img, i) => {
     if (img.dataset?.buggyBag) return;
-    if (img.naturalWidth === 0 && img.complete) addIssue("broken-img", "visual", `\u{1F5BC} \u0411\u0438\u0442\u0435 \u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F: ${img.src.slice(0, 60)}`);
-    if (!img.hasAttribute("width") && !img.hasAttribute("height")) addIssue("missing-dims", "visual", `\u{1F4D0} \u0417\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0431\u0435\u0437 width/height: ${img.src.slice(0, 40)}`);
-    if (!img.hasAttribute("alt")) addIssue("missing-alt", "a11y", `\u267F \u0417\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0431\u0435\u0437 alt: ${img.src.slice(0, 40)}`);
+    if (img.naturalWidth === 0 && img.complete) addIssue("broken-img", "visual", `\u{1F5BC} \u0411\u0438\u0442\u0435 \u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F: ${img.src.slice(0, 60)}`, img);
+    if (!img.hasAttribute("width") && !img.hasAttribute("height")) addIssue("missing-dims", "visual", `\u{1F4D0} \u0417\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0431\u0435\u0437 width/height: ${img.src.slice(0, 40)}`, img);
+    if (!img.hasAttribute("alt")) addIssue("missing-alt", "a11y", `\u267F \u0417\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0431\u0435\u0437 alt: ${img.src.slice(0, 40)}`, img);
   });
   const ids = /* @__PURE__ */ new Map();
   document.querySelectorAll("*").forEach((el) => {
@@ -30186,38 +30189,38 @@ function runAutoBugScan() {
     const label = `<${tag}${cls ? ` class="${cls}"` : ""}>`;
     if (el.id) {
       ids.set(el.id, (ids.get(el.id) || 0) + 1);
-      if (ids.get(el.id) === 2) addIssue("duplicate-id", "other", `\u{1F194} \u0414\u0443\u0431\u043B\u0456\u043A\u0430\u0442 ID: #${el.id}`);
+      if (ids.get(el.id) === 2) addIssue("duplicate-id", "other", `\u{1F194} \u0414\u0443\u0431\u043B\u0456\u043A\u0430\u0442 ID: #${el.id}`, el);
     }
     const s = window.getComputedStyle(el);
     const rect = el.getBoundingClientRect();
     if (s.overflow === "hidden" || s.overflowX === "hidden" || s.overflowY === "hidden") {
       if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) {
-        addIssue("overflow", "visual", `\u{1F4CF} Overflow hidden \u0437\u0456 \u0441\u043A\u0440\u043E\u043B\u043E\u043C: ${label}`);
+        addIssue("overflow", "visual", `\u{1F4CF} Overflow hidden \u0437\u0456 \u0441\u043A\u0440\u043E\u043B\u043E\u043C: ${label}`, el);
       }
     }
     if ((s.whiteSpace === "nowrap" || s.textOverflow === "ellipsis") && el.scrollWidth > el.clientWidth + 2) {
-      addIssue("truncated-text", "visual", `\u2702 \u0422\u0435\u043A\u0441\u0442 \u043E\u0431\u0440\u0456\u0437\u0430\u0454\u0442\u044C\u0441\u044F: ${label}`);
+      addIssue("truncated-text", "visual", `\u2702 \u0422\u0435\u043A\u0441\u0442 \u043E\u0431\u0440\u0456\u0437\u0430\u0454\u0442\u044C\u0441\u044F: ${label}`, el);
     }
     if (rect.right > window.innerWidth + 5 && rect.width > 0) {
-      addIssue("out-of-bounds", "visual", `\u2194 \u0415\u043B\u0435\u043C\u0435\u043D\u0442 \u0432\u0438\u0445\u043E\u0434\u0438\u0442\u044C \u0437\u0430 \u043C\u0435\u0436\u0456 \u0435\u043A\u0440\u0430\u043D\u0443 \u043F\u043E \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u0430\u043B\u0456: ${label}`);
+      addIssue("out-of-bounds", "visual", `\u2194 \u0415\u043B\u0435\u043C\u0435\u043D\u0442 \u0432\u0438\u0445\u043E\u0434\u0438\u0442\u044C \u0437\u0430 \u043C\u0435\u0436\u0456 \u0435\u043A\u0440\u0430\u043D\u0443 \u043F\u043E \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u0430\u043B\u0456: ${label}`, el);
     }
     if (tag === "a" || tag === "button" || el.hasAttribute("onclick") || el.getAttribute("role") === "button") {
       if (rect.width > 0 && rect.height > 0 && (rect.width < 24 || rect.height < 24)) {
-        addIssue("small-tap", "a11y", `\u{1F446} \u0417\u0430\u043C\u0430\u043B\u0430 \u043A\u043B\u0456\u043A\u0430\u0431\u0435\u043B\u044C\u043D\u0430 \u0437\u043E\u043D\u0430 (${Math.round(rect.width)}x${Math.round(rect.height)}): ${label}`);
+        addIssue("small-tap", "a11y", `\u{1F446} \u0417\u0430\u043C\u0430\u043B\u0430 \u043A\u043B\u0456\u043A\u0430\u0431\u0435\u043B\u044C\u043D\u0430 \u0437\u043E\u043D\u0430 (${Math.round(rect.width)}x${Math.round(rect.height)}): ${label}`, el);
       }
       if (tag === "a" || tag === "button" || el.getAttribute("role") === "button") {
         const text = el.textContent?.trim() || "";
         const hasGraphics = el.querySelector("img, svg");
         const hasAria = el.getAttribute("aria-label") || el.getAttribute("aria-labelledby");
         if (!text && !hasGraphics && !hasAria) {
-          addIssue("empty-btn", "a11y", `\u{1F47B} \u041F\u043E\u0440\u043E\u0436\u043D\u0456\u0439 \u043A\u043B\u0456\u043A\u0430\u0431\u0435\u043B\u044C\u043D\u0438\u0439 \u0435\u043B\u0435\u043C\u0435\u043D\u0442 (\u0431\u0435\u0437 \u0442\u0435\u043A\u0441\u0442\u0443/\u0456\u043A\u043E\u043D\u043E\u043A/aria): ${label}`);
+          addIssue("empty-btn", "a11y", `\u{1F47B} \u041F\u043E\u0440\u043E\u0436\u043D\u0456\u0439 \u043A\u043B\u0456\u043A\u0430\u0431\u0435\u043B\u044C\u043D\u0438\u0439 \u0435\u043B\u0435\u043C\u0435\u043D\u0442 (\u0431\u0435\u0437 \u0442\u0435\u043A\u0441\u0442\u0443/\u0456\u043A\u043E\u043D\u043E\u043A/aria): ${label}`, el);
         }
       }
     }
     if (tag === "a") {
       const href = el.getAttribute("href");
       if (href === "#" || href === "javascript:void(0)" || href === "") {
-        addIssue("broken-link", "other", `\u{1F517} \u041F\u0443\u0441\u0442\u0435/\u0437\u0430\u0433\u043B\u0443\u0448\u043A\u043E\u0432\u0435 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F: ${label}`);
+        addIssue("broken-link", "other", `\u{1F517} \u041F\u0443\u0441\u0442\u0435/\u0437\u0430\u0433\u043B\u0443\u0448\u043A\u043E\u0432\u0435 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F: ${label}`, el);
       }
     }
     if (["input", "textarea", "select"].includes(tag)) {
@@ -30227,7 +30230,7 @@ function runAutoBugScan() {
         const hasIdLabel = el.id ? document.querySelector(`label[for="${el.id}"]`) : null;
         const insideLabel = el.closest("label");
         if (!hasAria && !hasIdLabel && !insideLabel) {
-          addIssue("missing-label", "a11y", `\u{1F4DD} Form input \u0431\u0435\u0437 label/aria-label: ${label}`);
+          addIssue("missing-label", "a11y", `\u{1F4DD} Form input \u0431\u0435\u0437 label/aria-label: ${label}`, el);
         }
       }
     }
@@ -30249,14 +30252,14 @@ function runAutoBugScan() {
         const isLarge = parseInt(s.fontSize) >= 18 || parseInt(s.fontSize) >= 14 && parseInt(s.fontWeight) >= 700;
         const req = isLarge ? 3 : 4.5;
         if (contrast < req) {
-          addIssue("contrast", "visual", `\u{1F3A8} \u041F\u043E\u0433\u0430\u043D\u0438\u0439 \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442 \u0442\u0435\u043A\u0441\u0442\u0443 (${contrast.toFixed(1)}:1 < ${req}:1): ${label}`);
+          addIssue("contrast", "visual", `\u{1F3A8} \u041D\u0438\u0437\u044C\u043A\u0438\u0439 \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442 (${contrast.toFixed(1)}:1, \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u043E ${req}:1): \u0442\u0435\u043A\u0441\u0442 ${s.color} \u043D\u0430 \u0444\u043E\u043D\u0456 ${bgStr || "rgb(255, 255, 255)"}`, el);
         }
       }
     }
     if (window.location.protocol === "https:") {
       const src = el.getAttribute("src") || el.getAttribute("href") || "";
       if (src.startsWith("http://")) {
-        addIssue("mixed-content", "network", `\u{1F513} Mixed content (HTTP \u043D\u0430 HTTPS): ${label}`);
+        addIssue("mixed-content", "network", `\u{1F513} Mixed content (HTTP \u043D\u0430 HTTPS): ${label}`, el);
       }
     }
   });
@@ -30264,7 +30267,7 @@ function runAutoBugScan() {
     const ctx = window.__BUGGY_BAG_CONTEXT__;
     if (ctx?.consoleErrors?.length) {
       ctx.consoleErrors.forEach((e) => {
-        addIssue(e.level === "warn" ? "console-warn" : "console-error", "other", `${e.level === "warn" ? "\u26A0\uFE0F" : "\u274C"} Console ${e.level}: ${String(e.message).slice(0, 80)}`);
+        addIssue(e.level === "warn" ? "console-warn" : "console-error", "console", `${e.level === "warn" ? "\u26A0\uFE0F" : "\u274C"} Console ${e.level}: ${String(e.message).slice(0, 80)}`);
       });
     }
     if (ctx?.networkRequests?.length) {
@@ -30276,7 +30279,7 @@ function runAutoBugScan() {
     }
   } catch {
   }
-  return issues;
+  return { issues, categoryCounts };
 }
 function runDesignAudit() {
   const fonts = /* @__PURE__ */ new Map();
@@ -30284,6 +30287,7 @@ function runDesignAudit() {
   const colors = /* @__PURE__ */ new Map();
   const spacings = /* @__PURE__ */ new Map();
   const borderRadii = /* @__PURE__ */ new Map();
+  const shadows = /* @__PURE__ */ new Map();
   const normalizeColor = (str) => str.replace(/\s+/g, "").toLowerCase();
   const addMetric = (map, key, el) => {
     if (!map.has(key)) map.set(key, { count: 0, elements: [] });
@@ -30322,6 +30326,9 @@ function runDesignAudit() {
     if (s.borderRadius && s.borderRadius !== "0px") {
       addMetric(borderRadii, s.borderRadius, htmlEl);
     }
+    if (s.boxShadow && s.boxShadow !== "none") {
+      addMetric(shadows, s.boxShadow, htmlEl);
+    }
   });
   const sortAndLimit = (map) => {
     return Array.from(map.entries()).sort((a, b) => b[1].count - a[1].count).slice(0, 20).map(([value, item]) => ({ value, count: item.count, elements: item.elements }));
@@ -30331,7 +30338,8 @@ function runDesignAudit() {
     fontSizes: sortAndLimit(fontSizes),
     colors: sortAndLimit(colors),
     spacings: sortAndLimit(spacings),
-    borderRadii: sortAndLimit(borderRadii)
+    borderRadii: sortAndLimit(borderRadii),
+    shadows: sortAndLimit(shadows)
   };
 }
 var _zoomActive = false;
@@ -30425,9 +30433,12 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const [hoveredCode, setHoveredCode] = useState4("");
   const [hoveredStyle, setHoveredStyle] = useState4("");
   const [hoveredRect, setHoveredRect] = useState4(null);
+  const [inspectorTab, setInspectorTab] = useState4("code");
+  const [auditTab, setAuditTab] = useState4("fonts");
+  const [autoBugTab, setAutoBugTab] = useState4("visual");
   const [codeWinPos, setCodeWinPos] = useState4({ x: typeof window !== "undefined" ? window.innerWidth - 440 : 800, y: 24 });
   const [bugWinPos, setBugWinPos] = useState4({ x: 24, y: 24 });
-  const [auditWinPos, setAuditWinPos] = useState4({ x: typeof window !== "undefined" ? window.innerWidth - 440 : 800, y: 400 });
+  const [auditWinPos, setAuditWinPos] = useState4({ x: 24, y: typeof window !== "undefined" ? window.innerHeight - 480 : 400 });
   const [auditHoveredElements, setAuditHoveredElements] = useState4([]);
   const [lastCopiedColor, setLastCopiedColor] = useState4(null);
   const dragRef = useRef4(null);
@@ -30632,7 +30643,30 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
       }
     }
     const freshTechContext = collectTechContext(lastElement);
-    if (designAuditResult) freshTechContext.designAudit = designAuditResult;
+    if (designAuditResult) {
+      const stripped = {
+        fonts: designAuditResult.fonts.map(({ value, count }) => ({ value, count })),
+        fontSizes: designAuditResult.fontSizes.map(({ value, count }) => ({ value, count })),
+        colors: designAuditResult.colors.map(({ value, count }) => ({ value, count })),
+        spacings: designAuditResult.spacings.map(({ value, count }) => ({ value, count })),
+        borderRadii: designAuditResult.borderRadii.map(({ value, count }) => ({ value, count })),
+        shadows: designAuditResult.shadows.map(({ value, count }) => ({ value, count }))
+      };
+      freshTechContext.designAudit = stripped;
+    }
+    if (autoBugResults) {
+      const issues = autoBugResults.issues;
+      const hasA11y = issues.some((i) => i.category === "a11y");
+      const countVisual = issues.filter((i) => i.category === "visual").length;
+      if (hasA11y || countVisual >= 3) {
+        const severities = ["low", "medium", "high", "critical"];
+        const currentIdx = severities.indexOf(freshTechContext.autoSeverity);
+        const targetIdx = severities.indexOf("medium");
+        if (currentIdx !== -1 && currentIdx < targetIdx) {
+          freshTechContext.autoSeverity = "medium";
+        }
+      }
+    }
     onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443", tech_context: freshTechContext });
   }, [shapes, annotations, apiKey, onSend, sending, designAuditResult]);
   const handleCloseRequest = useCallback2(() => {
@@ -30779,10 +30813,6 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
           e.preventDefault();
           toggleDebug("zoom");
         }
-        if (e.key.toLowerCase() === "t") {
-          e.preventDefault();
-          toggleDebug("typography");
-        }
       }
     };
     window.addEventListener("keydown", handler);
@@ -30854,36 +30884,39 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
     }).replace(/(\/\*.*?\*\/)/g, '<span style="color:#616e88">$1</span>');
   };
   useEffect4(() => {
-    if (!activeDebug.has("show-code") && !activeDebug.has("typography") || !cursor) return;
+    if (!activeDebug.has("show-code") || !cursor) return;
     const els = document.elementsFromPoint(cursor.x, cursor.y);
     const target = els.find((el) => !el.closest?.("[data-buggy-bag]"));
     if (target) {
-      if (activeDebug.has("show-code")) {
-        const path = [];
-        let curr = target;
-        while (curr && curr.tagName !== "HTML") {
-          let sel = curr.tagName.toLowerCase();
-          if (curr.id) sel += "#" + curr.id;
-          else if (curr.className && typeof curr.className === "string") sel += "." + curr.className.split(" ")[0];
-          path.unshift(sel);
-          curr = curr.parentElement;
-        }
-        const breadcrumb = path.slice(-4).join(" > ");
-        const html = formatNode(target, 0, 2);
-        setHoveredCode(highlightHtml(`/* ${breadcrumb} */
+      const path = [];
+      let curr = target;
+      while (curr && curr.tagName !== "HTML") {
+        let sel = curr.tagName.toLowerCase();
+        if (curr.id) sel += "#" + curr.id;
+        else if (curr.className && typeof curr.className === "string") sel += "." + curr.className.split(" ")[0];
+        path.unshift(sel);
+        curr = curr.parentElement;
+      }
+      const breadcrumb = path.slice(-4).join(" > ");
+      const html = formatNode(target, 0, 2);
+      setHoveredCode(highlightHtml(`/* ${breadcrumb} */
 
 ${html}`));
-      }
-      if (activeDebug.has("typography")) {
-        const style = window.getComputedStyle(target);
-        const typ = `\u0428\u0440\u0438\u0444\u0442: ${style.fontFamily}
+      const style = window.getComputedStyle(target);
+      const typ = `\u0428\u0440\u0438\u0444\u0442: ${style.fontFamily}
 \u0420\u043E\u0437\u043C\u0456\u0440: ${style.fontSize}
 \u0412\u0430\u0433\u0430: ${style.fontWeight}
 \u041A\u043E\u043B\u0456\u0440: ${style.color}
 \u0412\u0438\u0441\u043E\u0442\u0430 \u0440\u044F\u0434\u043A\u0430: ${style.lineHeight}
-Letter-spacing: ${style.letterSpacing}`;
-        setHoveredStyle(typ);
-      }
+Letter-spacing: ${style.letterSpacing}
+
+Display: ${style.display}
+Position: ${style.position}
+Margin: ${style.margin}
+Padding: ${style.padding}
+Border-width: ${style.borderWidth}
+Width/Height: ${style.width} x ${style.height}`;
+      setHoveredStyle(typ);
       setHoveredRect(target.getBoundingClientRect());
     } else {
       setHoveredRect(null);
@@ -30908,8 +30941,28 @@ Letter-spacing: ${style.letterSpacing}`;
     setShapes((p) => [...p, shape]);
     setAnnotations((p) => ({ ...p, [id]: `\u0410\u0443\u0434\u0438\u0442 (${category}): ${value} \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F ${count} \u0440\u0430\u0437\u0456\u0432.` }));
     setPendingShape({ shape, isNew: true });
-    toggleDebug("design-audit");
-  }, [shapes, toggleDebug]);
+  }, [shapes]);
+  const handleBugClick = useCallback2((issue) => {
+    let x = typeof window !== "undefined" ? window.innerWidth / 2 : 500;
+    let y = typeof window !== "undefined" ? window.innerHeight / 2 : 500;
+    if (issue.element) {
+      const rect = issue.element.getBoundingClientRect();
+      x = rect.left + rect.width / 2;
+      y = rect.top + rect.height / 2;
+    }
+    const id = "shape-" + Date.now();
+    const shape = {
+      id,
+      type: "pin",
+      x,
+      y,
+      pinNumber: shapes.filter((s) => s.type === "pin").length + 1
+    };
+    setShapes((p) => [...p, shape]);
+    setAnnotations((p) => ({ ...p, [id]: `\u0410\u0432\u0442\u043E-\u043F\u043E\u0448\u0443\u043A:
+${issue.message}` }));
+    setPendingShape({ shape, isNew: true });
+  }, [shapes]);
   const divider = /* @__PURE__ */ jsx4("div", { style: { width: "1px", height: "20px", background: "rgba(255,255,255,0.12)", margin: "0 2px" } });
   return /* @__PURE__ */ jsxs3(
     "div",
@@ -30924,7 +30977,7 @@ Letter-spacing: ${style.letterSpacing}`;
           50% { opacity: 0.55; }
         }
       ` }),
-        (activeDebug.has("show-code") || activeDebug.has("typography")) && hoveredRect && /* @__PURE__ */ jsx4("div", { id: "buggy-bag-highlighter", style: {
+        activeDebug.has("show-code") && hoveredRect && /* @__PURE__ */ jsx4("div", { id: "buggy-bag-highlighter", style: {
           position: "fixed",
           top: hoveredRect.top,
           left: hoveredRect.left,
@@ -30971,7 +31024,7 @@ Letter-spacing: ${style.letterSpacing}`;
             }
           }
         ),
-        (activeDebug.has("show-code") || activeDebug.has("typography")) && /* @__PURE__ */ jsxs3("div", { id: "buggy-bag-code-window", "data-buggy-bag": "true", style: {
+        activeDebug.has("show-code") && /* @__PURE__ */ jsxs3("div", { id: "buggy-bag-code-window", "data-buggy-bag": "true", style: {
           position: "fixed",
           top: codeWinPos.y + "px",
           left: codeWinPos.x + "px",
@@ -30985,9 +31038,9 @@ Letter-spacing: ${style.letterSpacing}`;
           backdropFilter: "blur(10px)",
           fontFamily: "monospace",
           overflow: "hidden",
-          display: "flex",
+          display: pendingShape ? "none" : "flex",
           flexDirection: "column",
-          zIndex: 10005
+          zIndex: 10001
         }, children: [
           /* @__PURE__ */ jsxs3("div", { onMouseDown: (e) => startDrag(e, "code"), style: {
             padding: "16px 20px",
@@ -30998,7 +31051,7 @@ Letter-spacing: ${style.letterSpacing}`;
             alignItems: "center",
             justifyContent: "space-between"
           }, children: [
-            /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(56,189,248,0.9)", textTransform: "uppercase", letterSpacing: "0.07em" }, children: "Live Inspector" }),
+            /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(56,189,248,0.9)", textTransform: "uppercase", letterSpacing: "0.07em" }, children: "\u0406\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440 \u0435\u043B\u0435\u043C\u0435\u043D\u0442\u0456\u0432" }),
             /* @__PURE__ */ jsx4(
               "button",
               {
@@ -31006,7 +31059,6 @@ Letter-spacing: ${style.letterSpacing}`;
                 onClick: () => setActiveDebug((prev) => {
                   const n = new Set(prev);
                   n.delete("show-code");
-                  n.delete("typography");
                   return n;
                 }),
                 style: {
@@ -31035,18 +31087,19 @@ Letter-spacing: ${style.letterSpacing}`;
               }
             )
           ] }),
+          /* @__PURE__ */ jsxs3("div", { style: { padding: "0 20px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", gap: "16px" }, children: [
+            /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setInspectorTab("code"), style: { padding: "12px 0", background: "none", border: "none", borderBottom: inspectorTab === "code" ? "2px solid #38bdf8" : "2px solid transparent", color: inspectorTab === "code" ? "#38bdf8" : "rgba(255,255,255,0.5)", fontSize: "11px", fontWeight: "bold", cursor: "pointer", transition: "all 0.2s" }, children: "\u041A\u043E\u0434" }),
+            /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setInspectorTab("styles"), style: { padding: "12px 0", background: "none", border: "none", borderBottom: inspectorTab === "styles" ? "2px solid #38bdf8" : "2px solid transparent", color: inspectorTab === "styles" ? "#38bdf8" : "rgba(255,255,255,0.5)", fontSize: "11px", fontWeight: "bold", cursor: "pointer", transition: "all 0.2s" }, children: "\u0421\u0442\u0438\u043B\u0456" })
+          ] }),
           /* @__PURE__ */ jsxs3("div", { style: { padding: "20px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }, children: [
-            activeDebug.has("show-code") && /* @__PURE__ */ jsx4("div", { style: { flex: "1 1 auto" }, children: /* @__PURE__ */ jsx4(
+            inspectorTab === "code" && /* @__PURE__ */ jsx4(
               "div",
               {
                 style: { fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5" },
                 dangerouslySetInnerHTML: { __html: hoveredCode }
               }
-            ) }),
-            activeDebug.has("typography") && /* @__PURE__ */ jsxs3("div", { style: { flex: "0 0 auto" }, children: [
-              /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(56,189,248,0.9)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }, children: "\u0421\u0442\u0438\u043B\u0456" }),
-              /* @__PURE__ */ jsx4("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.9)", whiteSpace: "pre-wrap", lineHeight: "1.6" }, children: hoveredStyle })
-            ] })
+            ),
+            inspectorTab === "styles" && /* @__PURE__ */ jsx4("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.9)", whiteSpace: "pre-wrap", lineHeight: "1.6" }, children: hoveredStyle })
           ] })
         ] }),
         autoBugResults && /* @__PURE__ */ jsxs3("div", { id: "buggy-bag-autobug-window", "data-buggy-bag": "true", style: {
@@ -31063,9 +31116,9 @@ Letter-spacing: ${style.letterSpacing}`;
           backdropFilter: "blur(10px)",
           fontFamily: "monospace",
           overflow: "hidden",
-          display: "flex",
+          display: pendingShape ? "none" : "flex",
           flexDirection: "column",
-          zIndex: 10005
+          zIndex: 10001
         }, children: [
           /* @__PURE__ */ jsxs3("div", { onMouseDown: (e) => startDrag(e, "bug"), style: {
             padding: "16px 20px",
@@ -31076,75 +31129,135 @@ Letter-spacing: ${style.letterSpacing}`;
             alignItems: "center",
             justifyContent: "space-between"
           }, children: [
-            /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(139,92,246,0.9)", textTransform: "uppercase", letterSpacing: "0.07em" }, children: "\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u0438 \u0430\u043D\u0430\u043B\u0456\u0437\u0443" }),
-            /* @__PURE__ */ jsx4(
-              "button",
-              {
-                type: "button",
-                onClick: () => toggleDebug("auto-bugs"),
-                style: {
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: "20px",
-                  height: "20px",
-                  cursor: "pointer",
-                  color: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "background 0.15s"
-                },
-                onMouseEnter: (e) => {
-                  e.currentTarget.style.background = "rgba(239,68,68,0.8)";
-                },
-                onMouseLeave: (e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-                },
-                children: /* @__PURE__ */ jsxs3("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                  /* @__PURE__ */ jsx4("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
-                  /* @__PURE__ */ jsx4("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
-                ] })
-              }
-            )
+            /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(139,92,246,0.9)", textTransform: "uppercase", letterSpacing: "0.07em" }, children: "\u0410\u0432\u0442\u043E\u043F\u043E\u0448\u0443\u043A \u0431\u0430\u0433\u0456\u0432" }),
+            /* @__PURE__ */ jsxs3("div", { style: { display: "flex", gap: "6px" }, children: [
+              /* @__PURE__ */ jsx4(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => setAutoBugResults(runAutoBugScan()),
+                  title: "\u041F\u0435\u0440\u0435\u0440\u0430\u0445\u0443\u0432\u0430\u0442\u0438",
+                  style: {
+                    background: "rgba(255,255,255,0.1)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    cursor: "pointer",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "background 0.15s"
+                  },
+                  onMouseEnter: (e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                  },
+                  onMouseLeave: (e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                  },
+                  children: /* @__PURE__ */ jsx4("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsx4("path", { d: "M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.92-10.26l3.08 2.69" }) })
+                }
+              ),
+              /* @__PURE__ */ jsx4(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => toggleDebug("auto-bugs"),
+                  style: {
+                    background: "rgba(255,255,255,0.1)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    cursor: "pointer",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "background 0.15s"
+                  },
+                  onMouseEnter: (e) => {
+                    e.currentTarget.style.background = "rgba(239,68,68,0.8)";
+                  },
+                  onMouseLeave: (e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                  },
+                  children: /* @__PURE__ */ jsxs3("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+                    /* @__PURE__ */ jsx4("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
+                  ] })
+                }
+              )
+            ] })
           ] }),
-          /* @__PURE__ */ jsxs3("div", { style: { padding: "20px", fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5", overflowY: "auto" }, children: [
-            ["visual", "network", "a11y", "other"].map((cat) => {
-              const catBugs = autoBugResults.filter((b) => b.category === cat);
-              const title = cat === "visual" ? "\u0412\u0456\u0437\u0443\u0430\u043B\u044C\u043D\u0456 \u0431\u0430\u0433\u0438 \u{1F3A8}" : cat === "network" ? "\u041C\u0435\u0440\u0435\u0436\u0435\u0432\u0456 \u043F\u043E\u043C\u0438\u043B\u043A\u0438 \u{1F310}" : cat === "a11y" ? "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u0456\u0441\u0442\u044C \u267F" : "\u0406\u043D\u0448\u0435 \u{1F527}";
-              return /* @__PURE__ */ jsxs3("div", { style: { marginBottom: "16px" }, children: [
-                /* @__PURE__ */ jsx4("div", { style: { fontWeight: "bold", color: "rgba(255,255,255,0.9)", marginBottom: "8px" }, children: title }),
-                catBugs.length > 0 ? catBugs.map((b, i) => /* @__PURE__ */ jsx4("div", { style: { marginBottom: "4px" }, children: b.message }, i)) : /* @__PURE__ */ jsx4("div", { style: { color: "#10b981" }, children: "\u0412\u0456\u0434\u0441\u0443\u0442\u043D\u0456" })
-              ] }, cat);
-            }),
-            autoBugResults.length > 0 && /* @__PURE__ */ jsx4(
-              "button",
-              {
-                onClick: () => {
-                  const text = autoBugResults.map((b) => b.message).join(" | ");
-                  const id = "shape-" + Date.now();
-                  setShapes((prev) => [...prev, { id, type: "pin", x: window.innerWidth / 2, y: window.innerHeight / 2, pinNumber: prev.filter((s) => s.type === "pin").length + 1 }]);
-                  setAnnotations((prev) => ({ ...prev, [id]: "\u0410\u0432\u0442\u043E-\u043F\u043E\u0448\u0443\u043A:\n" + text }));
-                  toggleDebug("auto-bugs");
+          /* @__PURE__ */ jsx4("div", { style: { display: "flex", overflowX: "auto", padding: "0 20px", borderBottom: "1px solid rgba(255,255,255,0.05)", gap: "16px" }, children: ["visual", "network", "a11y", "console", "other"].map((cat) => {
+            const title = cat === "visual" ? "\u0412\u0456\u0437\u0443\u0430\u043B\u044C\u043D\u0456 \u{1F3A8}" : cat === "network" ? "\u041C\u0435\u0440\u0435\u0436\u0435\u0432\u0456 \u{1F310}" : cat === "a11y" ? "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u0456\u0441\u0442\u044C \u267F" : cat === "console" ? "\u041A\u043E\u043D\u0441\u043E\u043B\u044C \u{1F5A5}" : "HTML \u{1F3D7}";
+            const count = autoBugResults.categoryCounts[cat] || 0;
+            const isActive2 = autoBugTab === cat;
+            return /* @__PURE__ */ jsxs3("button", { type: "button", onClick: () => setAutoBugTab(cat), style: { padding: "12px 0", background: "none", border: "none", borderBottom: isActive2 ? "2px solid #8b5cf6" : "2px solid transparent", color: isActive2 ? "#8b5cf6" : "rgba(255,255,255,0.5)", fontSize: "11px", fontWeight: "bold", cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "6px" }, children: [
+              title,
+              " ",
+              count > 0 && /* @__PURE__ */ jsx4("span", { style: { background: isActive2 ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.1)", padding: "2px 6px", borderRadius: "10px", fontSize: "9px" }, children: count })
+            ] }, cat);
+          }) }),
+          /* @__PURE__ */ jsx4("div", { style: { padding: "20px", fontSize: "11px", color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: "1.5", overflowY: "auto" }, children: (() => {
+            const catBugs = autoBugResults.issues.filter((b) => b.category === autoBugTab);
+            const totalCount = autoBugResults.categoryCounts[autoBugTab] || 0;
+            const hiddenCount = totalCount - catBugs.length;
+            return /* @__PURE__ */ jsx4("div", { children: catBugs.length > 0 ? /* @__PURE__ */ jsxs3(Fragment2, { children: [
+              catBugs.map((b, i) => /* @__PURE__ */ jsx4(
+                "div",
+                {
+                  onClick: () => handleBugClick(b),
+                  style: {
+                    marginBottom: "8px",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    color: "rgba(255,255,255,0.8)",
+                    padding: "2px 0"
+                  },
+                  onMouseEnter: (e) => e.currentTarget.style.color = "#fff",
+                  onMouseLeave: (e) => e.currentTarget.style.color = "rgba(255,255,255,0.8)",
+                  children: b.message
                 },
-                style: {
-                  marginTop: "16px",
-                  background: "#8b5cf6",
-                  color: "white",
-                  border: "none",
-                  padding: "8px 12px",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  width: "100%",
-                  fontWeight: "bold",
-                  transition: "background 0.2s"
-                },
-                onMouseEnter: (e) => e.currentTarget.style.background = "#7c3aed",
-                onMouseLeave: (e) => e.currentTarget.style.background = "#8b5cf6",
-                children: "\u0414\u043E\u0434\u0430\u0442\u0438 \u0432 \u0437\u0432\u0456\u0442"
-              }
-            )
-          ] })
+                i
+              )),
+              hiddenCount > 0 && /* @__PURE__ */ jsxs3("div", { style: { color: "rgba(255,255,255,0.4)", fontSize: "10px", marginTop: "4px" }, children: [
+                "...\u0456 \u0449\u0435 ",
+                hiddenCount,
+                " \u043F\u043E\u0434\u0456\u0431\u043D\u0438\u0445"
+              ] }),
+              /* @__PURE__ */ jsx4(
+                "button",
+                {
+                  onClick: () => {
+                    const text = catBugs.map((b) => b.message).join(" | ");
+                    const id = "shape-" + Date.now();
+                    setShapes((prev) => [...prev, { id, type: "pin", x: window.innerWidth / 2, y: window.innerHeight / 2, pinNumber: prev.filter((s) => s.type === "pin").length + 1 }]);
+                    setAnnotations((prev) => ({ ...prev, [id]: `\u0410\u0432\u0442\u043E-\u043F\u043E\u0448\u0443\u043A (${autoBugTab}):
+` + text }));
+                    toggleDebug("auto-bugs");
+                  },
+                  style: {
+                    marginTop: "16px",
+                    background: "#ffffff",
+                    color: "#18181b",
+                    border: "none",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    width: "100%",
+                    fontWeight: "bold",
+                    transition: "background 0.2s"
+                  },
+                  onMouseEnter: (e) => e.currentTarget.style.background = "#e5e7eb",
+                  onMouseLeave: (e) => e.currentTarget.style.background = "#ffffff",
+                  children: "\u0414\u043E\u0434\u0430\u0442\u0438 \u0432\u0441\u0435"
+                }
+              )
+            ] }) : /* @__PURE__ */ jsx4("div", { style: { color: "#10b981" }, children: "\u0412\u0456\u0434\u0441\u0443\u0442\u043D\u0456" }) });
+          })() })
         ] }),
         designAuditResult && /* @__PURE__ */ jsxs3("div", { id: "buggy-bag-design-audit-window", "data-buggy-bag": "true", style: {
           position: "fixed",
@@ -31160,7 +31273,7 @@ Letter-spacing: ${style.letterSpacing}`;
           backdropFilter: "blur(10px)",
           fontFamily: "monospace",
           overflow: "hidden",
-          display: "flex",
+          display: pendingShape ? "none" : "flex",
           flexDirection: "column",
           zIndex: 10005
         }, children: [
@@ -31174,130 +31287,150 @@ Letter-spacing: ${style.letterSpacing}`;
             justifyContent: "space-between"
           }, children: [
             /* @__PURE__ */ jsx4("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(16,185,129,0.9)", textTransform: "uppercase", letterSpacing: "0.07em" }, children: "\u0414\u0438\u0437\u0430\u0439\u043D-\u0430\u0443\u0434\u0438\u0442" }),
-            /* @__PURE__ */ jsx4(
-              "button",
-              {
-                type: "button",
-                onClick: () => toggleDebug("design-audit"),
-                style: {
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: "20px",
-                  height: "20px",
-                  cursor: "pointer",
-                  color: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "background 0.15s"
-                },
-                onMouseEnter: (e) => {
-                  e.currentTarget.style.background = "rgba(239,68,68,0.8)";
-                },
-                onMouseLeave: (e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-                },
-                children: /* @__PURE__ */ jsxs3("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                  /* @__PURE__ */ jsx4("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
-                  /* @__PURE__ */ jsx4("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
-                ] })
-              }
-            )
+            /* @__PURE__ */ jsxs3("div", { style: { display: "flex", gap: "6px" }, children: [
+              /* @__PURE__ */ jsx4(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => setDesignAuditResult(runDesignAudit()),
+                  title: "\u041F\u0435\u0440\u0435\u0440\u0430\u0445\u0443\u0432\u0430\u0442\u0438",
+                  style: {
+                    background: "rgba(255,255,255,0.1)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    cursor: "pointer",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "background 0.15s"
+                  },
+                  onMouseEnter: (e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                  },
+                  onMouseLeave: (e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                  },
+                  children: /* @__PURE__ */ jsx4("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsx4("path", { d: "M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.92-10.26l3.08 2.69" }) })
+                }
+              ),
+              /* @__PURE__ */ jsx4(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => toggleDebug("design-audit"),
+                  style: {
+                    background: "rgba(255,255,255,0.1)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    cursor: "pointer",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "background 0.15s"
+                  },
+                  onMouseEnter: (e) => {
+                    e.currentTarget.style.background = "rgba(239,68,68,0.8)";
+                  },
+                  onMouseLeave: (e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                  },
+                  children: /* @__PURE__ */ jsxs3("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+                    /* @__PURE__ */ jsx4("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
+                  ] })
+                }
+              )
+            ] })
           ] }),
+          /* @__PURE__ */ jsx4("div", { style: { display: "flex", overflowX: "auto", padding: "0 20px", borderBottom: "1px solid rgba(255,255,255,0.05)", gap: "16px" }, children: [
+            { id: "fonts", label: "\u0428\u0440\u0438\u0444\u0442\u0438", data: designAuditResult.fonts },
+            { id: "fontSizes", label: "\u0420\u043E\u0437\u043C\u0456\u0440\u0438 \u0448\u0440\u0438\u0444\u0442\u0456\u0432", data: designAuditResult.fontSizes },
+            { id: "colors", label: "\u041A\u043E\u043B\u044C\u043E\u0440\u0438", data: designAuditResult.colors },
+            { id: "spacings", label: "\u0412\u0456\u0434\u0441\u0442\u0443\u043F\u0438", data: designAuditResult.spacings },
+            { id: "borderRadii", label: "Border-radius", data: designAuditResult.borderRadii },
+            { id: "shadows", label: "\u0422\u0456\u043D\u0456", data: designAuditResult.shadows }
+          ].map((tab) => /* @__PURE__ */ jsxs3("button", { type: "button", onClick: () => setAuditTab(tab.id), style: { padding: "12px 0", background: "none", border: "none", borderBottom: auditTab === tab.id ? "2px solid #10b981" : "2px solid transparent", color: auditTab === tab.id ? "#10b981" : "rgba(255,255,255,0.5)", fontSize: "11px", fontWeight: "bold", cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "6px" }, children: [
+            tab.label,
+            " ",
+            /* @__PURE__ */ jsx4("span", { style: { background: auditTab === tab.id ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.1)", padding: "2px 6px", borderRadius: "10px", fontSize: "9px" }, children: tab.data.length })
+          ] }, tab.id)) }),
           /* @__PURE__ */ jsxs3("div", { style: { padding: "20px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }, children: [
             (designAuditResult.fonts.length > 8 || designAuditResult.colors.length > 20 || designAuditResult.spacings.length > 15) && /* @__PURE__ */ jsx4("div", { style: { padding: "10px", background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "8px", color: "#fbbf24", fontSize: "11px", lineHeight: "1.4" }, children: "\u26A0\uFE0F \u0417\u0430\u0431\u0430\u0433\u0430\u0442\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u044C! \u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0454\u043C\u043E \u0437\u0432\u0435\u0441\u0442\u0438 \u0434\u043E \u0434\u0438\u0437\u0430\u0439\u043D-\u0441\u0438\u0441\u0442\u0435\u043C\u0438." }),
-            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
-              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
-                /* @__PURE__ */ jsxs3("span", { children: [
-                  "\u0428\u0440\u0438\u0444\u0442\u0438 (",
-                  designAuditResult.fonts.length,
-                  ")"
+            /* @__PURE__ */ jsx4("div", { onMouseLeave: () => setAuditHoveredElements([]), children: (() => {
+              const tabsConfig = [
+                { id: "fonts", label: "\u0428\u0440\u0438\u0444\u0442\u0438", data: designAuditResult.fonts, limit: 5, render: (f, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0428\u0440\u0438\u0444\u0442", f.value, f.count, f.elements), onMouseEnter: () => setAuditHoveredElements(f.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                  f.value,
+                  " ",
+                  /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                    "\xD7",
+                    f.count
+                  ] })
+                ] }, i) },
+                { id: "fontSizes", label: "\u0420\u043E\u0437\u043C\u0456\u0440\u0438 \u0448\u0440\u0438\u0444\u0442\u0456\u0432", data: designAuditResult.fontSizes, limit: 8, render: (f, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0420\u043E\u0437\u043C\u0456\u0440 \u0448\u0440\u0438\u0444\u0442\u0443", f.value, f.count, f.elements), onMouseEnter: () => setAuditHoveredElements(f.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                  f.value,
+                  " ",
+                  /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                    "\xD7",
+                    f.count
+                  ] })
+                ] }, i) },
+                { id: "colors", label: "\u041A\u043E\u043B\u044C\u043E\u0440\u0438", data: designAuditResult.colors, limit: 15, render: (c, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u041A\u043E\u043B\u0456\u0440", c.value, c.count, c.elements), onMouseEnter: () => setAuditHoveredElements(c.elements || []), style: { display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,255,255,0.05)", padding: "2px 6px 2px 4px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                  /* @__PURE__ */ jsx4("div", { style: { width: "12px", height: "12px", borderRadius: "2px", background: c.value, border: "1px solid rgba(255,255,255,0.1)" } }),
+                  /* @__PURE__ */ jsx4("span", { children: c.value }),
+                  " ",
+                  /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                    "\xD7",
+                    c.count
+                  ] })
+                ] }, i) },
+                { id: "spacings", label: "\u0412\u0456\u0434\u0441\u0442\u0443\u043F\u0438", data: designAuditResult.spacings, limit: 10, render: (s, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0412\u0456\u0434\u0441\u0442\u0443\u043F", s.value, s.count, s.elements), onMouseEnter: () => setAuditHoveredElements(s.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                  s.value,
+                  " ",
+                  /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                    "\xD7",
+                    s.count
+                  ] })
+                ] }, i) },
+                { id: "borderRadii", label: "Border-radius", data: designAuditResult.borderRadii, limit: 5, render: (b, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("Border-radius", b.value, b.count, b.elements), onMouseEnter: () => setAuditHoveredElements(b.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                  b.value,
+                  " ",
+                  /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                    "\xD7",
+                    b.count
+                  ] })
+                ] }, i) },
+                { id: "shadows", label: "\u0422\u0456\u043D\u0456", data: designAuditResult.shadows, limit: 5, render: (s, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0422\u0456\u043D\u044C", s.value, s.count, s.elements), onMouseEnter: () => setAuditHoveredElements(s.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
+                  s.value,
+                  " ",
+                  /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
+                    "\xD7",
+                    s.count
+                  ] })
+                ] }, i) }
+              ];
+              const activeCfg = tabsConfig.find((t) => t.id === auditTab) || tabsConfig[0];
+              return /* @__PURE__ */ jsxs3(Fragment2, { children: [
+                /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
+                  /* @__PURE__ */ jsxs3("span", { children: [
+                    activeCfg.label,
+                    " (",
+                    activeCfg.data.length,
+                    ")"
+                  ] }),
+                  /* @__PURE__ */ jsxs3("span", { style: { color: activeCfg.data.length > activeCfg.limit ? "#fbbf24" : "#10b981" }, children: [
+                    "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E ",
+                    activeCfg.limit
+                  ] })
                 ] }),
-                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.fonts.length > 5 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 5" })
-              ] }),
-              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.fonts.map((f, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0428\u0440\u0438\u0444\u0442", f.value, f.count, f.elements), onMouseEnter: () => setAuditHoveredElements(f.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
-                f.value,
-                " ",
-                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
-                  "\xD7",
-                  f.count
-                ] })
-              ] }, i)) })
-            ] }),
-            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
-              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
-                /* @__PURE__ */ jsxs3("span", { children: [
-                  "\u0420\u043E\u0437\u043C\u0456\u0440\u0438 \u0448\u0440\u0438\u0444\u0442\u0456\u0432 (",
-                  designAuditResult.fontSizes.length,
-                  ")"
-                ] }),
-                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.fontSizes.length > 8 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 8" })
-              ] }),
-              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.fontSizes.map((f, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0420\u043E\u0437\u043C\u0456\u0440 \u0448\u0440\u0438\u0444\u0442\u0443", f.value, f.count, f.elements), onMouseEnter: () => setAuditHoveredElements(f.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
-                f.value,
-                " ",
-                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
-                  "\xD7",
-                  f.count
-                ] })
-              ] }, i)) })
-            ] }),
-            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
-              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
-                /* @__PURE__ */ jsxs3("span", { children: [
-                  "\u041A\u043E\u043B\u044C\u043E\u0440\u0438 (",
-                  designAuditResult.colors.length,
-                  ")"
-                ] }),
-                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.colors.length > 15 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 15" })
-              ] }),
-              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.colors.map((c, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u041A\u043E\u043B\u0456\u0440", c.value, c.count, c.elements), onMouseEnter: () => setAuditHoveredElements(c.elements || []), style: { display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,255,255,0.05)", padding: "2px 6px 2px 4px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
-                /* @__PURE__ */ jsx4("div", { style: { width: "12px", height: "12px", borderRadius: "2px", background: c.value, border: "1px solid rgba(255,255,255,0.1)" } }),
-                /* @__PURE__ */ jsx4("span", { children: c.value }),
-                " ",
-                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
-                  "\xD7",
-                  c.count
-                ] })
-              ] }, i)) })
-            ] }),
-            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
-              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
-                /* @__PURE__ */ jsxs3("span", { children: [
-                  "\u0412\u0456\u0434\u0441\u0442\u0443\u043F\u0438 (",
-                  designAuditResult.spacings.length,
-                  ")"
-                ] }),
-                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.spacings.length > 10 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 10" })
-              ] }),
-              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.spacings.map((s, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("\u0412\u0456\u0434\u0441\u0442\u0443\u043F", s.value, s.count, s.elements), onMouseEnter: () => setAuditHoveredElements(s.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
-                s.value,
-                " ",
-                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
-                  "\xD7",
-                  s.count
-                ] })
-              ] }, i)) })
-            ] }),
-            /* @__PURE__ */ jsxs3("div", { onMouseLeave: () => setAuditHoveredElements([]), children: [
-              /* @__PURE__ */ jsxs3("div", { style: { fontSize: "10px", fontWeight: "bold", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: "8px", display: "flex", justifyContent: "space-between" }, children: [
-                /* @__PURE__ */ jsxs3("span", { children: [
-                  "Border-radius (",
-                  designAuditResult.borderRadii.length,
-                  ")"
-                ] }),
-                /* @__PURE__ */ jsx4("span", { style: { color: designAuditResult.borderRadii.length > 5 ? "#fbbf24" : "#10b981" }, children: "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E: \u0434\u043E 5" })
-              ] }),
-              /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: designAuditResult.borderRadii.map((b, i) => /* @__PURE__ */ jsxs3("div", { onClick: () => handleAuditClick("Border-radius", b.value, b.count, b.elements), onMouseEnter: () => setAuditHoveredElements(b.elements || []), style: { background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#e5e7eb", cursor: "pointer" }, children: [
-                b.value,
-                " ",
-                /* @__PURE__ */ jsxs3("span", { style: { color: "rgba(255,255,255,0.3)" }, children: [
-                  "\xD7",
-                  b.count
-                ] })
-              ] }, i)) })
-            ] })
+                /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px" }, children: activeCfg.data.map(activeCfg.render) })
+              ] });
+            })() })
           ] })
         ] }),
         !showExitConfirm && /* @__PURE__ */ jsx4(
@@ -31426,28 +31559,61 @@ Letter-spacing: ${style.letterSpacing}`;
               gap: "2px",
               zIndex: 10003
             }, children: [
-              /* @__PURE__ */ jsx4("div", { style: { fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 8px 4px" }, children: "Debug" }),
+              /* @__PURE__ */ jsx4("div", { style: { fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 8px 4px" }, children: "\u0406\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440" }),
               [
                 {
-                  id: "invert",
-                  label: "\u0406\u043D\u0432\u0435\u0440\u0442 \u043A\u043E\u043B\u044C\u043E\u0440\u0456\u0432",
+                  id: "show-code",
+                  label: "\u0406\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440 \u0435\u043B\u0435\u043C\u0435\u043D\u0442\u0456\u0432",
                   icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                    /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "12", r: "10" }),
-                    /* @__PURE__ */ jsx4("path", { d: "M12 2a10 10 0 0 1 0 20z" })
+                    /* @__PURE__ */ jsx4("polyline", { points: "16 18 22 12 16 6" }),
+                    /* @__PURE__ */ jsx4("polyline", { points: "8 6 2 12 8 18" })
                   ] }),
-                  hotkey: "Alt+I"
-                },
-                {
-                  id: "spacing",
-                  label: "Spacing overlay",
-                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                    /* @__PURE__ */ jsx4("path", { d: "M21 6H3" }),
-                    /* @__PURE__ */ jsx4("path", { d: "M21 18H3" }),
-                    /* @__PURE__ */ jsx4("path", { d: "M3 6v12" }),
-                    /* @__PURE__ */ jsx4("path", { d: "M21 6v12" })
-                  ] }),
-                  hotkey: "Alt+S"
-                },
+                  hotkey: "Alt+C"
+                }
+              ].map(({ id, label, icon, hotkey }) => /* @__PURE__ */ jsxs3("button", { type: "button", "aria-label": label, onClick: () => toggleDebug(id), style: {
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "7px 10px",
+                borderRadius: "8px",
+                background: activeDebug.has(id) ? "rgba(255,255,255,0.07)" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: activeDebug.has(id) ? "white" : "rgba(255,255,255,0.65)",
+                fontSize: "12px",
+                fontWeight: "500",
+                textAlign: "left",
+                width: "100%",
+                transition: "all 0.1s"
+              }, children: [
+                icon,
+                /* @__PURE__ */ jsx4("span", { children: label }),
+                /* @__PURE__ */ jsxs3("span", { style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px" }, children: [
+                  /* @__PURE__ */ jsx4("kbd", { style: { fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)", borderRadius: "3px", padding: "1px 4px", flexShrink: 0 }, children: hotkey }),
+                  /* @__PURE__ */ jsx4("span", { style: {
+                    width: "28px",
+                    height: "16px",
+                    borderRadius: "8px",
+                    background: activeDebug.has(id) ? "rgba(99,102,241,0.8)" : "rgba(255,255,255,0.12)",
+                    position: "relative",
+                    display: "inline-block",
+                    transition: "background 0.2s",
+                    flexShrink: 0
+                  }, children: /* @__PURE__ */ jsx4("span", { style: {
+                    position: "absolute",
+                    top: "2px",
+                    left: activeDebug.has(id) ? "14px" : "2px",
+                    width: "12px",
+                    height: "12px",
+                    borderRadius: "50%",
+                    background: "white",
+                    transition: "left 0.2s",
+                    display: "block"
+                  } }) })
+                ] })
+              ] }, id)),
+              /* @__PURE__ */ jsx4("div", { style: { fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "8px 8px 4px" }, children: "\u0410\u043D\u0430\u043B\u0456\u0437" }),
+              [
                 {
                   id: "auto-bugs",
                   label: "\u0410\u0432\u0442\u043E\u043F\u043E\u0448\u0443\u043A \u0431\u0430\u0433\u0456\u0432",
@@ -31467,25 +31633,6 @@ Letter-spacing: ${style.letterSpacing}`;
                   hotkey: "Alt+A"
                 },
                 {
-                  id: "show-code",
-                  label: "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u043A\u043E\u0434",
-                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                    /* @__PURE__ */ jsx4("polyline", { points: "16 18 22 12 16 6" }),
-                    /* @__PURE__ */ jsx4("polyline", { points: "8 6 2 12 8 18" })
-                  ] }),
-                  hotkey: "Alt+C"
-                },
-                {
-                  id: "typography",
-                  label: "\u0428\u0440\u0438\u0444\u0442\u0438",
-                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
-                    /* @__PURE__ */ jsx4("polyline", { points: "4 7 4 4 20 4 20 7" }),
-                    /* @__PURE__ */ jsx4("line", { x1: "9", y1: "20", x2: "15", y2: "20" }),
-                    /* @__PURE__ */ jsx4("line", { x1: "12", y1: "4", x2: "12", y2: "20" })
-                  ] }),
-                  hotkey: "Alt+T"
-                },
-                {
                   id: "design-audit",
                   label: "\u0414\u0438\u0437\u0430\u0439\u043D-\u0430\u0443\u0434\u0438\u0442",
                   icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
@@ -31494,7 +31641,71 @@ Letter-spacing: ${style.letterSpacing}`;
                   ] }),
                   hotkey: "Alt+D"
                 }
-              ].map(({ id, label, icon, hotkey }) => /* @__PURE__ */ jsxs3("button", { type: "button", onClick: () => toggleDebug(id), style: {
+              ].map(({ id, label, icon, hotkey }) => /* @__PURE__ */ jsxs3("button", { type: "button", "aria-label": label, onClick: () => toggleDebug(id), style: {
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "7px 10px",
+                borderRadius: "8px",
+                background: activeDebug.has(id) ? "rgba(255,255,255,0.07)" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: activeDebug.has(id) ? "white" : "rgba(255,255,255,0.65)",
+                fontSize: "12px",
+                fontWeight: "500",
+                textAlign: "left",
+                width: "100%",
+                transition: "all 0.1s"
+              }, children: [
+                icon,
+                /* @__PURE__ */ jsx4("span", { children: label }),
+                /* @__PURE__ */ jsxs3("span", { style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px" }, children: [
+                  /* @__PURE__ */ jsx4("kbd", { style: { fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)", borderRadius: "3px", padding: "1px 4px", flexShrink: 0 }, children: hotkey }),
+                  /* @__PURE__ */ jsx4("span", { style: {
+                    width: "28px",
+                    height: "16px",
+                    borderRadius: "8px",
+                    background: activeDebug.has(id) ? "rgba(99,102,241,0.8)" : "rgba(255,255,255,0.12)",
+                    position: "relative",
+                    display: "inline-block",
+                    transition: "background 0.2s",
+                    flexShrink: 0
+                  }, children: /* @__PURE__ */ jsx4("span", { style: {
+                    position: "absolute",
+                    top: "2px",
+                    left: activeDebug.has(id) ? "14px" : "2px",
+                    width: "12px",
+                    height: "12px",
+                    borderRadius: "50%",
+                    background: "white",
+                    transition: "left 0.2s",
+                    display: "block"
+                  } }) })
+                ] })
+              ] }, id)),
+              /* @__PURE__ */ jsx4("div", { style: { fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "8px 8px 4px" }, children: "\u041E\u0433\u043B\u044F\u0434 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438" }),
+              [
+                {
+                  id: "invert",
+                  label: "\u0406\u043D\u0432\u0435\u0440\u0442 \u043A\u043E\u043B\u044C\u043E\u0440\u0456\u0432",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "12", r: "10" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M12 2a10 10 0 0 1 0 20z" })
+                  ] }),
+                  hotkey: "Alt+I"
+                },
+                {
+                  id: "spacing",
+                  label: "\u041A\u043E\u043D\u0442\u0443\u0440 \u0435\u043B\u0435\u043C\u0435\u043D\u0442\u0456\u0432",
+                  icon: /* @__PURE__ */ jsxs3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                    /* @__PURE__ */ jsx4("path", { d: "M21 6H3" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M21 18H3" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M3 6v12" }),
+                    /* @__PURE__ */ jsx4("path", { d: "M21 6v12" })
+                  ] }),
+                  hotkey: "Alt+S"
+                }
+              ].map(({ id, label, icon, hotkey }) => /* @__PURE__ */ jsxs3("button", { type: "button", "aria-label": label, onClick: () => toggleDebug(id), style: {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
@@ -31723,7 +31934,7 @@ function detectFavicon() {
 }
 
 // src/styles.gen.ts
-var styles = '.container {\r\n    width: 100%\n}\r\n@media (min-width: 640px) {\r\n    .container {\r\n        max-width: 640px\n    }\n}\r\n@media (min-width: 768px) {\r\n    .container {\r\n        max-width: 768px\n    }\n}\r\n@media (min-width: 1024px) {\r\n    .container {\r\n        max-width: 1024px\n    }\n}\r\n@media (min-width: 1280px) {\r\n    .container {\r\n        max-width: 1280px\n    }\n}\r\n@media (min-width: 1536px) {\r\n    .container {\r\n        max-width: 1536px\n    }\n}\r\n.sr-only {\r\n    position: absolute;\r\n    width: 1px;\r\n    height: 1px;\r\n    padding: 0;\r\n    margin: -1px;\r\n    overflow: hidden;\r\n    clip: rect(0, 0, 0, 0);\r\n    white-space: nowrap;\r\n    border-width: 0\n}\r\n.pointer-events-none {\r\n    pointer-events: none\n}\r\n.visible {\r\n    visibility: visible\n}\r\n.static {\r\n    position: static\n}\r\n.fixed {\r\n    position: fixed\n}\r\n.absolute {\r\n    position: absolute\n}\r\n.relative {\r\n    position: relative\n}\r\n.inset-0 {\r\n    inset: 0px\n}\r\n.-right-1 {\r\n    right: -0.25rem\n}\r\n.-top-1 {\r\n    top: -0.25rem\n}\r\n.bottom-24 {\r\n    bottom: 6rem\n}\r\n.bottom-6 {\r\n    bottom: 1.5rem\n}\r\n.left-1 {\r\n    left: 0.25rem\n}\r\n.right-6 {\r\n    right: 1.5rem\n}\r\n.top-1 {\r\n    top: 0.25rem\n}\r\n.top-4 {\r\n    top: 1rem\n}\r\n.z-\\[9998\\] {\r\n    z-index: 9998\n}\r\n.mx-1 {\r\n    margin-left: 0.25rem;\r\n    margin-right: 0.25rem\n}\r\n.mx-4 {\r\n    margin-left: 1rem;\r\n    margin-right: 1rem\n}\r\n.mx-auto {\r\n    margin-left: auto;\r\n    margin-right: auto\n}\r\n.mb-1 {\r\n    margin-bottom: 0.25rem\n}\r\n.mb-2 {\r\n    margin-bottom: 0.5rem\n}\r\n.mb-3 {\r\n    margin-bottom: 0.75rem\n}\r\n.mb-4 {\r\n    margin-bottom: 1rem\n}\r\n.mb-6 {\r\n    margin-bottom: 1.5rem\n}\r\n.ml-1 {\r\n    margin-left: 0.25rem\n}\r\n.mt-0 {\r\n    margin-top: 0px\n}\r\n.mt-1 {\r\n    margin-top: 0.25rem\n}\r\n.mt-2 {\r\n    margin-top: 0.5rem\n}\r\n.mt-6 {\r\n    margin-top: 1.5rem\n}\r\n.line-clamp-2 {\r\n    overflow: hidden;\r\n    display: -webkit-box;\r\n    -webkit-box-orient: vertical;\r\n    -webkit-line-clamp: 2\n}\r\n.block {\r\n    display: block\n}\r\n.inline-block {\r\n    display: inline-block\n}\r\n.flex {\r\n    display: flex\n}\r\n.inline-flex {\r\n    display: inline-flex\n}\r\n.hidden {\r\n    display: none\n}\r\n.h-10 {\r\n    height: 2.5rem\n}\r\n.h-12 {\r\n    height: 3rem\n}\r\n.h-6 {\r\n    height: 1.5rem\n}\r\n.h-\\[28px\\] {\r\n    height: 28px\n}\r\n.h-\\[32px\\] {\r\n    height: 32px\n}\r\n.h-\\[36px\\] {\r\n    height: 36px\n}\r\n.h-full {\r\n    height: 100%\n}\r\n.max-h-\\[calc\\(100vh-200px\\)\\] {\r\n    max-height: calc(100vh - 200px)\n}\r\n.w-10 {\r\n    width: 2.5rem\n}\r\n.w-12 {\r\n    width: 3rem\n}\r\n.w-\\[32px\\] {\r\n    width: 32px\n}\r\n.w-full {\r\n    width: 100%\n}\r\n.w-px {\r\n    width: 1px\n}\r\n.min-w-0 {\r\n    min-width: 0px\n}\r\n.max-w-\\[1200px\\] {\r\n    max-width: 1200px\n}\r\n.max-w-\\[480px\\] {\r\n    max-width: 480px\n}\r\n.max-w-\\[640px\\] {\r\n    max-width: 640px\n}\r\n.max-w-\\[900px\\] {\r\n    max-width: 900px\n}\r\n.flex-1 {\r\n    flex: 1 1 0%\n}\r\n.flex-shrink {\r\n    flex-shrink: 1\n}\r\n.shrink-0 {\r\n    flex-shrink: 0\n}\r\n.-translate-x-1 {\r\n    --tw-translate-x: -0.25rem;\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.-translate-y-1 {\r\n    --tw-translate-y: -0.25rem;\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.transform {\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n@keyframes pulse {\r\n    50% {\r\n        opacity: .5\n    }\n}\r\n.animate-pulse {\r\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\r\n@keyframes spin {\r\n    to {\r\n        transform: rotate(360deg)\n    }\n}\r\n.animate-spin {\r\n    animation: spin 1s linear infinite\n}\r\n.cursor-default {\r\n    cursor: default\n}\r\n.select-none {\r\n    -webkit-user-select: none;\r\n       -moz-user-select: none;\r\n            user-select: none\n}\r\n.resize-none {\r\n    resize: none\n}\r\n.resize {\r\n    resize: both\n}\r\n.flex-col {\r\n    flex-direction: column\n}\r\n.flex-wrap {\r\n    flex-wrap: wrap\n}\r\n.items-start {\r\n    align-items: flex-start\n}\r\n.items-end {\r\n    align-items: flex-end\n}\r\n.items-center {\r\n    align-items: center\n}\r\n.justify-center {\r\n    justify-content: center\n}\r\n.justify-between {\r\n    justify-content: space-between\n}\r\n.gap-1 {\r\n    gap: 0.25rem\n}\r\n.gap-2 {\r\n    gap: 0.5rem\n}\r\n.gap-3 {\r\n    gap: 0.75rem\n}\r\n.gap-4 {\r\n    gap: 1rem\n}\r\n.gap-\\[6px\\] {\r\n    gap: 6px\n}\r\n.self-start {\r\n    align-self: flex-start\n}\r\n.overflow-hidden {\r\n    overflow: hidden\n}\r\n.overflow-y-auto {\r\n    overflow-y: auto\n}\r\n.truncate {\r\n    overflow: hidden;\r\n    text-overflow: ellipsis;\r\n    white-space: nowrap\n}\r\n.break-all {\r\n    word-break: break-all\n}\r\n.rounded {\r\n    border-radius: 0.25rem\n}\r\n.rounded-\\[10px\\] {\r\n    border-radius: 10px\n}\r\n.rounded-\\[16px\\] {\r\n    border-radius: 16px\n}\r\n.rounded-\\[24px\\] {\r\n    border-radius: 24px\n}\r\n.rounded-\\[8px\\] {\r\n    border-radius: 8px\n}\r\n.rounded-full {\r\n    border-radius: 9999px\n}\r\n.border {\r\n    border-width: 1px\n}\r\n.border-2 {\r\n    border-width: 2px\n}\r\n.border-b {\r\n    border-bottom-width: 1px\n}\r\n.border-t {\r\n    border-top-width: 1px\n}\r\n.border-\\[\\#f0f0f0\\] {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\r\n.border-red-500 {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\r\n.border-transparent {\r\n    border-color: transparent\n}\r\n.border-white {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\r\n.bg-\\[\\#1f1f1f\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#ef4444\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f0f0f0\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f4f4f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f5f5f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-amber-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black\\/40 {\r\n    background-color: rgb(0 0 0 / 0.4)\n}\r\n.bg-indigo-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(99 102 241 / var(--tw-bg-opacity, 1))\n}\r\n.bg-red-50 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\r\n.bg-red-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-transparent {\r\n    background-color: transparent\n}\r\n.bg-white {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\r\n.object-contain {\r\n    -o-object-fit: contain;\r\n       object-fit: contain\n}\r\n.object-cover {\r\n    -o-object-fit: cover;\r\n       object-fit: cover\n}\r\n.p-0 {\r\n    padding: 0px\n}\r\n.p-1 {\r\n    padding: 0.25rem\n}\r\n.p-3 {\r\n    padding: 0.75rem\n}\r\n.p-4 {\r\n    padding: 1rem\n}\r\n.p-\\[12px\\] {\r\n    padding: 12px\n}\r\n.p-\\[16px\\] {\r\n    padding: 16px\n}\r\n.p-\\[20px\\] {\r\n    padding: 20px\n}\r\n.p-\\[24px\\] {\r\n    padding: 24px\n}\r\n.px-1 {\r\n    padding-left: 0.25rem;\r\n    padding-right: 0.25rem\n}\r\n.px-2 {\r\n    padding-left: 0.5rem;\r\n    padding-right: 0.5rem\n}\r\n.px-3 {\r\n    padding-left: 0.75rem;\r\n    padding-right: 0.75rem\n}\r\n.px-4 {\r\n    padding-left: 1rem;\r\n    padding-right: 1rem\n}\r\n.px-6 {\r\n    padding-left: 1.5rem;\r\n    padding-right: 1.5rem\n}\r\n.px-\\[12px\\] {\r\n    padding-left: 12px;\r\n    padding-right: 12px\n}\r\n.px-\\[16px\\] {\r\n    padding-left: 16px;\r\n    padding-right: 16px\n}\r\n.px-\\[18px\\] {\r\n    padding-left: 18px;\r\n    padding-right: 18px\n}\r\n.py-0 {\r\n    padding-top: 0px;\r\n    padding-bottom: 0px\n}\r\n.py-12 {\r\n    padding-top: 3rem;\r\n    padding-bottom: 3rem\n}\r\n.py-2 {\r\n    padding-top: 0.5rem;\r\n    padding-bottom: 0.5rem\n}\r\n.py-3 {\r\n    padding-top: 0.75rem;\r\n    padding-bottom: 0.75rem\n}\r\n.py-5 {\r\n    padding-top: 1.25rem;\r\n    padding-bottom: 1.25rem\n}\r\n.py-8 {\r\n    padding-top: 2rem;\r\n    padding-bottom: 2rem\n}\r\n.pb-2 {\r\n    padding-bottom: 0.5rem\n}\r\n.pb-3 {\r\n    padding-bottom: 0.75rem\n}\r\n.pb-4 {\r\n    padding-bottom: 1rem\n}\r\n.pb-6 {\r\n    padding-bottom: 1.5rem\n}\r\n.pt-12 {\r\n    padding-top: 3rem\n}\r\n.pt-3 {\r\n    padding-top: 0.75rem\n}\r\n.pt-4 {\r\n    padding-top: 1rem\n}\r\n.pt-6 {\r\n    padding-top: 1.5rem\n}\r\n.text-center {\r\n    text-align: center\n}\r\n.font-mono {\r\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\r\n.text-\\[12px\\] {\r\n    font-size: 12px\n}\r\n.text-\\[13px\\] {\r\n    font-size: 13px\n}\r\n.text-\\[18px\\] {\r\n    font-size: 18px\n}\r\n.font-bold {\r\n    font-weight: 700\n}\r\n.font-semibold {\r\n    font-weight: 600\n}\r\n.uppercase {\r\n    text-transform: uppercase\n}\r\n.italic {\r\n    font-style: italic\n}\r\n.leading-none {\r\n    line-height: 1\n}\r\n.leading-relaxed {\r\n    line-height: 1.625\n}\r\n.leading-snug {\r\n    line-height: 1.375\n}\r\n.tracking-wider {\r\n    letter-spacing: 0.05em\n}\r\n.text-\\[\\#1f1f1f\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.text-\\[\\#9a9a9a\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\r\n.text-amber-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(252 211 77 / var(--tw-text-opacity, 1))\n}\r\n.text-indigo-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(165 180 252 / var(--tw-text-opacity, 1))\n}\r\n.text-red-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(252 165 165 / var(--tw-text-opacity, 1))\n}\r\n.text-white {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\r\n.opacity-60 {\r\n    opacity: 0.6\n}\r\n.shadow {\r\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\r\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\r\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-lg {\r\n    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-sm {\r\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\r\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.outline-none {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.outline {\r\n    outline-style: solid\n}\r\n.ring {\r\n    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\r\n    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);\r\n    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)\n}\r\n.blur {\r\n    --tw-blur: blur(8px);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.invert {\r\n    --tw-invert: invert(100%);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.filter {\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.backdrop-blur-sm {\r\n    --tw-backdrop-blur: blur(4px);\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.backdrop-filter {\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.transition {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-all {\r\n    transition-property: all;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-colors {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.duration-150 {\r\n    transition-duration: 150ms\n}\r\n.ease-in-out {\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)\n}\r\n.ease-out {\r\n    transition-timing-function: cubic-bezier(0, 0, 0.2, 1)\n}\r\n.hover\\:bg-\\[\\#303030\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#dc2626\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.focus\\:outline-none:focus {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.disabled\\:cursor-not-allowed:disabled {\r\n    cursor: not-allowed\n}\r\n.disabled\\:opacity-50:disabled {\r\n    opacity: 0.5\n}\r\n';
+var styles = '.container {\r\n    width: 100%\n}\r\n@media (min-width: 640px) {\r\n    .container {\r\n        max-width: 640px\n    }\n}\r\n@media (min-width: 768px) {\r\n    .container {\r\n        max-width: 768px\n    }\n}\r\n@media (min-width: 1024px) {\r\n    .container {\r\n        max-width: 1024px\n    }\n}\r\n@media (min-width: 1280px) {\r\n    .container {\r\n        max-width: 1280px\n    }\n}\r\n@media (min-width: 1536px) {\r\n    .container {\r\n        max-width: 1536px\n    }\n}\r\n.sr-only {\r\n    position: absolute;\r\n    width: 1px;\r\n    height: 1px;\r\n    padding: 0;\r\n    margin: -1px;\r\n    overflow: hidden;\r\n    clip: rect(0, 0, 0, 0);\r\n    white-space: nowrap;\r\n    border-width: 0\n}\r\n.pointer-events-none {\r\n    pointer-events: none\n}\r\n.visible {\r\n    visibility: visible\n}\r\n.static {\r\n    position: static\n}\r\n.fixed {\r\n    position: fixed\n}\r\n.absolute {\r\n    position: absolute\n}\r\n.relative {\r\n    position: relative\n}\r\n.inset-0 {\r\n    inset: 0px\n}\r\n.-right-1 {\r\n    right: -0.25rem\n}\r\n.-top-1 {\r\n    top: -0.25rem\n}\r\n.bottom-24 {\r\n    bottom: 6rem\n}\r\n.bottom-6 {\r\n    bottom: 1.5rem\n}\r\n.left-1 {\r\n    left: 0.25rem\n}\r\n.right-6 {\r\n    right: 1.5rem\n}\r\n.top-1 {\r\n    top: 0.25rem\n}\r\n.top-4 {\r\n    top: 1rem\n}\r\n.z-\\[9998\\] {\r\n    z-index: 9998\n}\r\n.mx-1 {\r\n    margin-left: 0.25rem;\r\n    margin-right: 0.25rem\n}\r\n.mx-4 {\r\n    margin-left: 1rem;\r\n    margin-right: 1rem\n}\r\n.mx-auto {\r\n    margin-left: auto;\r\n    margin-right: auto\n}\r\n.mb-1 {\r\n    margin-bottom: 0.25rem\n}\r\n.mb-2 {\r\n    margin-bottom: 0.5rem\n}\r\n.mb-3 {\r\n    margin-bottom: 0.75rem\n}\r\n.mb-4 {\r\n    margin-bottom: 1rem\n}\r\n.mb-6 {\r\n    margin-bottom: 1.5rem\n}\r\n.ml-1 {\r\n    margin-left: 0.25rem\n}\r\n.mt-0 {\r\n    margin-top: 0px\n}\r\n.mt-1 {\r\n    margin-top: 0.25rem\n}\r\n.mt-2 {\r\n    margin-top: 0.5rem\n}\r\n.mt-6 {\r\n    margin-top: 1.5rem\n}\r\n.line-clamp-2 {\r\n    overflow: hidden;\r\n    display: -webkit-box;\r\n    -webkit-box-orient: vertical;\r\n    -webkit-line-clamp: 2\n}\r\n.block {\r\n    display: block\n}\r\n.inline-block {\r\n    display: inline-block\n}\r\n.flex {\r\n    display: flex\n}\r\n.inline-flex {\r\n    display: inline-flex\n}\r\n.hidden {\r\n    display: none\n}\r\n.h-10 {\r\n    height: 2.5rem\n}\r\n.h-12 {\r\n    height: 3rem\n}\r\n.h-6 {\r\n    height: 1.5rem\n}\r\n.h-\\[28px\\] {\r\n    height: 28px\n}\r\n.h-\\[32px\\] {\r\n    height: 32px\n}\r\n.h-\\[36px\\] {\r\n    height: 36px\n}\r\n.h-full {\r\n    height: 100%\n}\r\n.max-h-\\[calc\\(100vh-200px\\)\\] {\r\n    max-height: calc(100vh - 200px)\n}\r\n.w-10 {\r\n    width: 2.5rem\n}\r\n.w-12 {\r\n    width: 3rem\n}\r\n.w-\\[32px\\] {\r\n    width: 32px\n}\r\n.w-full {\r\n    width: 100%\n}\r\n.w-px {\r\n    width: 1px\n}\r\n.min-w-0 {\r\n    min-width: 0px\n}\r\n.max-w-\\[1200px\\] {\r\n    max-width: 1200px\n}\r\n.max-w-\\[480px\\] {\r\n    max-width: 480px\n}\r\n.max-w-\\[640px\\] {\r\n    max-width: 640px\n}\r\n.max-w-\\[900px\\] {\r\n    max-width: 900px\n}\r\n.flex-1 {\r\n    flex: 1 1 0%\n}\r\n.flex-shrink {\r\n    flex-shrink: 1\n}\r\n.shrink-0 {\r\n    flex-shrink: 0\n}\r\n.-translate-x-1 {\r\n    --tw-translate-x: -0.25rem;\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.-translate-y-1 {\r\n    --tw-translate-y: -0.25rem;\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.transform {\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n@keyframes pulse {\r\n    50% {\r\n        opacity: .5\n    }\n}\r\n.animate-pulse {\r\n    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite\n}\r\n@keyframes spin {\r\n    to {\r\n        transform: rotate(360deg)\n    }\n}\r\n.animate-spin {\r\n    animation: spin 1s linear infinite\n}\r\n.cursor-default {\r\n    cursor: default\n}\r\n.select-none {\r\n    -webkit-user-select: none;\r\n       -moz-user-select: none;\r\n            user-select: none\n}\r\n.resize-none {\r\n    resize: none\n}\r\n.resize {\r\n    resize: both\n}\r\n.flex-col {\r\n    flex-direction: column\n}\r\n.flex-wrap {\r\n    flex-wrap: wrap\n}\r\n.items-start {\r\n    align-items: flex-start\n}\r\n.items-end {\r\n    align-items: flex-end\n}\r\n.items-center {\r\n    align-items: center\n}\r\n.justify-center {\r\n    justify-content: center\n}\r\n.justify-between {\r\n    justify-content: space-between\n}\r\n.gap-1 {\r\n    gap: 0.25rem\n}\r\n.gap-2 {\r\n    gap: 0.5rem\n}\r\n.gap-3 {\r\n    gap: 0.75rem\n}\r\n.gap-4 {\r\n    gap: 1rem\n}\r\n.gap-\\[6px\\] {\r\n    gap: 6px\n}\r\n.self-start {\r\n    align-self: flex-start\n}\r\n.overflow-hidden {\r\n    overflow: hidden\n}\r\n.overflow-y-auto {\r\n    overflow-y: auto\n}\r\n.truncate {\r\n    overflow: hidden;\r\n    text-overflow: ellipsis;\r\n    white-space: nowrap\n}\r\n.break-all {\r\n    word-break: break-all\n}\r\n.rounded {\r\n    border-radius: 0.25rem\n}\r\n.rounded-\\[10px\\] {\r\n    border-radius: 10px\n}\r\n.rounded-\\[16px\\] {\r\n    border-radius: 16px\n}\r\n.rounded-\\[24px\\] {\r\n    border-radius: 24px\n}\r\n.rounded-\\[8px\\] {\r\n    border-radius: 8px\n}\r\n.rounded-full {\r\n    border-radius: 9999px\n}\r\n.border {\r\n    border-width: 1px\n}\r\n.border-2 {\r\n    border-width: 2px\n}\r\n.border-b {\r\n    border-bottom-width: 1px\n}\r\n.border-t {\r\n    border-top-width: 1px\n}\r\n.border-\\[\\#f0f0f0\\] {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\r\n.border-red-500 {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(239 68 68 / var(--tw-border-opacity, 1))\n}\r\n.border-transparent {\r\n    border-color: transparent\n}\r\n.border-white {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(255 255 255 / var(--tw-border-opacity, 1))\n}\r\n.bg-\\[\\#1f1f1f\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#ef4444\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f0f0f0\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f4f4f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f5f5f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-amber-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black\\/40 {\r\n    background-color: rgb(0 0 0 / 0.4)\n}\r\n.bg-indigo-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(99 102 241 / var(--tw-bg-opacity, 1))\n}\r\n.bg-red-50 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1))\n}\r\n.bg-red-500 {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-transparent {\r\n    background-color: transparent\n}\r\n.bg-white {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\r\n.object-contain {\r\n    -o-object-fit: contain;\r\n       object-fit: contain\n}\r\n.object-cover {\r\n    -o-object-fit: cover;\r\n       object-fit: cover\n}\r\n.p-0 {\r\n    padding: 0px\n}\r\n.p-1 {\r\n    padding: 0.25rem\n}\r\n.p-3 {\r\n    padding: 0.75rem\n}\r\n.p-4 {\r\n    padding: 1rem\n}\r\n.p-\\[12px\\] {\r\n    padding: 12px\n}\r\n.p-\\[16px\\] {\r\n    padding: 16px\n}\r\n.p-\\[20px\\] {\r\n    padding: 20px\n}\r\n.p-\\[24px\\] {\r\n    padding: 24px\n}\r\n.px-1 {\r\n    padding-left: 0.25rem;\r\n    padding-right: 0.25rem\n}\r\n.px-2 {\r\n    padding-left: 0.5rem;\r\n    padding-right: 0.5rem\n}\r\n.px-3 {\r\n    padding-left: 0.75rem;\r\n    padding-right: 0.75rem\n}\r\n.px-4 {\r\n    padding-left: 1rem;\r\n    padding-right: 1rem\n}\r\n.px-6 {\r\n    padding-left: 1.5rem;\r\n    padding-right: 1.5rem\n}\r\n.px-\\[12px\\] {\r\n    padding-left: 12px;\r\n    padding-right: 12px\n}\r\n.px-\\[16px\\] {\r\n    padding-left: 16px;\r\n    padding-right: 16px\n}\r\n.px-\\[18px\\] {\r\n    padding-left: 18px;\r\n    padding-right: 18px\n}\r\n.py-0 {\r\n    padding-top: 0px;\r\n    padding-bottom: 0px\n}\r\n.py-12 {\r\n    padding-top: 3rem;\r\n    padding-bottom: 3rem\n}\r\n.py-2 {\r\n    padding-top: 0.5rem;\r\n    padding-bottom: 0.5rem\n}\r\n.py-3 {\r\n    padding-top: 0.75rem;\r\n    padding-bottom: 0.75rem\n}\r\n.py-5 {\r\n    padding-top: 1.25rem;\r\n    padding-bottom: 1.25rem\n}\r\n.py-8 {\r\n    padding-top: 2rem;\r\n    padding-bottom: 2rem\n}\r\n.pb-2 {\r\n    padding-bottom: 0.5rem\n}\r\n.pb-3 {\r\n    padding-bottom: 0.75rem\n}\r\n.pb-4 {\r\n    padding-bottom: 1rem\n}\r\n.pb-6 {\r\n    padding-bottom: 1.5rem\n}\r\n.pt-12 {\r\n    padding-top: 3rem\n}\r\n.pt-3 {\r\n    padding-top: 0.75rem\n}\r\n.pt-4 {\r\n    padding-top: 1rem\n}\r\n.pt-6 {\r\n    padding-top: 1.5rem\n}\r\n.text-center {\r\n    text-align: center\n}\r\n.font-mono {\r\n    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace\n}\r\n.text-\\[12px\\] {\r\n    font-size: 12px\n}\r\n.text-\\[13px\\] {\r\n    font-size: 13px\n}\r\n.text-\\[18px\\] {\r\n    font-size: 18px\n}\r\n.font-bold {\r\n    font-weight: 700\n}\r\n.font-semibold {\r\n    font-weight: 600\n}\r\n.uppercase {\r\n    text-transform: uppercase\n}\r\n.italic {\r\n    font-style: italic\n}\r\n.leading-none {\r\n    line-height: 1\n}\r\n.leading-relaxed {\r\n    line-height: 1.625\n}\r\n.leading-snug {\r\n    line-height: 1.375\n}\r\n.tracking-wider {\r\n    letter-spacing: 0.05em\n}\r\n.text-\\[\\#1f1f1f\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.text-\\[\\#9a9a9a\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\r\n.text-amber-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(252 211 77 / var(--tw-text-opacity, 1))\n}\r\n.text-indigo-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(165 180 252 / var(--tw-text-opacity, 1))\n}\r\n.text-red-300 {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(252 165 165 / var(--tw-text-opacity, 1))\n}\r\n.text-white {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\r\n.underline {\r\n    text-decoration-line: underline\n}\r\n.opacity-60 {\r\n    opacity: 0.6\n}\r\n.shadow {\r\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\r\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\r\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-lg {\r\n    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-sm {\r\n    --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);\r\n    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.outline-none {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.outline {\r\n    outline-style: solid\n}\r\n.ring {\r\n    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\r\n    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);\r\n    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)\n}\r\n.blur {\r\n    --tw-blur: blur(8px);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.invert {\r\n    --tw-invert: invert(100%);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.filter {\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.backdrop-blur-sm {\r\n    --tw-backdrop-blur: blur(4px);\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.backdrop-filter {\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.transition {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-all {\r\n    transition-property: all;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-colors {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.duration-150 {\r\n    transition-duration: 150ms\n}\r\n.ease-in-out {\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)\n}\r\n.ease-out {\r\n    transition-timing-function: cubic-bezier(0, 0, 0.2, 1)\n}\r\n.hover\\:bg-\\[\\#303030\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#dc2626\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.focus\\:outline-none:focus {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.disabled\\:cursor-not-allowed:disabled {\r\n    cursor: not-allowed\n}\r\n.disabled\\:opacity-50:disabled {\r\n    opacity: 0.5\n}\r\n';
 var styles_gen_default = styles;
 
 // src/components/BuggyBag.tsx
