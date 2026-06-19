@@ -50,6 +50,20 @@ export default defineConfig(async () => {
         options.define = {
           'process.env.NODE_ENV': '"production"'
         };
+      },
+      onSuccess: async () => {
+        const { copyFileSync, existsSync, mkdirSync } = await import('fs');
+        const path = await import('path');
+        const src = path.join(process.cwd(), 'dist/buggy-bag-standalone.global.js');
+        const dest = path.join(process.cwd(), '../buggy-bag-portal/public/buggy-bag-standalone.js');
+        try {
+          if (existsSync(src)) {
+            copyFileSync(src, dest);
+            console.log('Successfully copied buggy-bag-standalone.js to portal public directory');
+          }
+        } catch (e) {
+          console.error('Failed to copy standalone file', e);
+        }
       }
     }
   ];

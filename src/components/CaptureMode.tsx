@@ -393,6 +393,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
   const [tool, setTool]         = useState<DrawTool>(initialTool);
   const [shapes, setShapes]     = useState<DrawShape[]>([]);
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
+  const [shapeAttachments, setShapeAttachments] = useState<Record<string, { name: string; type: string; base64: string }[]>>({});
   const [pendingShape, setPendingShape] = useState<{ shape: DrawShape; isNew: boolean } | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [sending, setSending]   = useState(false);
@@ -493,13 +494,22 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     });
   }, [annotations]);
 
-  const handleAnnotationConfirm = useCallback((shapeId: string, text: string) => {
+  const handleAnnotationConfirm = useCallback((shapeId: string, text: string, attachments?: { name: string; type: string; base64: string }[]) => {
     setAnnotations(prev => {
       const next = { ...prev, [shapeId]: text };
       try { 
         localStorage.setItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`, JSON.stringify({ shapes, annotations: next })); 
         window.dispatchEvent(new CustomEvent('buggy-bag:draft-changed'));
       } catch {}
+      return next;
+    });
+    setShapeAttachments(prev => {
+      const next = { ...prev };
+      if (attachments && attachments.length > 0) {
+        next[shapeId] = attachments;
+      } else {
+        delete next[shapeId];
+      }
       return next;
     });
     setPendingShape(null);
@@ -615,8 +625,16 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       }
     }
 
-    onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(' | ') || 'Без опису', tech_context: freshTechContext });
-  }, [shapes, annotations, apiKey, onSend, sending, designAuditResult]);
+    onSend({
+      api_key: apiKey,
+      base64_image: imageUrl,
+      shapes,
+      annotations,
+      shape_attachments: Object.keys(shapeAttachments).length > 0 ? shapeAttachments : undefined,
+      description: Object.values(annotations).filter(Boolean).join(' | ') || 'Без опису',
+      tech_context: freshTechContext
+    });
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
 
   const handleCloseRequest = useCallback(() => {
     if (shapes.length > 0) { setShowExitConfirm(true); } 
@@ -1266,6 +1284,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             <ShapeAnnotation
               shape={pendingShape.shape}
               initialText={annotations[pendingShape.shape.id]}
+              initialAttachments={shapeAttachments[pendingShape.shape.id]}
               clipboardHint={lastCopiedColor}
               onClearClipboardHint={() => setLastCopiedColor(null)}
               containerWidth={w}

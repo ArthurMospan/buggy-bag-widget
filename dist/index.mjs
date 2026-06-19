@@ -29197,7 +29197,7 @@ function calcPos(shape, cw, ch) {
   };
 }
 var hasSpeechRecognition = typeof window !== "undefined" && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
-function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHint, containerWidth, containerHeight, onConfirm, onDismiss, onDelete }) {
+function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHint, containerWidth, containerHeight, onConfirm, onDismiss, onDelete, initialAttachments }) {
   const measureDefault = shape.type === "measure" && shape.points ? (() => {
     const [x1, y1, x2, y2] = shape.points;
     const dist = Math.round(Math.hypot(x2 - x1, y2 - y1));
@@ -29209,6 +29209,8 @@ function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHi
   const [interim, setInterim] = useState3("");
   const [listening, setListening] = useState3(false);
   const [micError, setMicError] = useState3("");
+  const [localAttachments, setLocalAttachments] = useState3(initialAttachments || []);
+  const fileInputRef = useRef3(null);
   const { x, y } = calcPos(shape, containerWidth, containerHeight);
   const textareaRef = useRef3(null);
   useEffect3(() => {
@@ -29254,7 +29256,19 @@ function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHi
   };
   const handleConfirm = () => {
     window.dispatchEvent(new CustomEvent("buggy-bag:stop-voice"));
-    onConfirm(shape.id, (text + (interim ? " " + interim : "")).trim());
+    onConfirm(shape.id, (text + (interim ? " " + interim : "")).trim(), localAttachments);
+  };
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    Promise.all(files.map((file) => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve({ name: file.name, type: file.type, base64: ev.target?.result });
+      reader.readAsDataURL(file);
+    }))).then((newAttachments) => {
+      setLocalAttachments((prev) => [...prev, ...newAttachments]);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
   const handleDismiss = () => {
     window.dispatchEvent(new CustomEvent("buggy-bag:stop-voice"));
@@ -29341,6 +29355,18 @@ function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHi
             /* @__PURE__ */ jsx3("button", { type: "button", onClick: () => onClearClipboardHint?.(), style: { background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", fontSize: "12px", cursor: "pointer", padding: "0 4px" }, title: "\u0421\u0445\u043E\u0432\u0430\u0442\u0438", children: "\u2715" })
           ] })
         ] }),
+        localAttachments.length > 0 && /* @__PURE__ */ jsx3("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }, children: localAttachments.map((att, i) => /* @__PURE__ */ jsxs2("div", { style: { position: "relative", width: "40px", height: "40px", borderRadius: "6px", overflow: "hidden", background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }, children: [
+          att.type.startsWith("image/") ? /* @__PURE__ */ jsx3("img", { src: att.base64, alt: "preview", style: { width: "100%", height: "100%", objectFit: "cover" } }) : /* @__PURE__ */ jsx3("span", { style: { fontSize: "10px", color: "white", fontWeight: "bold" }, children: att.name.split(".").pop()?.toUpperCase() || "FILE" }),
+          /* @__PURE__ */ jsx3(
+            "button",
+            {
+              type: "button",
+              onClick: () => setLocalAttachments((p) => p.filter((_, idx) => idx !== i)),
+              style: { position: "absolute", top: 0, right: 0, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "0 0 0 4px", width: "16px", height: "16px", fontSize: "10px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+              children: "\u2715"
+            }
+          )
+        ] }, i)) }),
         /* @__PURE__ */ jsxs2("div", { style: { display: "flex", gap: "6px", marginTop: "10px" }, children: [
           hasSpeechRecognition ? /* @__PURE__ */ jsx3(
             "button",
@@ -29392,6 +29418,17 @@ function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHi
                 /* @__PURE__ */ jsx3("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
                 /* @__PURE__ */ jsx3("line", { x1: "12", y1: "19", x2: "12", y2: "22" })
               ] })
+            }
+          ),
+          /* @__PURE__ */ jsx3("input", { type: "file", ref: fileInputRef, style: { display: "none" }, multiple: true, onChange: handleFileChange }),
+          /* @__PURE__ */ jsx3(
+            "button",
+            {
+              type: "button",
+              onClick: () => fileInputRef.current?.click(),
+              title: "\u041F\u0440\u0438\u043A\u0440\u0456\u043F\u0438\u0442\u0438 \u0444\u0430\u0439\u043B\u0438",
+              style: { width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0, background: "rgba(255,255,255,0.08)", border: "1px solid transparent", cursor: "pointer", color: "white", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" },
+              children: /* @__PURE__ */ jsx3("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsx3("path", { d: "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" }) })
             }
           ),
           onDelete && /* @__PURE__ */ jsx3(
@@ -30482,6 +30519,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const [tool, setTool] = useState4(initialTool);
   const [shapes, setShapes] = useState4([]);
   const [annotations, setAnnotations] = useState4({});
+  const [shapeAttachments, setShapeAttachments] = useState4({});
   const [pendingShape, setPendingShape] = useState4(null);
   const [showExitConfirm, setShowExitConfirm] = useState4(false);
   const [sending, setSending] = useState4(false);
@@ -30569,13 +30607,22 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
       return next;
     });
   }, [annotations]);
-  const handleAnnotationConfirm = useCallback2((shapeId, text) => {
+  const handleAnnotationConfirm = useCallback2((shapeId, text, attachments) => {
     setAnnotations((prev) => {
       const next = { ...prev, [shapeId]: text };
       try {
         localStorage.setItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`, JSON.stringify({ shapes, annotations: next }));
         window.dispatchEvent(new CustomEvent("buggy-bag:draft-changed"));
       } catch {
+      }
+      return next;
+    });
+    setShapeAttachments((prev) => {
+      const next = { ...prev };
+      if (attachments && attachments.length > 0) {
+        next[shapeId] = attachments;
+      } else {
+        delete next[shapeId];
       }
       return next;
     });
@@ -30682,8 +30729,16 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
         }
       }
     }
-    onSend({ api_key: apiKey, base64_image: imageUrl, shapes, annotations, description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443", tech_context: freshTechContext });
-  }, [shapes, annotations, apiKey, onSend, sending, designAuditResult]);
+    onSend({
+      api_key: apiKey,
+      base64_image: imageUrl,
+      shapes,
+      annotations,
+      shape_attachments: Object.keys(shapeAttachments).length > 0 ? shapeAttachments : void 0,
+      description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443",
+      tech_context: freshTechContext
+    });
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
   const handleCloseRequest = useCallback2(() => {
     if (shapes.length > 0) {
       setShowExitConfirm(true);
@@ -31512,6 +31567,7 @@ ${issue.message}` }));
             {
               shape: pendingShape.shape,
               initialText: annotations[pendingShape.shape.id],
+              initialAttachments: shapeAttachments[pendingShape.shape.id],
               clipboardHint: lastCopiedColor,
               onClearClipboardHint: () => setLastCopiedColor(null),
               containerWidth: w,
@@ -32056,7 +32112,7 @@ ${issue.message}` }));
 }
 
 // src/components/MobileCaptureMode.tsx
-import { useCallback as useCallback3, useState as useState5 } from "react";
+import React7, { useCallback as useCallback3, useState as useState5 } from "react";
 import { Fragment as Fragment3, jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
 function resolvePageElement(x, y) {
   const els = document.elementsFromPoint(x, y);
@@ -32068,6 +32124,8 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
   const [pin, setPin] = useState5(null);
   const [description, setDescription] = useState5("");
   const [sending, setSending] = useState5(false);
+  const [localAttachments, setLocalAttachments] = useState5([]);
+  const fileInputRef = React7.useRef(null);
   const handleTap = useCallback3((e) => {
     if (pin) return;
     const { clientX: x, clientY: y } = e;
@@ -32095,13 +32153,26 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
         base64_image: imageUrl,
         shapes: [shape],
         annotations: { [shapeId]: text },
+        shape_attachments: localAttachments.length > 0 ? { [shapeId]: localAttachments } : void 0,
         description: text,
         tech_context: techContext
       });
     } finally {
       setSending(false);
     }
-  }, [pin, description, sending, apiKey, onSend]);
+  }, [pin, description, sending, apiKey, onSend, localAttachments]);
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    Promise.all(files.map((file) => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve({ name: file.name, type: file.type, base64: ev.target?.result });
+      reader.readAsDataURL(file);
+    }))).then((newAttachments) => {
+      setLocalAttachments((prev) => [...prev, ...newAttachments]);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
   return /* @__PURE__ */ jsxs4("div", { "data-buggy-bag": "true", style: { position: "fixed", inset: 0, zIndex: 9998, fontFamily: "system-ui, -apple-system, sans-serif" }, children: [
     /* @__PURE__ */ jsx5(
       "div",
@@ -32201,7 +32272,42 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
             }
           }
         ),
+        localAttachments.length > 0 && /* @__PURE__ */ jsx5("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }, children: localAttachments.map((att, i) => /* @__PURE__ */ jsxs4("div", { style: { position: "relative", width: "48px", height: "48px", borderRadius: "8px", overflow: "hidden", background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }, children: [
+          att.type.startsWith("image/") ? /* @__PURE__ */ jsx5("img", { src: att.base64, alt: "preview", style: { width: "100%", height: "100%", objectFit: "cover" } }) : /* @__PURE__ */ jsx5("span", { style: { fontSize: "11px", color: "white", fontWeight: "bold" }, children: att.name.split(".").pop()?.toUpperCase() || "FILE" }),
+          /* @__PURE__ */ jsx5(
+            "button",
+            {
+              type: "button",
+              onClick: () => setLocalAttachments((p) => p.filter((_, idx) => idx !== i)),
+              style: { position: "absolute", top: 0, right: 0, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "0 0 0 6px", width: "20px", height: "20px", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+              children: "\u2715"
+            }
+          )
+        ] }, i)) }),
         /* @__PURE__ */ jsxs4("div", { style: { display: "flex", gap: "8px" }, children: [
+          /* @__PURE__ */ jsx5("input", { type: "file", ref: fileInputRef, style: { display: "none" }, multiple: true, onChange: handleFileChange }),
+          /* @__PURE__ */ jsx5(
+            "button",
+            {
+              type: "button",
+              onClick: () => fileInputRef.current?.click(),
+              disabled: sending,
+              title: "\u041F\u0440\u0438\u043A\u0440\u0456\u043F\u0438\u0442\u0438 \u0444\u0430\u0439\u043B\u0438",
+              style: {
+                flex: "0 0 auto",
+                background: "rgba(255,255,255,0.08)",
+                color: "white",
+                border: "none",
+                borderRadius: "12px",
+                width: "44px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: sending ? "default" : "pointer"
+              },
+              children: /* @__PURE__ */ jsx5("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsx5("path", { d: "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" }) })
+            }
+          ),
           /* @__PURE__ */ jsx5(
             "button",
             {

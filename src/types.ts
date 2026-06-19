@@ -112,12 +112,12 @@ export interface TechContext {
   designAudit?: DesignAuditResult | null;
 }
 
-// What the widget sends to /api/bugs/submit
 export interface SubmitBugPayload {
   api_key: string;
   base64_image: string;          // "data:image/png;base64,..."
   shapes: DrawShape[];
   annotations: Record<string, string>;
+  shape_attachments?: Record<string, { name: string; type: string; base64: string }[]>;
   description: string;
   tech_context: TechContext;
 }

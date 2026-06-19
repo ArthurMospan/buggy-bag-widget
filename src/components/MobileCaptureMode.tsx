@@ -39,6 +39,8 @@ export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureMod
   const [pin, setPin] = useState<PendingPin | null>(null);
   const [description, setDescription] = useState('');
   const [sending, setSending] = useState(false);
+  const [localAttachments, setLocalAttachments] = useState<{ name: string; type: string; base64: string }[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleTap = useCallback((e: React.MouseEvent) => {
     if (pin) return; // pin already placed — use "Назад" to retarget instead of jumping on stray taps
@@ -71,13 +73,27 @@ export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureMod
         base64_image: imageUrl,
         shapes: [shape],
         annotations: { [shapeId]: text },
+        shape_attachments: localAttachments.length > 0 ? { [shapeId]: localAttachments } : undefined,
         description: text,
         tech_context: techContext,
       });
     } finally {
       setSending(false);
     }
-  }, [pin, description, sending, apiKey, onSend]);
+  }, [pin, description, sending, apiKey, onSend, localAttachments]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    Promise.all(files.map(file => new Promise<{ name: string; type: string; base64: string }>(resolve => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve({ name: file.name, type: file.type, base64: ev.target?.result as string });
+      reader.readAsDataURL(file);
+    }))).then(newAttachments => {
+      setLocalAttachments(prev => [...prev, ...newAttachments]);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   return (
     <div data-buggy-bag="true" style={{ position: 'fixed', inset: 0, zIndex: 9998, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -147,7 +163,41 @@ export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureMod
                 outline: 'none', marginBottom: '12px',
               }}
             />
+
+            {localAttachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                {localAttachments.map((att, i) => (
+                  <div key={i} style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {att.type.startsWith('image/') ? (
+                      <img src={att.base64} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>{att.name.split('.').pop()?.toUpperCase() || 'FILE'}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setLocalAttachments(p => p.filter((_, idx) => idx !== i))}
+                      style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '0 0 0 6px', width: '20px', height: '20px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '8px' }}>
+              <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileChange} />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sending}
+                title="Прикріпити файли"
+                style={{
+                  flex: '0 0 auto', background: 'rgba(255,255,255,0.08)', color: 'white',
+                  border: 'none', borderRadius: '12px', width: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: sending ? 'default' : 'pointer',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </button>
               <button
                 type="button"
                 onClick={handleBack}

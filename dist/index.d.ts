@@ -137,6 +137,11 @@ interface SubmitBugPayload {
     base64_image: string;
     shapes: DrawShape[];
     annotations: Record<string, string>;
+    shape_attachments?: Record<string, {
+        name: string;
+        type: string;
+        base64: string;
+    }[]>;
     description: string;
     tech_context: TechContext;
 }

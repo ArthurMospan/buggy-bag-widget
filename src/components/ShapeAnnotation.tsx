@@ -8,9 +8,10 @@ interface ShapeAnnotationProps {
   onClearClipboardHint?: () => void;
   containerWidth: number;
   containerHeight: number;
-  onConfirm: (shapeId: string, text: string) => void;
+  onConfirm: (shapeId: string, text: string, attachments?: { name: string; type: string; base64: string }[]) => void;
   onDismiss: () => void;
   onDelete?: (shapeId: string) => void;
+  initialAttachments?: { name: string; type: string; base64: string }[];
 }
 
 const W = 280;
@@ -40,7 +41,7 @@ function calcPos(shape: DrawShape, cw: number, ch: number): { x: number; y: numb
 const hasSpeechRecognition = typeof window !== 'undefined' &&
   !!((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
 
-export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHint, containerWidth, containerHeight, onConfirm, onDismiss, onDelete }: ShapeAnnotationProps) {
+export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClipboardHint, containerWidth, containerHeight, onConfirm, onDismiss, onDelete, initialAttachments }: ShapeAnnotationProps) {
   const measureDefault = shape.type === 'measure' && shape.points
     ? (() => {
         const [x1, y1, x2, y2] = shape.points;
@@ -54,6 +55,8 @@ export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClip
   const [interim, setInterim] = useState('');
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState('');
+  const [localAttachments, setLocalAttachments] = useState<{ name: string; type: string; base64: string }[]>(initialAttachments || []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { x, y } = calcPos(shape, containerWidth, containerHeight);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -100,7 +103,21 @@ export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClip
 
   const handleConfirm = () => {
     window.dispatchEvent(new CustomEvent('buggy-bag:stop-voice'));
-    onConfirm(shape.id, (text + (interim ? ' ' + interim : '')).trim());
+    onConfirm(shape.id, (text + (interim ? ' ' + interim : '')).trim(), localAttachments);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    Promise.all(files.map(file => new Promise<{ name: string; type: string; base64: string }>(resolve => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve({ name: file.name, type: file.type, base64: ev.target?.result as string });
+      reader.readAsDataURL(file);
+    }))).then(newAttachments => {
+      setLocalAttachments(prev => [...prev, ...newAttachments]);
+    });
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDismiss = () => {
@@ -179,6 +196,25 @@ export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClip
         </div>
       )}
 
+      {localAttachments.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+          {localAttachments.map((att, i) => (
+            <div key={i} style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {att.type.startsWith('image/') ? (
+                <img src={att.base64} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: '10px', color: 'white', fontWeight: 'bold' }}>{att.name.split('.').pop()?.toUpperCase() || 'FILE'}</span>
+              )}
+              <button
+                type="button"
+                onClick={() => setLocalAttachments(p => p.filter((_, idx) => idx !== i))}
+                style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '0 0 0 4px', width: '16px', height: '16px', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
         {/* Voice button */}
         {hasSpeechRecognition ? (
@@ -221,6 +257,16 @@ export function ShapeAnnotation({ shape, initialText, clipboardHint, onClearClip
             </svg>
           </button>
         )}
+
+        <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileChange} />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          title="Прикріпити файли"
+          style={{ width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0, background: 'rgba(255,255,255,0.08)', border: '1px solid transparent', cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
 
         {/* Delete */}
         {onDelete && (
