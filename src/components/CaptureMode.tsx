@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { toPng } from 'html-to-image';
-import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditResult, AutoBugResult } from '../types';
+import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditResult, AutoBugResult, TechContext } from '../types';
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
@@ -97,7 +97,7 @@ function parseRgb(str: string) {
   return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : null;
 }
 
-function runAutoBugScan(): { issues: AutoBugResult[], categoryCounts: Record<string, number> } {
+function runAutoBugScan(ctx: TechContext): { issues: AutoBugResult[], categoryCounts: Record<string, number> } {
   const issues: AutoBugResult[] = [];
   const counts: Record<string, number> = {};
   const categoryCounts: Record<string, number> = {};
@@ -223,7 +223,6 @@ function runAutoBugScan(): { issues: AutoBugResult[], categoryCounts: Record<str
   });
 
   try {
-    const ctx = (window as any).__BUGGY_BAG_CONTEXT__;
     // 6. Console warnings and errors
     if (ctx?.consoleErrors?.length) {
       ctx.consoleErrors.forEach((e: any) => {
@@ -712,7 +711,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         if (overlay === 'spacing') enableSpacingOverlay();
         if (overlay === 'zoom') enableZoom();
         if (overlay === 'invert') document.body.style.filter = 'invert(1) hue-rotate(180deg)';
-        if (overlay === 'auto-bugs') { setAutoBugResults(runAutoBugScan()); }
+        if (overlay === 'auto-bugs') { setAutoBugResults(runAutoBugScan(collectTechContext())); }
         if (overlay === 'design-audit') { setDesignAuditResult(runDesignAudit()); }
         if (overlay === 'show-code') document.body.style.cursor = 'crosshair';
       }

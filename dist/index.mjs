@@ -30264,7 +30264,7 @@ function parseRgb(str) {
   const match = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : null;
 }
-function runAutoBugScan() {
+function runAutoBugScan(ctx) {
   const issues = [];
   const counts = {};
   const categoryCounts = {};
@@ -30362,7 +30362,6 @@ function runAutoBugScan() {
     }
   });
   try {
-    const ctx = window.__BUGGY_BAG_CONTEXT__;
     if (ctx?.consoleErrors?.length) {
       ctx.consoleErrors.forEach((e) => {
         addIssue(e.level === "warn" ? "console-warn" : "console-error", "console", `${e.level === "warn" ? "\u26A0\uFE0F" : "\u274C"} Console ${e.level}: ${String(e.message).slice(0, 80)}`);
@@ -30815,7 +30814,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
         if (overlay === "zoom") enableZoom();
         if (overlay === "invert") document.body.style.filter = "invert(1) hue-rotate(180deg)";
         if (overlay === "auto-bugs") {
-          setAutoBugResults(runAutoBugScan());
+          setAutoBugResults(runAutoBugScan(collectTechContext()));
         }
         if (overlay === "design-audit") {
           setDesignAuditResult(runDesignAudit());
