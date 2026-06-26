@@ -403,6 +403,7 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
               params.delete('bb');
               const searchStr = params.toString() ? '?' + params.toString() : '';
               window.history.replaceState({}, '', window.location.pathname + searchStr);
+              window.location.reload();
             }
             if (data.is_active === false) {
               setIsProjectActive(false);
