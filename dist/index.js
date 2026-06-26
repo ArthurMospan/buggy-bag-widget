@@ -32579,7 +32579,16 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
         const pId = data?.bug?.project_id || null;
-        const targetProjUrl = pId && portalUrl ? `${portalUrl}/projects/${pId}` : portalUrl || null;
+        let targetProjUrl = null;
+        if (pId) {
+          if (portalUrl) {
+            targetProjUrl = `${portalUrl}/projects/${pId}`;
+          } else if (apiEndpoint && apiEndpoint.startsWith("/")) {
+            targetProjUrl = `/projects/${pId}`;
+          }
+        } else if (portalUrl) {
+          targetProjUrl = portalUrl;
+        }
         showSuccessToast(targetProjUrl);
       } else showToast("\u26A0 \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430", false);
     } catch {

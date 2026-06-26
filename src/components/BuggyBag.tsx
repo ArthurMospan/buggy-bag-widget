@@ -18,34 +18,34 @@ export interface BuggyBagProps {
 function BugIcon() {
   return (
     <svg width="56" height="56" viewBox="0 0 194 194" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10.7365 18.4947C-0.604524 20.9451 -6.27503 -5.19299 10.7365 0.933186C24.3457 5.83418 36.659 21.4903 41.1144 28.7056L42.7999 31.4049C54.7817 28.0012 71.5545 27.9996 97.0001 27.9996C122.445 27.9996 139.218 28.0014 151.199 31.4049L152.886 28.7056C157.341 21.4903 169.655 5.83418 183.264 0.933186C200.275 -5.19278 194.605 20.9448 183.264 18.4947C174.191 16.5343 165.982 22.0348 163.012 25.0299L157.341 31.1558L156.075 33.0904C159.532 34.5302 162.546 36.377 165.248 38.7467C166.669 39.9929 168.008 41.3305 169.254 42.7515C180 55.0055 180 73.6704 180 111C180 148.329 180 166.994 169.254 179.248C168.008 180.669 166.669 182.007 165.248 183.253C152.994 194 134.33 194 97.0001 194C59.6708 194 41.006 194 28.7521 183.253C27.331 182.007 25.9925 180.669 24.7462 179.248C14.0002 166.994 14.0001 148.329 14.0001 111C14.0001 73.6703 13.9999 55.0054 24.7462 42.7515C25.9925 41.3304 27.331 39.9929 28.7521 38.7467C31.454 36.3772 34.4674 34.5302 37.924 33.0904L36.6593 31.1558L30.9884 25.0299C28.0181 22.0348 19.8093 16.5343 10.7365 18.4947Z" fill="#1F1F1F"/>
-      <path d="M30.6001 102.7C30.6001 86.6564 43.6062 73.6503 59.6501 73.6503C75.6939 73.6503 88.7001 86.6564 88.7001 102.7V106.85C88.7001 122.894 75.6939 135.9 59.6501 135.9C43.6062 135.9 30.6001 122.894 30.6001 106.85V102.7Z" fill="white"/>
-      <path d="M105.3 102.7C105.3 86.6564 118.306 73.6503 134.35 73.6503C150.394 73.6503 163.4 86.6564 163.4 102.7V106.85C163.4 122.894 150.394 135.9 134.35 135.9C118.306 135.9 105.3 122.894 105.3 106.85V102.7Z" fill="white"/>
-      <path d="M126.05 97.512C126.05 88.917 133.018 81.9495 141.613 81.9495C150.208 81.9495 157.175 88.917 157.175 97.512C157.175 106.107 150.208 113.074 141.613 113.074C133.018 113.074 126.05 106.107 126.05 97.512Z" fill="#1F1F1F"/>
-      <path d="M51.3501 97.512C51.3501 88.917 58.3176 81.9495 66.9126 81.9495C75.5075 81.9495 82.4751 88.917 82.4751 97.512C82.4751 106.107 75.5075 113.074 66.9126 113.074C58.3176 113.074 51.3501 106.107 51.3501 97.512Z" fill="#1F1F1F"/>
+      <path d="M10.7365 18.4947C-0.604524 20.9451 -6.27503 -5.19299 10.7365 0.933186C24.3457 5.83418 36.659 21.4903 41.1144 28.7056L42.7999 31.4049C54.7817 28.0012 71.5545 27.9996 97.0001 27.9996C122.445 27.9996 139.218 28.0014 151.199 31.4049L152.886 28.7056C157.341 21.4903 169.655 5.83418 183.264 0.933186C200.275 -5.19278 194.605 20.9448 183.264 18.4947C174.191 16.5343 165.982 22.0348 163.012 25.0299L157.341 31.1558L156.075 33.0904C159.532 34.5302 162.546 36.377 165.248 38.7467C166.669 39.9929 168.008 41.3305 169.254 42.7515C180 55.0055 180 73.6704 180 111C180 148.329 180 166.994 169.254 179.248C168.008 180.669 166.669 182.007 165.248 183.253C152.994 194 134.33 194 97.0001 194C59.6708 194 41.006 194 28.7521 183.253C27.331 182.007 25.9925 180.669 24.7462 179.248C14.0002 166.994 14.0001 148.329 14.0001 111C14.0001 73.6703 13.9999 55.0054 24.7462 42.7515C25.9925 41.3304 27.331 39.9929 28.7521 38.7467C31.454 36.3772 34.4674 34.5302 37.924 33.0904L36.6593 31.1558L30.9884 25.0299C28.0181 22.0348 19.8093 16.5343 10.7365 18.4947Z" fill="#1F1F1F" />
+      <path d="M30.6001 102.7C30.6001 86.6564 43.6062 73.6503 59.6501 73.6503C75.6939 73.6503 88.7001 86.6564 88.7001 102.7V106.85C88.7001 122.894 75.6939 135.9 59.6501 135.9C43.6062 135.9 30.6001 122.894 30.6001 106.85V102.7Z" fill="white" />
+      <path d="M105.3 102.7C105.3 86.6564 118.306 73.6503 134.35 73.6503C150.394 73.6503 163.4 86.6564 163.4 102.7V106.85C163.4 122.894 150.394 135.9 134.35 135.9C118.306 135.9 105.3 122.894 105.3 106.85V102.7Z" fill="white" />
+      <path d="M126.05 97.512C126.05 88.917 133.018 81.9495 141.613 81.9495C150.208 81.9495 157.175 88.917 157.175 97.512C157.175 106.107 150.208 113.074 141.613 113.074C133.018 113.074 126.05 106.107 126.05 97.512Z" fill="#1F1F1F" />
+      <path d="M51.3501 97.512C51.3501 88.917 58.3176 81.9495 66.9126 81.9495C75.5075 81.9495 82.4751 88.917 82.4751 97.512C82.4751 106.107 75.5075 113.074 66.9126 113.074C58.3176 113.074 51.3501 106.107 51.3501 97.512Z" fill="#1F1F1F" />
     </svg>
   );
 }
 
 function PinIcon() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>;
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>;
 }
 function RectIcon() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>;
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /></svg>;
 }
 function ArrowIcon() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 19L19 5"/><path d="M8 5h11v11"/></svg>;
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 19L19 5" /><path d="M8 5h11v11" /></svg>;
 }
 function ExternalLinkIcon() {
-  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>;
 }
 
 // Tool definitions — Pin is first
 const toolsList: { tool: DrawTool; icon: React.ReactNode; title: string; hotkey: string }[] = [
-  { tool: 'pin',     icon: <PinIcon />,    title: 'Поставити пін',   hotkey: '1' },
-  { tool: 'rect',   icon: <RectIcon />,   title: 'Виділити область', hotkey: '2' },
-  { tool: 'arrow',  icon: <ArrowIcon />,  title: 'Намалювати стрілку', hotkey: '3' },
-  { tool: 'measure', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.55 6.45L17.55 2.45a1 1 0 0 0-1.41 0L2.45 16.14a1 1 0 0 0 0 1.41l4 4a1 1 0 0 0 1.41 0L21.55 7.86a1 1 0 0 0 0-1.41z"/><path d="M8 8l1.5 1.5"/><path d="M11.5 11.5l1.5 1.5"/><path d="M15 15l1.5 1.5"/></svg>, title: 'Лінійка', hotkey: '4' },
+  { tool: 'pin', icon: <PinIcon />, title: 'Поставити пін', hotkey: '1' },
+  { tool: 'rect', icon: <RectIcon />, title: 'Виділити область', hotkey: '2' },
+  { tool: 'arrow', icon: <ArrowIcon />, title: 'Намалювати стрілку', hotkey: '3' },
+  { tool: 'measure', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.55 6.45L17.55 2.45a1 1 0 0 0-1.41 0L2.45 16.14a1 1 0 0 0 0 1.41l4 4a1 1 0 0 0 1.41 0L21.55 7.86a1 1 0 0 0 0-1.41z" /><path d="M8 8l1.5 1.5" /><path d="M11.5 11.5l1.5 1.5" /><path d="M15 15l1.5 1.5" /></svg>, title: 'Лінійка', hotkey: '4' },
 ];
 
 function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
@@ -109,7 +109,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
             setDraftConflict({ path: key.replace('BUGGY_BAG_DRAFT_', ''), count: parsed.shapes.length });
             return;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     setActiveTool('pin');
@@ -130,7 +130,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
         setTimeout(() => setToast(null), 4000);
       }
     };
-    
+
     window.addEventListener('buggy-bag:toggle', handler);
     window.addEventListener('buggy-bag:toast', toastHandler);
     return () => {
@@ -309,7 +309,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
             // Success state
             <>
               <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
               </div>
               <span style={{ fontSize: '13px', fontWeight: '600', color: 'white' }}>{toast.msg || 'Баг репорт надіслано'}</span>
               {toast.isBugReport && (projectUrl || portalUrl) && (
@@ -322,7 +322,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
                   onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f4f4f5'; }}
                 >
                   Перейти в проєкт
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
                 </a>
               )}
               <button type="button" onClick={() => setToast(null)}
@@ -334,7 +334,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
           ) : (
             // Error state
             <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
               <span style={{ fontSize: '13px', color: '#fca5a5', fontWeight: '600' }}>{toast.msg}</span>
             </>
           )}
@@ -388,33 +388,33 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
         fetch(pingUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             api_key: apiKey,
             favicon_url: favicon.url,
             favicon_color: favicon.color,
             bb_param: bbParam || undefined
           }),
         })
-        .then(r => r.json())
-        .then(data => {
-          if (data.ok) {
-            if (data.grant_access) {
-              localStorage.setItem('BUGGY_BAG_ACCESS', 'active');
-              params.delete('bb');
-              const searchStr = params.toString() ? '?' + params.toString() : '';
-              window.history.replaceState({}, '', window.location.pathname + searchStr);
-              window.location.reload();
-            }
-            if (data.is_active === false) {
-              setIsProjectActive(false);
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              if (data.grant_access) {
+                localStorage.setItem('BUGGY_BAG_ACCESS', 'active');
+                params.delete('bb');
+                const searchStr = params.toString() ? '?' + params.toString() : '';
+                window.history.replaceState({}, '', window.location.pathname + searchStr);
+                window.location.reload();
+              }
+              if (data.is_active === false) {
+                setIsProjectActive(false);
+              } else {
+                setIsProjectActive(true);
+              }
             } else {
               setIsProjectActive(true);
             }
-          } else {
-            setIsProjectActive(true);
-          }
-        })
-        .catch(() => setIsProjectActive(true));
+          })
+          .catch(() => setIsProjectActive(true));
       });
     } else {
       setIsProjectActive(true);
@@ -492,7 +492,7 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
 
     const stopVoice = () => {
       _active = false;
-      try { _rec?.stop(); } catch {}
+      try { _rec?.stop(); } catch { }
       _rec = null;
     };
 
@@ -536,7 +536,7 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
 
     return () => {
       _active = false;
-      try { _rec?.stop(); } catch {}
+      try { _rec?.stop(); } catch { }
       document.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('buggy-bag:start-voice', startVoice);
       window.removeEventListener('buggy-bag:stop-voice', stopVoice);
