@@ -564,7 +564,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
     const annotationCanvas = host?.shadowRoot?.querySelector('canvas') ?? null;
 
-    const imageUrl = await capturePageScreenshot(annotationCanvas);
+    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas);
 
     setIsCapturing(false);
     try { 
@@ -624,13 +624,18 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       }
     }
 
+    let finalDescription = Object.values(annotations).filter(Boolean).join(' | ') || 'Без опису';
+    if (fallbackUsed) {
+      finalDescription += '\n\n⚠️ Увага: Цей скріншот було зроблено у спрощеному режимі (fallback), тому деякі шрифти або картинки можуть бути відсутні через налаштування безпеки сайту (CORS).';
+    }
+
     onSend({
       api_key: apiKey,
       base64_image: imageUrl,
       shapes,
       annotations,
       shape_attachments: Object.keys(shapeAttachments).length > 0 ? shapeAttachments : undefined,
-      description: Object.values(annotations).filter(Boolean).join(' | ') || 'Без опису',
+      description: finalDescription,
       tech_context: freshTechContext
     });
   }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);

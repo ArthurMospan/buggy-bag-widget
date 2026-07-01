@@ -12,7 +12,7 @@ import { toPng } from 'html-to-image';
  * so it works the same on desktop, inside the Адаптивність iframe, and on
  * a real phone.
  */
-export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement | null): Promise<string> {
+export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement | null): Promise<{ imageUrl: string; fallbackUsed: boolean }> {
   const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
 
   let annotationDataUrl: string | null = null;
@@ -25,23 +25,65 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
   if (host) host.style.opacity = '0';
 
   let imageUrl = '';
+  let fallbackUsed = false;
   try {
-    // Capture the host page without skipFonts so web fonts render correctly.
-    // html-to-image fetches @font-face rules; Google Fonts & same-origin fonts
-    // work fine. CORS-restricted fonts fall back gracefully.
-    const pageDataUrl = await toPng(document.body, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-      pixelRatio: 1,
-      // Skip the widget host — html-to-image can't serialize Shadow DOM
-      // and will throw or produce a corrupt blank image if it tries.
-      filter: (node: HTMLElement) => node.id !== 'buggy-bag-host',
-    });
+    const transparentPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+    let pageDataUrl = '';
+    
+    try {
+      // Tier 1: High quality, fetch everything (except favicons which are always skipped)
+      pageDataUrl = await toPng(document.body, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        imagePlaceholder: transparentPixel,
+        filter: (node: HTMLElement) => {
+          if (node.id === 'buggy-bag-host') return false;
+          if (node.tagName === 'LINK') {
+            const rel = (node as HTMLLinkElement).rel?.toLowerCase() || '';
+            if (rel.includes('icon')) return false;
+          }
+          return true;
+        },
+      });
+    } catch (tier1Err) {
+      console.warn('[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...', tier1Err);
+      fallbackUsed = true;
+      
+      try {
+        // Tier 2: Strip risky elements (images, iframes, stylesheets) but PRESERVE fonts
+        pageDataUrl = await toPng(document.body, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          pixelRatio: 1,
+          imagePlaceholder: transparentPixel,
+          filter: (node: HTMLElement) => {
+            if (node.id === 'buggy-bag-host') return false;
+            if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'IMG' || node.tagName === 'VIDEO') return false;
+            return true;
+          },
+        });
+      } catch (tier2Err) {
+        console.warn('[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...', tier2Err);
+        // Tier 3: Absolute fallback, strip EVERYTHING including fonts
+        pageDataUrl = await toPng(document.body, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          pixelRatio: 1,
+          imagePlaceholder: transparentPixel,
+          skipFonts: true,
+          filter: (node: HTMLElement) => {
+            if (node.id === 'buggy-bag-host') return false;
+            if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'IMG' || node.tagName === 'VIDEO' || node.tagName === 'SVG') return false;
+            return true;
+          },
+        });
+      }
+    }
 
     if (annotationDataUrl) {
-      // Composite page + annotations via Canvas 2D API. This is the reliable
-      // path: html-to-image never touches <canvas> elements, and we control
-      // the compositing precisely with pixel dimensions.
+      // Composite page + annotations via Canvas 2D API.
       const composite = document.createElement('canvas');
       composite.width = window.innerWidth;
       composite.height = window.innerHeight;
@@ -67,10 +109,10 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
       imageUrl = pageDataUrl;
     }
   } catch (e) {
-    console.warn('[BuggyBag] screenshot failed', e);
+    console.warn('[BuggyBag] screenshot completely failed', e);
   } finally {
     if (host) host.style.opacity = prevOpacity;
   }
 
-  return imageUrl;
+  return { imageUrl, fallbackUsed };
 }

@@ -56,7 +56,7 @@ export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureMod
     try {
       // capturePageScreenshot hides the whole widget host (this UI included)
       // while it snapshots, so the pin marker / sheet never end up in the shot.
-      const imageUrl = await capturePageScreenshot();
+      const { imageUrl, fallbackUsed } = await capturePageScreenshot();
       const shapeId = `pin-${Date.now()}`;
       const shape: DrawShape = {
         id: shapeId,
@@ -67,7 +67,11 @@ export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureMod
         elementContext: pin.elementContext ?? undefined,
       };
       const techContext = collectTechContext(pin.element);
-      const text = description.trim() || 'Без опису';
+      let text = description.trim() || 'Без опису';
+      if (fallbackUsed) {
+        text += '\n\n⚠️ Увага: Цей скріншот було зроблено у спрощеному режимі (fallback), тому деякі шрифти або картинки можуть бути відсутні через налаштування безпеки сайту (CORS).';
+      }
+      
       onSend({
         api_key: apiKey,
         base64_image: imageUrl,
