@@ -32175,7 +32175,12 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
   const [description, setDescription] = (0, import_react6.useState)("");
   const [sending, setSending] = (0, import_react6.useState)(false);
   const [localAttachments, setLocalAttachments] = (0, import_react6.useState)([]);
+  const [showHint, setShowHint] = (0, import_react6.useState)(true);
   const fileInputRef = import_react6.default.useRef(null);
+  import_react6.default.useEffect(() => {
+    const timer = setTimeout(() => setShowHint(false), 5e3);
+    return () => clearTimeout(timer);
+  }, []);
   const handleTap = (0, import_react6.useCallback)((e) => {
     if (pin) return;
     const { clientX: x, clientY: y } = e;
@@ -32242,29 +32247,31 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
         "aria-label": "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438",
         style: {
           position: "fixed",
-          top: "12px",
-          right: "12px",
-          width: "36px",
-          height: "36px",
+          bottom: "24px",
+          right: "24px",
+          width: "48px",
+          height: "48px",
           borderRadius: "50%",
           background: "rgba(28,28,30,0.85)",
           color: "white",
-          border: "none",
-          fontSize: "16px",
+          border: "1px solid rgba(255,255,255,0.15)",
+          fontSize: "20px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           cursor: "pointer",
-          backdropFilter: "blur(6px)"
+          backdropFilter: "blur(6px)",
+          boxShadow: "0 8px 28px rgba(0,0,0,0.5)",
+          zIndex: 9999
         },
         children: "\u2715"
       }
     ),
-    !pin && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: {
+    !pin && showHint && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: {
       position: "fixed",
-      top: "12px",
-      left: "12px",
-      right: "56px",
+      bottom: "30px",
+      left: "24px",
+      right: "84px",
       background: "rgba(28,28,30,0.85)",
       color: "white",
       borderRadius: "12px",
@@ -32272,7 +32279,8 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
       fontSize: "13px",
       fontWeight: 600,
       lineHeight: 1.4,
-      backdropFilter: "blur(6px)"
+      backdropFilter: "blur(6px)",
+      textAlign: "center"
     }, children: "\u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u043D\u0430 \u043C\u0456\u0441\u0446\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u0438 \u043D\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u0446\u0456" }),
     pin && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: {
