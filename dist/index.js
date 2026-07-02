@@ -30138,15 +30138,56 @@ async function capturePageScreenshot(annotationCanvas) {
   const prevOpacity = host?.style.opacity ?? "";
   if (host) host.style.opacity = "0";
   let imageUrl = "";
+  let fallbackUsed = false;
   try {
-    const pageDataUrl = await toPng(document.body, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-      pixelRatio: 1,
-      // Skip the widget host — html-to-image can't serialize Shadow DOM
-      // and will throw or produce a corrupt blank image if it tries.
-      filter: (node) => node.id !== "buggy-bag-host"
-    });
+    const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+    let pageDataUrl = "";
+    try {
+      pageDataUrl = await toPng(document.body, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        imagePlaceholder: transparentPixel,
+        filter: (node) => {
+          if (node.id === "buggy-bag-host") return false;
+          if (node.tagName === "LINK") {
+            const rel = node.rel?.toLowerCase() || "";
+            if (rel.includes("icon")) return false;
+          }
+          return true;
+        }
+      });
+    } catch (tier1Err) {
+      console.warn("[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...", tier1Err);
+      fallbackUsed = true;
+      try {
+        pageDataUrl = await toPng(document.body, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          pixelRatio: 1,
+          imagePlaceholder: transparentPixel,
+          filter: (node) => {
+            if (node.id === "buggy-bag-host") return false;
+            if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "IMG" || node.tagName === "VIDEO") return false;
+            return true;
+          }
+        });
+      } catch (tier2Err) {
+        console.warn("[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...", tier2Err);
+        pageDataUrl = await toPng(document.body, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          pixelRatio: 1,
+          imagePlaceholder: transparentPixel,
+          skipFonts: true,
+          filter: (node) => {
+            if (node.id === "buggy-bag-host") return false;
+            if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "IMG" || node.tagName === "VIDEO" || node.tagName === "SVG") return false;
+            return true;
+          }
+        });
+      }
+    }
     if (annotationDataUrl) {
       const composite = document.createElement("canvas");
       composite.width = window.innerWidth;
@@ -30179,11 +30220,11 @@ async function capturePageScreenshot(annotationCanvas) {
       imageUrl = pageDataUrl;
     }
   } catch (e) {
-    console.warn("[BuggyBag] screenshot failed", e);
+    console.warn("[BuggyBag] screenshot completely failed", e);
   } finally {
     if (host) host.style.opacity = prevOpacity;
   }
-  return imageUrl;
+  return { imageUrl, fallbackUsed };
 }
 
 // src/components/CaptureMode.tsx
@@ -30680,7 +30721,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
     await new Promise((r) => setTimeout(r, 80));
     const host = document.querySelector("#buggy-bag-host");
     const annotationCanvas = host?.shadowRoot?.querySelector("canvas") ?? null;
-    const imageUrl = await capturePageScreenshot(annotationCanvas);
+    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas);
     setIsCapturing(false);
     try {
       localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
@@ -30734,13 +30775,17 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
         }
       }
     }
+    let finalDescription = Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443";
+    if (fallbackUsed) {
+      finalDescription += "\n\n\u26A0\uFE0F \u0423\u0432\u0430\u0433\u0430: \u0426\u0435\u0439 \u0441\u043A\u0440\u0456\u043D\u0448\u043E\u0442 \u0431\u0443\u043B\u043E \u0437\u0440\u043E\u0431\u043B\u0435\u043D\u043E \u0443 \u0441\u043F\u0440\u043E\u0449\u0435\u043D\u043E\u043C\u0443 \u0440\u0435\u0436\u0438\u043C\u0456 (fallback), \u0442\u043E\u043C\u0443 \u0434\u0435\u044F\u043A\u0456 \u0448\u0440\u0438\u0444\u0442\u0438 \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u0438\u043D\u043A\u0438 \u043C\u043E\u0436\u0443\u0442\u044C \u0431\u0443\u0442\u0438 \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456 \u0447\u0435\u0440\u0435\u0437 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F \u0431\u0435\u0437\u043F\u0435\u043A\u0438 \u0441\u0430\u0439\u0442\u0443 (CORS).";
+    }
     onSend({
       api_key: apiKey,
       base64_image: imageUrl,
       shapes,
       annotations,
       shape_attachments: Object.keys(shapeAttachments).length > 0 ? shapeAttachments : void 0,
-      description: Object.values(annotations).filter(Boolean).join(" | ") || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443",
+      description: finalDescription,
       tech_context: freshTechContext
     });
   }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
@@ -32141,7 +32186,7 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
     if (!pin || sending) return;
     setSending(true);
     try {
-      const imageUrl = await capturePageScreenshot();
+      const { imageUrl, fallbackUsed } = await capturePageScreenshot();
       const shapeId = `pin-${Date.now()}`;
       const shape = {
         id: shapeId,
@@ -32152,7 +32197,10 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
         elementContext: pin.elementContext ?? void 0
       };
       const techContext = collectTechContext(pin.element);
-      const text = description.trim() || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443";
+      let text = description.trim() || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443";
+      if (fallbackUsed) {
+        text += "\n\n\u26A0\uFE0F \u0423\u0432\u0430\u0433\u0430: \u0426\u0435\u0439 \u0441\u043A\u0440\u0456\u043D\u0448\u043E\u0442 \u0431\u0443\u043B\u043E \u0437\u0440\u043E\u0431\u043B\u0435\u043D\u043E \u0443 \u0441\u043F\u0440\u043E\u0449\u0435\u043D\u043E\u043C\u0443 \u0440\u0435\u0436\u0438\u043C\u0456 (fallback), \u0442\u043E\u043C\u0443 \u0434\u0435\u044F\u043A\u0456 \u0448\u0440\u0438\u0444\u0442\u0438 \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u0438\u043D\u043A\u0438 \u043C\u043E\u0436\u0443\u0442\u044C \u0431\u0443\u0442\u0438 \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456 \u0447\u0435\u0440\u0435\u0437 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F \u0431\u0435\u0437\u043F\u0435\u043A\u0438 \u0441\u0430\u0439\u0442\u0443 (CORS).";
+      }
       onSend({
         api_key: apiKey,
         base64_image: imageUrl,
@@ -32579,16 +32627,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
         const pId = data?.bug?.project_id || null;
-        let targetProjUrl = null;
-        if (pId) {
-          if (portalUrl) {
-            targetProjUrl = `${portalUrl}/projects/${pId}`;
-          } else if (apiEndpoint && apiEndpoint.startsWith("/")) {
-            targetProjUrl = `/projects/${pId}`;
-          }
-        } else if (portalUrl) {
-          targetProjUrl = portalUrl;
-        }
+        const targetProjUrl = pId && portalUrl ? `${portalUrl}/projects/${pId}` : portalUrl || null;
         showSuccessToast(targetProjUrl);
       } else showToast("\u26A0 \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430", false);
     } catch {

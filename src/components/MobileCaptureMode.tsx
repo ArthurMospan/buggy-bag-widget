@@ -40,7 +40,13 @@ export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureMod
   const [description, setDescription] = useState('');
   const [sending, setSending] = useState(false);
   const [localAttachments, setLocalAttachments] = useState<{ name: string; type: string; base64: string }[]>([]);
+  const [showHint, setShowHint] = useState(true);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setShowHint(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleTap = useCallback((e: React.MouseEvent) => {
     if (pin) return; // pin already placed — use "Назад" to retarget instead of jumping on stray taps
@@ -113,21 +119,23 @@ export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureMod
         onClick={onCancel}
         aria-label="Скасувати"
         style={{
-          position: 'fixed', top: '12px', right: '12px', width: '36px', height: '36px',
-          borderRadius: '50%', background: 'rgba(28,28,30,0.85)', color: 'white', border: 'none',
-          fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', backdropFilter: 'blur(6px)',
+          position: 'fixed', bottom: '24px', right: '24px', width: '48px', height: '48px',
+          borderRadius: '50%', background: 'rgba(28,28,30,0.85)', color: 'white', 
+          border: '1px solid rgba(255,255,255,0.15)', fontSize: '20px', display: 'flex', 
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', 
+          backdropFilter: 'blur(6px)', boxShadow: '0 8px 28px rgba(0,0,0,0.5)',
+          zIndex: 9999
         }}
       >
         ✕
       </button>
 
-      {!pin && (
+      {!pin && showHint && (
         <div style={{
-          position: 'fixed', top: '12px', left: '12px', right: '56px',
+          position: 'fixed', bottom: '30px', left: '24px', right: '84px',
           background: 'rgba(28,28,30,0.85)', color: 'white', borderRadius: '12px',
           padding: '10px 14px', fontSize: '13px', fontWeight: 600, lineHeight: 1.4,
-          backdropFilter: 'blur(6px)',
+          backdropFilter: 'blur(6px)', textAlign: 'center'
         }}>
           Натисніть на місце проблеми на сторінці
         </div>
