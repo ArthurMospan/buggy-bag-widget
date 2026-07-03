@@ -235,7 +235,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
               type="button"
               className="bb-bug-btn"
               onClick={handleBugBtnClick}
-              title="Зафіксувати баг (Alt+B)"
+              title="Зафіксувати зауваження (Alt+B)"
               style={{ width: '56px', height: '56px', background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.15s', animation: 'bb-bugbtn-entry 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards', position: 'relative' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.1)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
@@ -311,7 +311,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
               <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
               </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'white' }}>{toast.msg || 'Баг репорт надіслано'}</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: 'white' }}>{toast.msg || 'Репорт надіслано'}</span>
               {toast.isBugReport && (projectUrl || portalUrl) && (
                 <a href={projectUrl || portalUrl} target="_blank" rel="noopener noreferrer" style={{
                   fontSize: '11px', color: '#1a1a1a', background: '#f4f4f5', textDecoration: 'none', fontWeight: '700',

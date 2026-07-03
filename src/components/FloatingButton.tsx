@@ -36,8 +36,8 @@ export function FloatingButton({ onCapture }: FloatingButtonProps) {
       <button
         type="button"
         onClick={onCapture}
-        aria-label="Зафіксувати баг (Alt+B)"
-        title="Зафіксувати баг (Alt+B)"
+        aria-label="Зафіксувати зауваження (Alt+B)"
+        title="Зафіксувати зауваження (Alt+B)"
         style={{
           width: '48px',
           height: '48px',
