@@ -366,6 +366,8 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
 }
 
+const isSafeHref = (h?: string) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
+
 export function BuggyBag({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps = {}) {
   return (
     <ErrorBoundary>

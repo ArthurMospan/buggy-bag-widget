@@ -388,6 +388,8 @@ function disableZoom() {
 
 // ──────────────────────────────────────────────────────────────────────────
 
+const isSafeHref = (h?: string) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
+
 export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }: CaptureModeProps) {
   const [tool, setTool]         = useState<DrawTool>(initialTool);
   const [shapes, setShapes]     = useState<DrawShape[]>([]);
