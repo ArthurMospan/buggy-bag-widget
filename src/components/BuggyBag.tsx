@@ -313,17 +313,29 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
               </div>
               <span style={{ fontSize: '13px', fontWeight: '600', color: 'white' }}>{toast.msg || 'Репорт надіслано'}</span>
               {toast.isBugReport && (projectUrl || portalUrl) && (
-                <a href={projectUrl || portalUrl} target="_blank" rel="noopener noreferrer" style={{
-                  fontSize: '11px', color: '#1a1a1a', background: '#f4f4f5', textDecoration: 'none', fontWeight: '700',
-                  padding: '5px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px',
-                  marginLeft: '6px', transition: 'background 0.15s'
-                }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#ffffff'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f4f4f5'; }}
-                >
-                  Перейти в проєкт
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-                </a>
+                <>
+                  {isSafeHref(projectUrl || portalUrl) ? (
+                    <a href={projectUrl || portalUrl} target="_blank" rel="noopener noreferrer" style={{
+                      fontSize: '11px', color: '#1a1a1a', background: '#f4f4f5', textDecoration: 'none', fontWeight: '700',
+                      padding: '5px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px',
+                      marginLeft: '6px', transition: 'background 0.15s'
+                    }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#ffffff'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = '#f4f4f5'; }}
+                    >
+                      Перейти в проєкт
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                    </a>
+                  ) : (
+                    <span style={{
+                      fontSize: '11px', color: '#1a1a1a', background: '#f4f4f5', fontWeight: '700',
+                      padding: '5px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px',
+                      marginLeft: '6px'
+                    }}>
+                      Buggy Bag
+                    </span>
+                  )}
+                </>
               )}
               <button type="button" onClick={() => setToast(null)}
                 style={{ marginLeft: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontSize: '13px', display: 'flex', alignItems: 'center', padding: '2px' }}

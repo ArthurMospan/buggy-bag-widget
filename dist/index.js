@@ -30561,6 +30561,7 @@ function disableZoom() {
     _zoomHandler = null;
   }
 }
+var isSafeHref = (h) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
 function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const [tool, setTool] = (0, import_react5.useState)(initialTool);
   const [shapes, setShapes] = (0, import_react5.useState)([]);
@@ -31935,7 +31936,7 @@ ${issue.message}` }));
               ] }),
               portalUrl && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 6px" } }),
-                /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+                isSafeHref(portalUrl) ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
                   "a",
                   {
                     href: portalUrl,
@@ -31960,7 +31961,7 @@ ${issue.message}` }));
                       /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { children: "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u0432 \u043F\u0440\u043E\u0454\u043A\u0442" })
                     ]
                   }
-                )
+                ) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { display: "flex", alignItems: "center", gap: "8px", padding: "7px 10px", borderRadius: "8px", color: "rgba(255,255,255,0.45)", fontSize: "12px", fontWeight: "500" }, children: "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u0432 \u043F\u0440\u043E\u0454\u043A\u0442" })
               ] }),
               shapes.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 6px" } }),
@@ -32759,7 +32760,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
       /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { width: "20px", height: "20px", borderRadius: "50%", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("svg", { width: "11", height: "11", viewBox: "0 0 24 24", fill: "none", stroke: "#22c55e", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("polyline", { points: "20 6 9 17 4 12" }) }) }),
         /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: { fontSize: "13px", fontWeight: "600", color: "white" }, children: toast.msg || "\u0420\u0435\u043F\u043E\u0440\u0442 \u043D\u0430\u0434\u0456\u0441\u043B\u0430\u043D\u043E" }),
-        toast.isBugReport && (projectUrl || portalUrl) && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        toast.isBugReport && (projectUrl || portalUrl) && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_jsx_runtime6.Fragment, { children: isSafeHref2(projectUrl || portalUrl) ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
           "a",
           {
             href: projectUrl || portalUrl,
@@ -32794,7 +32795,18 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
               ] })
             ]
           }
-        ),
+        ) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { style: {
+          fontSize: "11px",
+          color: "#1a1a1a",
+          background: "#f4f4f5",
+          fontWeight: "700",
+          padding: "5px 10px",
+          borderRadius: "6px",
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+          marginLeft: "6px"
+        }, children: "Buggy Bag" }) }),
         /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
           "button",
           {
@@ -32846,6 +32858,7 @@ var ErrorBoundary = class extends import_react7.default.Component {
     return this.props.children;
   }
 };
+var isSafeHref2 = (h) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
 function BuggyBag({ apiEndpoint, apiKey, portalUrl } = {}) {
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ErrorBoundary, { children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(BuggyBagWithHooks, { apiEndpoint, apiKey, portalUrl }) });
 }
