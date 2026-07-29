@@ -30146,6 +30146,10 @@ async function capturePageScreenshot(annotationCanvas) {
       pageDataUrl = await toPng(document.body, {
         width: window.innerWidth,
         height: window.innerHeight,
+        style: {
+          marginTop: `-${window.scrollY}px`,
+          marginLeft: `-${window.scrollX}px`
+        },
         pixelRatio: 1,
         imagePlaceholder: transparentPixel,
         filter: (node) => {
@@ -30164,6 +30168,10 @@ async function capturePageScreenshot(annotationCanvas) {
         pageDataUrl = await toPng(document.body, {
           width: window.innerWidth,
           height: window.innerHeight,
+          style: {
+            marginTop: `-${window.scrollY}px`,
+            marginLeft: `-${window.scrollX}px`
+          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           filter: (node) => {
@@ -30177,6 +30185,10 @@ async function capturePageScreenshot(annotationCanvas) {
         pageDataUrl = await toPng(document.body, {
           width: window.innerWidth,
           height: window.innerHeight,
+          style: {
+            marginTop: `-${window.scrollY}px`,
+            marginLeft: `-${window.scrollX}px`
+          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           skipFonts: true,
