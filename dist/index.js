@@ -30236,7 +30236,55 @@ async function capturePageScreenshot(annotationCanvas) {
   } finally {
     if (host) host.style.opacity = prevOpacity;
   }
+  if (imageUrl) {
+    imageUrl = await compressDataUrl(imageUrl);
+  }
   return { imageUrl, fallbackUsed };
+}
+async function compressDataUrl(dataUrl, quality = 0.82, maxDimension = 1920) {
+  if (!dataUrl || !dataUrl.startsWith("data:image")) return dataUrl;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round(height * maxDimension / width);
+          width = maxDimension;
+        } else {
+          width = Math.round(width * maxDimension / height);
+          height = maxDimension;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        try {
+          const webp = canvas.toDataURL("image/webp", quality);
+          if (webp && webp.startsWith("data:image/webp") && webp.length < dataUrl.length) {
+            resolve(webp);
+            return;
+          }
+        } catch {
+        }
+        try {
+          const jpeg = canvas.toDataURL("image/jpeg", quality);
+          if (jpeg && jpeg.startsWith("data:image/jpeg") && jpeg.length < dataUrl.length) {
+            resolve(jpeg);
+            return;
+          }
+        } catch {
+        }
+      }
+      resolve(dataUrl);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 }
 
 // src/components/CaptureMode.tsx
