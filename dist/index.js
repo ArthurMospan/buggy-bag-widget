@@ -30228,7 +30228,7 @@ function hideBackFacingElements(clonedRoot) {
     if (!numbers) return;
     const parts = numbers[1].split(",").map((value) => Number(value.trim()));
     if (parts.length !== 16 || parts.some(Number.isNaN)) return;
-    if (parts[10] < 0) element.style.setProperty("visibility", "hidden", "important");
+    if (parts[10] < 0) element.style.setProperty("display", "none", "important");
   });
 }
 var SCROLL_SNAPSHOT_ATTRIBUTE = "data-buggy-bag-scroll-snapshot";

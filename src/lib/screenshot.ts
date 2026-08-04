@@ -204,7 +204,12 @@ function hideBackFacingElements(clonedRoot: HTMLElement): void {
     if (parts.length !== 16 || parts.some(Number.isNaN)) return;
     // m33 is the third basis vector's z component; negative means the face
     // now points away from the camera.
-    if (parts[10] < 0) element.style.setProperty('visibility', 'hidden', 'important');
+    //
+    // `display: none` rather than `visibility: hidden`: the cloner writes
+    // every computed property inline, so each descendant carries its own
+    // `visibility: visible`, and a descendant saying visible overrides a
+    // hidden ancestor. Only display removes the subtree outright.
+    if (parts[10] < 0) element.style.setProperty('display', 'none', 'important');
   });
 }
 
