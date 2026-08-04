@@ -31683,9 +31683,8 @@ ${issue.message}` }));
             style: {
               position: "fixed",
               inset: 0,
-              width: "100vw",
-              height: "100vh",
-              objectFit: "cover",
+              width: `${w}px`,
+              height: `${h}px`,
               zIndex: 2,
               pointerEvents: "none",
               userSelect: "none"
