@@ -6,6 +6,8 @@ import { MobileCaptureMode } from './MobileCaptureMode';
 import { initCollector } from '../lib/collector';
 import { detectFavicon } from '../lib/favicon';
 import { isRealMobileDevice } from '../lib/device';
+import { capturePageScreenshot, getCaptureViewport } from '../lib/screenshot';
+import type { CaptureViewport, ScreenshotResult } from '../lib/screenshot';
 import type { SubmitBugPayload, DrawTool } from '../types';
 import widgetStyles from '../styles.gen';
 
@@ -13,6 +15,11 @@ export interface BuggyBagProps {
   apiEndpoint?: string;
   apiKey?: string;
   portalUrl?: string;
+}
+
+interface CaptureSession {
+  viewport: CaptureViewport;
+  screenshot: Promise<ScreenshotResult>;
 }
 
 function BugIcon() {
@@ -55,6 +62,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   const [projectUrl, setProjectUrl] = useState<string | null>(null);
   const [draftCount, setDraftCount] = useState(0);
   const [draftConflict, setDraftConflict] = useState<{ path: string; count: number } | null>(null);
+  const [captureSession, setCaptureSession] = useState<CaptureSession | null>(null);
 
   useEffect(() => { initCollector(); }, []);
 
@@ -82,7 +90,16 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
     return () => window.removeEventListener('buggy-bag:draft-changed', checkDraft);
   }, []);
 
-  const handleBugBtnClick = () => {
+  const beginDesktopCapture = useCallback(() => {
+    const viewport = getCaptureViewport();
+    // Start cloning the page in the same pointer event that opened the widget.
+    // This preserves an open custom dropdown and records the exact scroll frame.
+    const screenshot = capturePageScreenshot(null, viewport);
+    setCaptureSession({ viewport, screenshot });
+    setActiveTool('pin');
+  }, []);
+
+  const handleBugBtnClick = useCallback(() => {
     if (activeTool) {
       window.dispatchEvent(new CustomEvent('buggy-bag:request-close'));
       return;
@@ -112,8 +129,24 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
         } catch (e) { }
       }
     }
-    setActiveTool('pin');
-  };
+    beginDesktopCapture();
+  }, [activeTool, mobileCapture, beginDesktopCapture]);
+
+  const handleBugButtonPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    // Keep focus on the inspected control and prevent page-level outside-click
+    // handlers from dismissing an open dropdown before the DOM is cloned.
+    e.preventDefault();
+    e.stopPropagation();
+    handleBugBtnClick();
+  }, [handleBugBtnClick]);
+
+  const handleBugButtonClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    // Pointer activation is handled earlier. A zero-detail click is keyboard or
+    // programmatic activation and still needs to open the widget.
+    if (e.detail === 0) handleBugBtnClick();
+  }, [handleBugBtnClick]);
 
   // Alt+B: toggle between capture mode and idle
   useEffect(() => {
@@ -137,7 +170,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
       window.removeEventListener('buggy-bag:toggle', handler);
       window.removeEventListener('buggy-bag:toast', toastHandler);
     };
-  }, [activeTool]);
+  }, [activeTool, handleBugBtnClick]);
 
   const fireConfetti = () => {
     const colors = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'];
@@ -170,6 +203,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   const handleSend = async (payload: SubmitBugPayload) => {
     setActiveTool(null);
     setMobileCapture(false);
+    setCaptureSession(null);
     fireConfetti();
     const targetEndpoint = apiEndpoint || (portalUrl ? `${portalUrl}/api/bugs/submit` : null);
     if (!targetEndpoint || !apiKey) { showSuccessToast(null); return; }
@@ -220,7 +254,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
                   <button onClick={() => window.location.href = draftConflict.path} style={{ background: 'rgb(79, 70, 229)', color: 'white', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
                     Перейти на сторінку
                   </button>
-                  <button onClick={() => { localStorage.removeItem(`BUGGY_BAG_DRAFT_${draftConflict.path}`); setDraftConflict(null); setActiveTool('pin'); }} style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
+                  <button onClick={() => { localStorage.removeItem(`BUGGY_BAG_DRAFT_${draftConflict.path}`); setDraftConflict(null); beginDesktopCapture(); }} style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
                     Стерти всі мітки
                   </button>
                   <button onClick={() => setDraftConflict(null)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.5)', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
@@ -234,7 +268,9 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
             <button
               type="button"
               className="bb-bug-btn"
-              onClick={handleBugBtnClick}
+              onPointerDown={handleBugButtonPointerDown}
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
+              onClick={handleBugButtonClick}
               title="Зафіксувати зауваження (Alt+B)"
               style={{ width: '56px', height: '56px', background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.15s', animation: 'bb-bugbtn-entry 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards', position: 'relative' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.1)'; }}
@@ -278,8 +314,10 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
           initialTool={activeTool}
           apiKey={apiKey ?? ''}
           portalUrl={portalUrl}
+          initialScreenshot={captureSession?.screenshot}
+          captureViewport={captureSession?.viewport}
           onSend={handleSend}
-          onCancel={() => setActiveTool(null)}
+          onCancel={() => { setActiveTool(null); setCaptureSession(null); }}
         />
       )}
 
@@ -525,6 +563,20 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
     };
     document.addEventListener('keydown', handleKeyDown);
 
+    // Run before document-level outside-click listeners. The original pointer
+    // event never reaches the inspected app; activation happens via our event.
+    const handleActivationPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      const clickedBugButton = e.composedPath().some(target =>
+        target instanceof Element && target.classList.contains('bb-bug-btn')
+      );
+      if (!clickedBugButton) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.dispatchEvent(new CustomEvent('buggy-bag:toggle'));
+    };
+    window.addEventListener('pointerdown', handleActivationPointerDown, true);
+
     const host = document.createElement('div');
     host.id = 'buggy-bag-host';
     host.setAttribute('data-buggy-bag', 'true');
@@ -552,6 +604,7 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
       _active = false;
       try { _rec?.stop(); } catch { }
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('pointerdown', handleActivationPointerDown, true);
       window.removeEventListener('buggy-bag:start-voice', startVoice);
       window.removeEventListener('buggy-bag:stop-voice', stopVoice);
       window.removeEventListener('buggy-bag:eyedropper-open', handleEyedropperOpen);

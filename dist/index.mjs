@@ -27539,7 +27539,7 @@ var require_constants = __commonJS({
 });
 
 // src/components/BuggyBag.tsx
-import React8, { useState as useState6, useEffect as useEffect5 } from "react";
+import React8, { useState as useState6, useEffect as useEffect5, useCallback as useCallback4 } from "react";
 import { createRoot } from "react-dom/client";
 
 // src/guard.tsx
@@ -30120,8 +30120,110 @@ function collectTechContext(clickedElement) {
 }
 
 // src/lib/screenshot.ts
-async function capturePageScreenshot(annotationCanvas) {
-  const host = document.querySelector("#buggy-bag-host");
+import html2canvas from "html2canvas";
+function getCaptureViewport() {
+  return {
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+    width: window.innerWidth,
+    height: window.innerHeight
+  };
+}
+function isWidgetElement(element) {
+  return element.id === "buggy-bag-host" || element.hasAttribute("data-buggy-bag-standalone-root");
+}
+async function renderViewportWithHtml2Canvas(viewport, normalizeModernColors) {
+  const canvas = await html2canvas(document.documentElement, {
+    width: viewport.width,
+    height: viewport.height,
+    x: viewport.scrollX,
+    y: viewport.scrollY,
+    scrollX: viewport.scrollX,
+    scrollY: viewport.scrollY,
+    windowWidth: viewport.width,
+    windowHeight: viewport.height,
+    scale: 1,
+    useCORS: true,
+    allowTaint: false,
+    backgroundColor: null,
+    foreignObjectRendering: false,
+    imageTimeout: 5e3,
+    logging: false,
+    ignoreElements: isWidgetElement,
+    onclone: normalizeModernColors ? normalizeUnsupportedColors : void 0
+  });
+  return canvas.toDataURL("image/png");
+}
+var COLOR_PROPERTIES = [
+  "color",
+  "background-color",
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color",
+  "outline-color",
+  "text-decoration-color",
+  "box-shadow",
+  "text-shadow"
+];
+var MODERN_COLOR_PATTERN = /\b(?:oklch|oklab|lab|lch|color)\([^)]*\)/gi;
+function normalizeUnsupportedColors(clonedDocument) {
+  const colorCache = /* @__PURE__ */ new Map();
+  const converter = clonedDocument.createElement("canvas");
+  converter.width = 1;
+  converter.height = 1;
+  const ctx = converter.getContext("2d", { willReadFrequently: true });
+  const view = clonedDocument.defaultView;
+  if (!ctx || !view) return;
+  const toRgba = (color) => {
+    const cached = colorCache.get(color);
+    if (cached) return cached;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = "#000";
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    const normalized = `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+    colorCache.set(color, normalized);
+    return normalized;
+  };
+  clonedDocument.querySelectorAll("*").forEach((element) => {
+    const computed = view.getComputedStyle(element);
+    COLOR_PROPERTIES.forEach((property) => {
+      const value = computed.getPropertyValue(property);
+      if (!value || !MODERN_COLOR_PATTERN.test(value)) {
+        MODERN_COLOR_PATTERN.lastIndex = 0;
+        return;
+      }
+      MODERN_COLOR_PATTERN.lastIndex = 0;
+      const normalized = value.replace(MODERN_COLOR_PATTERN, (match) => toRgba(match));
+      MODERN_COLOR_PATTERN.lastIndex = 0;
+      element.style.setProperty(property, normalized, "important");
+    });
+  });
+}
+async function renderViewportWithHtmlToImage(viewport) {
+  const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  return toPng(document.documentElement, {
+    width: viewport.width,
+    height: viewport.height,
+    style: {
+      transform: `translate(${-viewport.scrollX}px, ${-viewport.scrollY}px)`,
+      transformOrigin: "top left",
+      width: `${Math.max(document.documentElement.scrollWidth, viewport.width)}px`,
+      height: `${Math.max(document.documentElement.scrollHeight, viewport.height)}px`
+    },
+    pixelRatio: 1,
+    imagePlaceholder: transparentPixel,
+    skipFonts: true,
+    filter: (node) => {
+      if (node.id === "buggy-bag-host" || node.hasAttribute?.("data-buggy-bag-standalone-root")) return false;
+      if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "VIDEO") return false;
+      return true;
+    }
+  });
+}
+async function capturePageScreenshot(annotationCanvas, viewport = getCaptureViewport()) {
   let annotationDataUrl = null;
   if (annotationCanvas) {
     try {
@@ -30129,81 +30231,32 @@ async function capturePageScreenshot(annotationCanvas) {
     } catch {
     }
   }
-  const prevOpacity = host?.style.opacity ?? "";
-  if (host) host.style.opacity = "0";
   let imageUrl = "";
   let fallbackUsed = false;
   try {
-    const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     let pageDataUrl = "";
     try {
-      pageDataUrl = await toPng(document.body, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        style: {
-          marginTop: `-${window.scrollY}px`,
-          marginLeft: `-${window.scrollX}px`
-        },
-        pixelRatio: 1,
-        imagePlaceholder: transparentPixel,
-        filter: (node) => {
-          if (node.id === "buggy-bag-host") return false;
-          if (node.tagName === "LINK") {
-            const rel = node.rel?.toLowerCase() || "";
-            if (rel.includes("icon")) return false;
-          }
-          return true;
-        }
-      });
+      pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
     } catch (tier1Err) {
-      console.warn("[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...", tier1Err);
+      console.warn("[BuggyBag] Tier 1 screenshot failed, normalizing modern CSS colors...", tier1Err);
       fallbackUsed = true;
       try {
-        pageDataUrl = await toPng(document.body, {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          style: {
-            marginTop: `-${window.scrollY}px`,
-            marginLeft: `-${window.scrollX}px`
-          },
-          pixelRatio: 1,
-          imagePlaceholder: transparentPixel,
-          filter: (node) => {
-            if (node.id === "buggy-bag-host") return false;
-            if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "IMG" || node.tagName === "VIDEO") return false;
-            return true;
-          }
-        });
+        pageDataUrl = await renderViewportWithHtml2Canvas(viewport, true);
       } catch (tier2Err) {
-        console.warn("[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...", tier2Err);
-        pageDataUrl = await toPng(document.body, {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          style: {
-            marginTop: `-${window.scrollY}px`,
-            marginLeft: `-${window.scrollX}px`
-          },
-          pixelRatio: 1,
-          imagePlaceholder: transparentPixel,
-          skipFonts: true,
-          filter: (node) => {
-            if (node.id === "buggy-bag-host") return false;
-            if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "IMG" || node.tagName === "VIDEO" || node.tagName === "SVG") return false;
-            return true;
-          }
-        });
+        console.warn("[BuggyBag] Tier 2 screenshot failed, trying safe mode...", tier2Err);
+        pageDataUrl = await renderViewportWithHtmlToImage(viewport);
       }
     }
     if (annotationDataUrl) {
       const composite = document.createElement("canvas");
-      composite.width = window.innerWidth;
-      composite.height = window.innerHeight;
+      composite.width = viewport.width;
+      composite.height = viewport.height;
       const ctx = composite.getContext("2d");
       if (ctx) {
         await new Promise((resolve) => {
           const img = new Image();
           img.onload = () => {
-            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0, viewport.width, viewport.height);
             resolve();
           };
           img.onerror = () => resolve();
@@ -30212,7 +30265,7 @@ async function capturePageScreenshot(annotationCanvas) {
         await new Promise((resolve) => {
           const img = new Image();
           img.onload = () => {
-            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0, viewport.width, viewport.height);
             resolve();
           };
           img.onerror = () => resolve();
@@ -30227,13 +30280,40 @@ async function capturePageScreenshot(annotationCanvas) {
     }
   } catch (e) {
     console.warn("[BuggyBag] screenshot completely failed", e);
-  } finally {
-    if (host) host.style.opacity = prevOpacity;
   }
   if (imageUrl) {
     imageUrl = await compressDataUrl(imageUrl);
   }
   return { imageUrl, fallbackUsed };
+}
+async function compositeScreenshot(base, annotationCanvas, viewport) {
+  if (!base.imageUrl || !annotationCanvas) return base;
+  let annotationDataUrl = "";
+  try {
+    annotationDataUrl = annotationCanvas.toDataURL("image/png");
+  } catch {
+    return base;
+  }
+  const composite = document.createElement("canvas");
+  composite.width = viewport.width;
+  composite.height = viewport.height;
+  const ctx = composite.getContext("2d");
+  if (!ctx) return base;
+  const draw = (source) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, viewport.width, viewport.height);
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = source;
+  });
+  await draw(base.imageUrl);
+  await draw(annotationDataUrl);
+  return {
+    imageUrl: await compressDataUrl(composite.toDataURL("image/png")),
+    fallbackUsed: base.fallbackUsed
+  };
 }
 async function compressDataUrl(dataUrl, quality = 0.82, maxDimension = 1920) {
   if (!dataUrl || !dataUrl.startsWith("data:image")) return dataUrl;
@@ -30616,7 +30696,7 @@ function disableZoom() {
   }
 }
 var isSafeHref = (h) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
-function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
+function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captureViewport, onSend, onCancel }) {
   const [tool, setTool] = useState4(initialTool);
   const [shapes, setShapes] = useState4([]);
   const [annotations, setAnnotations] = useState4({});
@@ -30657,6 +30737,21 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const hostRef = useRef4(null);
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
   const h = typeof window !== "undefined" ? window.innerHeight : 800;
+  useEffect4(() => {
+    const lockedViewport = captureViewport ?? getCaptureViewport();
+    let restoring = false;
+    const restoreScroll = () => {
+      if (restoring) return;
+      if (window.scrollX === lockedViewport.scrollX && window.scrollY === lockedViewport.scrollY) return;
+      restoring = true;
+      window.scrollTo(lockedViewport.scrollX, lockedViewport.scrollY);
+      requestAnimationFrame(() => {
+        restoring = false;
+      });
+    };
+    window.addEventListener("scroll", restoreScroll, { passive: true });
+    return () => window.removeEventListener("scroll", restoreScroll);
+  }, [captureViewport]);
   const handleShapeComplete = useCallback2(async (shape) => {
     let anchorX;
     let anchorY;
@@ -30776,7 +30871,15 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
     await new Promise((r) => setTimeout(r, 80));
     const host = document.querySelector("#buggy-bag-host");
     const annotationCanvas = host?.shadowRoot?.querySelector("canvas") ?? null;
-    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas);
+    const viewport = captureViewport ?? getCaptureViewport();
+    let result;
+    if (initialScreenshot) {
+      const base = await initialScreenshot;
+      result = base.imageUrl ? await compositeScreenshot(base, annotationCanvas, viewport) : await capturePageScreenshot(annotationCanvas, viewport);
+    } else {
+      result = await capturePageScreenshot(annotationCanvas, viewport);
+    }
+    const { imageUrl, fallbackUsed } = result;
     setIsCapturing(false);
     try {
       localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
@@ -30843,7 +30946,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
       description: finalDescription,
       tech_context: freshTechContext
     });
-  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult, initialScreenshot, captureViewport]);
   const handleCloseRequest = useCallback2(() => {
     if (shapes.length > 0) {
       setShowExitConfirm(true);
@@ -30993,6 +31096,9 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
           e.preventDefault();
           toggleDebug("responsive");
         }
+      }
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key)) {
+        e.preventDefault();
       }
     };
     window.addEventListener("keydown", handler);
@@ -31150,6 +31256,14 @@ ${issue.message}` }));
       ref: hostRef,
       "data-buggy-bag": "true",
       style: { position: "fixed", inset: 0, zIndex: 1e4, userSelect: "none" },
+      onPointerDown: (e) => e.stopPropagation(),
+      onPointerUp: (e) => e.stopPropagation(),
+      onMouseDown: (e) => e.stopPropagation(),
+      onMouseUp: (e) => e.stopPropagation(),
+      onClick: (e) => e.stopPropagation(),
+      onWheel: (e) => {
+        e.stopPropagation();
+      },
       children: [
         /* @__PURE__ */ jsx4("style", { children: `
         @keyframes bb-glow-pulse {
@@ -32570,6 +32684,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const [projectUrl, setProjectUrl] = useState6(null);
   const [draftCount, setDraftCount] = useState6(0);
   const [draftConflict, setDraftConflict] = useState6(null);
+  const [captureSession, setCaptureSession] = useState6(null);
   useEffect5(() => {
     initCollector();
   }, []);
@@ -32595,7 +32710,13 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
     window.addEventListener("buggy-bag:draft-changed", checkDraft);
     return () => window.removeEventListener("buggy-bag:draft-changed", checkDraft);
   }, []);
-  const handleBugBtnClick = () => {
+  const beginDesktopCapture = useCallback4(() => {
+    const viewport = getCaptureViewport();
+    const screenshot = capturePageScreenshot(null, viewport);
+    setCaptureSession({ viewport, screenshot });
+    setActiveTool("pin");
+  }, []);
+  const handleBugBtnClick = useCallback4(() => {
     if (activeTool) {
       window.dispatchEvent(new CustomEvent("buggy-bag:request-close"));
       return;
@@ -32621,8 +32742,18 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         }
       }
     }
-    setActiveTool("pin");
-  };
+    beginDesktopCapture();
+  }, [activeTool, mobileCapture, beginDesktopCapture]);
+  const handleBugButtonPointerDown = useCallback4((e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handleBugBtnClick();
+  }, [handleBugBtnClick]);
+  const handleBugButtonClick = useCallback4((e) => {
+    e.stopPropagation();
+    if (e.detail === 0) handleBugBtnClick();
+  }, [handleBugBtnClick]);
   useEffect5(() => {
     const handler = () => {
       if (activeTool) {
@@ -32643,7 +32774,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
       window.removeEventListener("buggy-bag:toggle", handler);
       window.removeEventListener("buggy-bag:toast", toastHandler);
     };
-  }, [activeTool]);
+  }, [activeTool, handleBugBtnClick]);
   const fireConfetti = () => {
     const colors = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ec4899"];
     if (!document.getElementById("bb-cf-kf")) {
@@ -32675,6 +32806,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const handleSend = async (payload) => {
     setActiveTool(null);
     setMobileCapture(false);
+    setCaptureSession(null);
     fireConfetti();
     const targetEndpoint = apiEndpoint || (portalUrl ? `${portalUrl}/api/bugs/submit` : null);
     if (!targetEndpoint || !apiKey) {
@@ -32728,7 +32860,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
           /* @__PURE__ */ jsx6("button", { onClick: () => {
             localStorage.removeItem(`BUGGY_BAG_DRAFT_${draftConflict.path}`);
             setDraftConflict(null);
-            setActiveTool("pin");
+            beginDesktopCapture();
           }, style: { background: "rgba(239,68,68,0.2)", color: "#ef4444", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }, children: "\u0421\u0442\u0435\u0440\u0442\u0438 \u0432\u0441\u0456 \u043C\u0456\u0442\u043A\u0438" }),
           /* @__PURE__ */ jsx6("button", { onClick: () => setDraftConflict(null), style: { background: "transparent", color: "rgba(255,255,255,0.5)", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }, children: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438" })
         ] })
@@ -32738,7 +32870,12 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         {
           type: "button",
           className: "bb-bug-btn",
-          onClick: handleBugBtnClick,
+          onPointerDown: handleBugButtonPointerDown,
+          onMouseDown: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          },
+          onClick: handleBugButtonClick,
           title: "\u0417\u0430\u0444\u0456\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0437\u0430\u0443\u0432\u0430\u0436\u0435\u043D\u043D\u044F (Alt+B)",
           style: { width: "56px", height: "56px", background: "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "transform 0.15s", animation: "bb-bugbtn-entry 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards", position: "relative" },
           onMouseEnter: (e) => {
@@ -32779,8 +32916,13 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         initialTool: activeTool,
         apiKey: apiKey ?? "",
         portalUrl,
+        initialScreenshot: captureSession?.screenshot,
+        captureViewport: captureSession?.viewport,
         onSend: handleSend,
-        onCancel: () => setActiveTool(null)
+        onCancel: () => {
+          setActiveTool(null);
+          setCaptureSession(null);
+        }
       }
     ),
     mobileCapture && /* @__PURE__ */ jsx6(
@@ -33037,6 +33179,17 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }) {
       if (e.key === "Escape") window.dispatchEvent(new CustomEvent("buggy-bag:escape"));
     };
     document.addEventListener("keydown", handleKeyDown);
+    const handleActivationPointerDown = (e) => {
+      if (e.button !== 0) return;
+      const clickedBugButton = e.composedPath().some(
+        (target) => target instanceof Element && target.classList.contains("bb-bug-btn")
+      );
+      if (!clickedBugButton) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.dispatchEvent(new CustomEvent("buggy-bag:toggle"));
+    };
+    window.addEventListener("pointerdown", handleActivationPointerDown, true);
     const host = document.createElement("div");
     host.id = "buggy-bag-host";
     host.setAttribute("data-buggy-bag", "true");
@@ -33062,6 +33215,7 @@ function BuggyBagWithHooks({ apiEndpoint, apiKey, portalUrl }) {
       } catch {
       }
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("pointerdown", handleActivationPointerDown, true);
       window.removeEventListener("buggy-bag:start-voice", startVoice);
       window.removeEventListener("buggy-bag:stop-voice", stopVoice);
       window.removeEventListener("buggy-bag:eyedropper-open", handleEyedropperOpen);

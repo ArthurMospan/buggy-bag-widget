@@ -4,12 +4,15 @@ import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditRe
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
-import { capturePageScreenshot } from '../lib/screenshot';
+import { capturePageScreenshot, compositeScreenshot, getCaptureViewport } from '../lib/screenshot';
+import type { CaptureViewport, ScreenshotResult } from '../lib/screenshot';
 
 interface CaptureModeProps {
   initialTool: DrawTool;
   apiKey: string;
   portalUrl?: string;
+  initialScreenshot?: Promise<ScreenshotResult>;
+  captureViewport?: CaptureViewport;
   onSend: (payload: SubmitBugPayload) => void;
   onCancel: () => void;
 }
@@ -390,7 +393,7 @@ function disableZoom() {
 
 const isSafeHref = (h?: string) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
 
-export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }: CaptureModeProps) {
+export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captureViewport, onSend, onCancel }: CaptureModeProps) {
   const [tool, setTool]         = useState<DrawTool>(initialTool);
   const [shapes, setShapes]     = useState<DrawShape[]>([]);
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
@@ -439,6 +442,23 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
   const hostRef = useRef<HTMLDivElement>(null);
   const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const h = typeof window !== 'undefined' ? window.innerHeight : 800;
+
+  // A report represents one viewport. Keep the document at the activation
+  // scroll position so fixed canvas coordinates cannot drift from its frame.
+  useEffect(() => {
+    const lockedViewport = captureViewport ?? getCaptureViewport();
+    let restoring = false;
+    const restoreScroll = () => {
+      if (restoring) return;
+      if (window.scrollX === lockedViewport.scrollX && window.scrollY === lockedViewport.scrollY) return;
+      restoring = true;
+      window.scrollTo(lockedViewport.scrollX, lockedViewport.scrollY);
+      requestAnimationFrame(() => { restoring = false; });
+    };
+
+    window.addEventListener('scroll', restoreScroll, { passive: true });
+    return () => window.removeEventListener('scroll', restoreScroll);
+  }, [captureViewport]);
 
   const handleShapeComplete = useCallback(async (shape: DrawShape) => {
     // Compute anchor point per shape type so every annotation carries DOM context
@@ -566,7 +586,17 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
     const annotationCanvas = host?.shadowRoot?.querySelector('canvas') ?? null;
 
-    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas);
+    const viewport = captureViewport ?? getCaptureViewport();
+    let result: ScreenshotResult;
+    if (initialScreenshot) {
+      const base = await initialScreenshot;
+      result = base.imageUrl
+        ? await compositeScreenshot(base, annotationCanvas, viewport)
+        : await capturePageScreenshot(annotationCanvas, viewport);
+    } else {
+      result = await capturePageScreenshot(annotationCanvas, viewport);
+    }
+    const { imageUrl, fallbackUsed } = result;
 
     setIsCapturing(false);
     try { 
@@ -640,7 +670,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       description: finalDescription,
       tech_context: freshTechContext
     });
-  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult, initialScreenshot, captureViewport]);
 
   const handleCloseRequest = useCallback(() => {
     if (shapes.length > 0) { setShowExitConfirm(true); } 
@@ -753,6 +783,9 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
         if (e.code === 'KeyC') { e.preventDefault(); toggleDebug('show-code'); }
         if (e.code === 'KeyL') { e.preventDefault(); toggleDebug('zoom'); }
         if (e.code === 'KeyM' && !isInIframe) { e.preventDefault(); toggleDebug('responsive'); }
+      }
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
+        e.preventDefault();
       }
     };
     window.addEventListener('keydown', handler);
@@ -918,6 +951,14 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       ref={hostRef}
       data-buggy-bag="true"
       style={{ position: 'fixed', inset: 0, zIndex: 10000, userSelect: 'none' }}
+      onPointerDown={e => e.stopPropagation()}
+      onPointerUp={e => e.stopPropagation()}
+      onMouseDown={e => e.stopPropagation()}
+      onMouseUp={e => e.stopPropagation()}
+      onClick={e => e.stopPropagation()}
+      onWheel={e => {
+        e.stopPropagation();
+      }}
     >
       {/* Animated glow ring — hidden instantly via ref during eyedropper */}
       <style>{`

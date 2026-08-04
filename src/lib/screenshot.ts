@@ -1,4 +1,133 @@
 import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
+
+export interface CaptureViewport {
+  scrollX: number;
+  scrollY: number;
+  width: number;
+  height: number;
+}
+
+export interface ScreenshotResult {
+  imageUrl: string;
+  fallbackUsed: boolean;
+}
+
+export function getCaptureViewport(): CaptureViewport {
+  return {
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
+function isWidgetElement(element: Element): boolean {
+  return element.id === 'buggy-bag-host' || element.hasAttribute('data-buggy-bag-standalone-root');
+}
+
+async function renderViewportWithHtml2Canvas(
+  viewport: CaptureViewport,
+  normalizeModernColors: boolean,
+): Promise<string> {
+  const canvas = await html2canvas(document.documentElement, {
+    width: viewport.width,
+    height: viewport.height,
+    x: viewport.scrollX,
+    y: viewport.scrollY,
+    scrollX: viewport.scrollX,
+    scrollY: viewport.scrollY,
+    windowWidth: viewport.width,
+    windowHeight: viewport.height,
+    scale: 1,
+    useCORS: true,
+    allowTaint: false,
+    backgroundColor: null,
+    foreignObjectRendering: false,
+    imageTimeout: 5000,
+    logging: false,
+    ignoreElements: isWidgetElement,
+    onclone: normalizeModernColors ? normalizeUnsupportedColors : undefined,
+  });
+
+  return canvas.toDataURL('image/png');
+}
+
+const COLOR_PROPERTIES = [
+  'color',
+  'background-color',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+  'outline-color',
+  'text-decoration-color',
+  'box-shadow',
+  'text-shadow',
+] as const;
+
+const MODERN_COLOR_PATTERN = /\b(?:oklch|oklab|lab|lch|color)\([^)]*\)/gi;
+
+function normalizeUnsupportedColors(clonedDocument: Document): void {
+  const colorCache = new Map<string, string>();
+  const converter = clonedDocument.createElement('canvas');
+  converter.width = 1;
+  converter.height = 1;
+  const ctx = converter.getContext('2d', { willReadFrequently: true });
+  const view = clonedDocument.defaultView;
+  if (!ctx || !view) return;
+
+  const toRgba = (color: string): string => {
+    const cached = colorCache.get(color);
+    if (cached) return cached;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    const normalized = `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+    colorCache.set(color, normalized);
+    return normalized;
+  };
+
+  clonedDocument.querySelectorAll<HTMLElement>('*').forEach(element => {
+    const computed = view.getComputedStyle(element);
+    COLOR_PROPERTIES.forEach(property => {
+      const value = computed.getPropertyValue(property);
+      if (!value || !MODERN_COLOR_PATTERN.test(value)) {
+        MODERN_COLOR_PATTERN.lastIndex = 0;
+        return;
+      }
+      MODERN_COLOR_PATTERN.lastIndex = 0;
+      const normalized = value.replace(MODERN_COLOR_PATTERN, match => toRgba(match));
+      MODERN_COLOR_PATTERN.lastIndex = 0;
+      element.style.setProperty(property, normalized, 'important');
+    });
+  });
+}
+
+async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise<string> {
+  const transparentPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+  return toPng(document.documentElement, {
+    width: viewport.width,
+    height: viewport.height,
+    style: {
+      transform: `translate(${-viewport.scrollX}px, ${-viewport.scrollY}px)`,
+      transformOrigin: 'top left',
+      width: `${Math.max(document.documentElement.scrollWidth, viewport.width)}px`,
+      height: `${Math.max(document.documentElement.scrollHeight, viewport.height)}px`,
+    },
+    pixelRatio: 1,
+    imagePlaceholder: transparentPixel,
+    skipFonts: true,
+    filter: (node: HTMLElement) => {
+      if (node.id === 'buggy-bag-host' || node.hasAttribute?.('data-buggy-bag-standalone-root')) return false;
+      if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'VIDEO') return false;
+      return true;
+    },
+  });
+}
 
 /**
  * Captures the current page (minus the BuggyBag widget host) as a PNG data
@@ -12,104 +141,52 @@ import { toPng } from 'html-to-image';
  * so it works the same on desktop, inside the Адаптивність iframe, and on
  * a real phone.
  */
-export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement | null): Promise<{ imageUrl: string; fallbackUsed: boolean }> {
-  const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
-
+export async function capturePageScreenshot(
+  annotationCanvas?: HTMLCanvasElement | null,
+  viewport: CaptureViewport = getCaptureViewport(),
+): Promise<ScreenshotResult> {
   let annotationDataUrl: string | null = null;
   if (annotationCanvas) {
     try { annotationDataUrl = annotationCanvas.toDataURL('image/png'); } catch { /* tainted canvas */ }
   }
 
-  // Hide the widget so html-to-image only captures the page underneath it.
-  const prevOpacity = host?.style.opacity ?? '';
-  if (host) host.style.opacity = '0';
-
   let imageUrl = '';
   let fallbackUsed = false;
   try {
-    const transparentPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-
     let pageDataUrl = '';
-    
+
     try {
-      // Tier 1: High quality, fetch everything (except favicons which are always skipped)
-      pageDataUrl = await toPng(document.body, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        style: {
-          marginTop: `-${window.scrollY}px`,
-          marginLeft: `-${window.scrollX}px`,
-        },
-        pixelRatio: 1,
-        imagePlaceholder: transparentPixel,
-        filter: (node: HTMLElement) => {
-          if (node.id === 'buggy-bag-host') return false;
-          if (node.tagName === 'LINK') {
-            const rel = (node as HTMLLinkElement).rel?.toLowerCase() || '';
-            if (rel.includes('icon')) return false;
-          }
-          return true;
-        },
-      });
+      // Browser-backed DOM rendering keeps fixed/sticky elements and the exact
+      // scrolled viewport in the same coordinate system as the drawing canvas.
+      pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
     } catch (tier1Err) {
-      console.warn('[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...', tier1Err);
+      console.warn('[BuggyBag] Tier 1 screenshot failed, normalizing modern CSS colors...', tier1Err);
       fallbackUsed = true;
-      
+
       try {
-        // Tier 2: Strip risky elements (images, iframes, stylesheets) but PRESERVE fonts
-        pageDataUrl = await toPng(document.body, {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          style: {
-            marginTop: `-${window.scrollY}px`,
-            marginLeft: `-${window.scrollX}px`,
-          },
-          pixelRatio: 1,
-          imagePlaceholder: transparentPixel,
-          filter: (node: HTMLElement) => {
-            if (node.id === 'buggy-bag-host') return false;
-            if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'IMG' || node.tagName === 'VIDEO') return false;
-            return true;
-          },
-        });
+        pageDataUrl = await renderViewportWithHtml2Canvas(viewport, true);
       } catch (tier2Err) {
-        console.warn('[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...', tier2Err);
-        // Tier 3: Absolute fallback, strip EVERYTHING including fonts
-        pageDataUrl = await toPng(document.body, {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          style: {
-            marginTop: `-${window.scrollY}px`,
-            marginLeft: `-${window.scrollX}px`,
-          },
-          pixelRatio: 1,
-          imagePlaceholder: transparentPixel,
-          skipFonts: true,
-          filter: (node: HTMLElement) => {
-            if (node.id === 'buggy-bag-host') return false;
-            if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'IMG' || node.tagName === 'VIDEO' || node.tagName === 'SVG') return false;
-            return true;
-          },
-        });
+        console.warn('[BuggyBag] Tier 2 screenshot failed, trying safe mode...', tier2Err);
+        pageDataUrl = await renderViewportWithHtmlToImage(viewport);
       }
     }
 
     if (annotationDataUrl) {
       // Composite page + annotations via Canvas 2D API.
       const composite = document.createElement('canvas');
-      composite.width = window.innerWidth;
-      composite.height = window.innerHeight;
+      composite.width = viewport.width;
+      composite.height = viewport.height;
       const ctx = composite.getContext('2d');
       if (ctx) {
         await new Promise<void>(resolve => {
           const img = new Image();
-          img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
+          img.onload = () => { ctx.drawImage(img, 0, 0, viewport.width, viewport.height); resolve(); };
           img.onerror = () => resolve();
           img.src = pageDataUrl;
         });
         await new Promise<void>(resolve => {
           const img = new Image();
-          img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
+          img.onload = () => { ctx.drawImage(img, 0, 0, viewport.width, viewport.height); resolve(); };
           img.onerror = () => resolve();
           img.src = annotationDataUrl!;
         });
@@ -122,8 +199,6 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
     }
   } catch (e) {
     console.warn('[BuggyBag] screenshot completely failed', e);
-  } finally {
-    if (host) host.style.opacity = prevOpacity;
   }
 
   if (imageUrl) {
@@ -131,6 +206,46 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
   }
 
   return { imageUrl, fallbackUsed };
+}
+
+/** Adds the current annotation canvas to the frame captured on activation. */
+export async function compositeScreenshot(
+  base: ScreenshotResult,
+  annotationCanvas: HTMLCanvasElement | null,
+  viewport: CaptureViewport,
+): Promise<ScreenshotResult> {
+  if (!base.imageUrl || !annotationCanvas) return base;
+
+  let annotationDataUrl = '';
+  try {
+    annotationDataUrl = annotationCanvas.toDataURL('image/png');
+  } catch {
+    return base;
+  }
+
+  const composite = document.createElement('canvas');
+  composite.width = viewport.width;
+  composite.height = viewport.height;
+  const ctx = composite.getContext('2d');
+  if (!ctx) return base;
+
+  const draw = (source: string) => new Promise<void>(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, viewport.width, viewport.height);
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = source;
+  });
+
+  await draw(base.imageUrl);
+  await draw(annotationDataUrl);
+
+  return {
+    imageUrl: await compressDataUrl(composite.toDataURL('image/png')),
+    fallbackUsed: base.fallbackUsed,
+  };
 }
 
 /**
@@ -182,4 +297,3 @@ export async function compressDataUrl(dataUrl: string, quality = 0.82, maxDimens
     img.src = dataUrl;
   });
 }
-
