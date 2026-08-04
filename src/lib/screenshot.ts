@@ -33,13 +33,9 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
     
     try {
       // Tier 1: High quality, fetch everything (except favicons which are always skipped)
-      pageDataUrl = await toPng(document.body, {
+      pageDataUrl = await toPng(document.documentElement, {
         width: window.innerWidth,
         height: window.innerHeight,
-        style: {
-          marginTop: `-${window.scrollY}px`,
-          marginLeft: `-${window.scrollX}px`,
-        },
         pixelRatio: 1,
         imagePlaceholder: transparentPixel,
         filter: (node: HTMLElement) => {
@@ -57,13 +53,9 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
       
       try {
         // Tier 2: Strip risky elements (images, iframes, stylesheets) but PRESERVE fonts
-        pageDataUrl = await toPng(document.body, {
+        pageDataUrl = await toPng(document.documentElement, {
           width: window.innerWidth,
           height: window.innerHeight,
-          style: {
-            marginTop: `-${window.scrollY}px`,
-            marginLeft: `-${window.scrollX}px`,
-          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           filter: (node: HTMLElement) => {
@@ -75,13 +67,9 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
       } catch (tier2Err) {
         console.warn('[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...', tier2Err);
         // Tier 3: Absolute fallback, strip EVERYTHING including fonts
-        pageDataUrl = await toPng(document.body, {
+        pageDataUrl = await toPng(document.documentElement, {
           width: window.innerWidth,
           height: window.innerHeight,
-          style: {
-            marginTop: `-${window.scrollY}px`,
-            marginLeft: `-${window.scrollX}px`,
-          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           skipFonts: true,

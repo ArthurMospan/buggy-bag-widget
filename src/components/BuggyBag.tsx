@@ -85,7 +85,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
     return () => window.removeEventListener('buggy-bag:draft-changed', checkDraft);
   }, []);
 
-  const handleBugBtnClick = async () => {
+  const handleBugBtnClick = () => {
     if (activeTool) {
       window.dispatchEvent(new CustomEvent('buggy-bag:request-close'));
       return;
@@ -115,16 +115,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
         } catch (e) { }
       }
     }
-    // Capture a frozen screenshot BEFORE entering capture mode
-    setCapturingFrozen(true);
-    try {
-      const { imageUrl } = await capturePageScreenshot(null);
-      setFrozenScreenshot(imageUrl || null);
-    } catch (e) {
-      console.warn('[BuggyBag] Failed to capture frozen screenshot, continuing without', e);
-      setFrozenScreenshot(null);
-    }
-    setCapturingFrozen(false);
+    
     setActiveTool('pin');
   };
 

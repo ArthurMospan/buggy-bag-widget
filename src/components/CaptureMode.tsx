@@ -567,20 +567,13 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, 
     const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
     const annotationCanvas = host?.shadowRoot?.querySelector('canvas') ?? null;
 
-    let imageUrl: string;
+    let imageUrl = '';
     let fallbackUsed = false;
 
-    if (frozenScreenshot) {
-      // Freeze-page flow: composite annotations onto the pre-captured screenshot
-      const result = await compositeScreenshot(frozenScreenshot, annotationCanvas, w, h);
-      imageUrl = result.imageUrl;
-      fallbackUsed = result.fallbackUsed;
-    } else {
-      // Legacy fallback: capture page screenshot at send time
-      const result = await capturePageScreenshot(annotationCanvas);
-      imageUrl = result.imageUrl;
-      fallbackUsed = result.fallbackUsed;
-    }
+    // Capture page screenshot at send time
+    const result = await capturePageScreenshot(annotationCanvas);
+    imageUrl = result.imageUrl;
+    fallbackUsed = result.fallbackUsed;
 
     setIsCapturing(false);
     try { 
@@ -1255,23 +1248,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, 
         </div>
       )}
 
-      {/* Frozen page screenshot — covers real page so user annotates a static snapshot */}
-      {frozenScreenshot && (
-        <img
-          src={frozenScreenshot}
-          alt=""
-          data-buggy-bag="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            width: `${w}px`,
-            height: `${h}px`,
-            zIndex: 2,
-            pointerEvents: 'none',
-            userSelect: 'none',
-          }}
-        />
-      )}
+
 
       {/* Drawing canvas — ALWAYS rendered (visible behind popup too) */}
       {!showExitConfirm && (

@@ -30143,13 +30143,9 @@ async function capturePageScreenshot(annotationCanvas) {
     const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     let pageDataUrl = "";
     try {
-      pageDataUrl = await toPng(document.body, {
+      pageDataUrl = await toPng(document.documentElement, {
         width: window.innerWidth,
         height: window.innerHeight,
-        style: {
-          marginTop: `-${window.scrollY}px`,
-          marginLeft: `-${window.scrollX}px`
-        },
         pixelRatio: 1,
         imagePlaceholder: transparentPixel,
         filter: (node) => {
@@ -30165,13 +30161,9 @@ async function capturePageScreenshot(annotationCanvas) {
       console.warn("[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...", tier1Err);
       fallbackUsed = true;
       try {
-        pageDataUrl = await toPng(document.body, {
+        pageDataUrl = await toPng(document.documentElement, {
           width: window.innerWidth,
           height: window.innerHeight,
-          style: {
-            marginTop: `-${window.scrollY}px`,
-            marginLeft: `-${window.scrollX}px`
-          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           filter: (node) => {
@@ -30182,13 +30174,9 @@ async function capturePageScreenshot(annotationCanvas) {
         });
       } catch (tier2Err) {
         console.warn("[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...", tier2Err);
-        pageDataUrl = await toPng(document.body, {
+        pageDataUrl = await toPng(document.documentElement, {
           width: window.innerWidth,
           height: window.innerHeight,
-          style: {
-            marginTop: `-${window.scrollY}px`,
-            marginLeft: `-${window.scrollX}px`
-          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           skipFonts: true,
@@ -30240,45 +30228,6 @@ async function capturePageScreenshot(annotationCanvas) {
     imageUrl = await compressDataUrl(imageUrl);
   }
   return { imageUrl, fallbackUsed };
-}
-async function compositeScreenshot(baseImageUrl, annotationCanvas, viewportWidth, viewportHeight) {
-  let annotationDataUrl = null;
-  if (annotationCanvas) {
-    try {
-      annotationDataUrl = annotationCanvas.toDataURL("image/png");
-    } catch {
-    }
-  }
-  const composite = document.createElement("canvas");
-  composite.width = viewportWidth;
-  composite.height = viewportHeight;
-  const ctx = composite.getContext("2d");
-  if (!ctx) {
-    return { imageUrl: baseImageUrl, fallbackUsed: false };
-  }
-  await new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, viewportWidth, viewportHeight);
-      resolve();
-    };
-    img.onerror = () => resolve();
-    img.src = baseImageUrl;
-  });
-  if (annotationDataUrl) {
-    await new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = annotationDataUrl;
-    });
-  }
-  let imageUrl = composite.toDataURL("image/png");
-  imageUrl = await compressDataUrl(imageUrl);
-  return { imageUrl, fallbackUsed: false };
 }
 async function compressDataUrl(dataUrl, quality = 0.82, maxDimension = 1920) {
   if (!dataUrl || !dataUrl.startsWith("data:image")) return dataUrl;
@@ -30821,17 +30770,11 @@ function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, onSend,
     await new Promise((r) => setTimeout(r, 80));
     const host = document.querySelector("#buggy-bag-host");
     const annotationCanvas = host?.shadowRoot?.querySelector("canvas") ?? null;
-    let imageUrl;
+    let imageUrl = "";
     let fallbackUsed = false;
-    if (frozenScreenshot) {
-      const result = await compositeScreenshot(frozenScreenshot, annotationCanvas, w, h);
-      imageUrl = result.imageUrl;
-      fallbackUsed = result.fallbackUsed;
-    } else {
-      const result = await capturePageScreenshot(annotationCanvas);
-      imageUrl = result.imageUrl;
-      fallbackUsed = result.fallbackUsed;
-    }
+    const result = await capturePageScreenshot(annotationCanvas);
+    imageUrl = result.imageUrl;
+    fallbackUsed = result.fallbackUsed;
     setIsCapturing(false);
     try {
       localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
@@ -31680,23 +31623,6 @@ ${issue.message}` }));
             })() })
           ] })
         ] }),
-        frozenScreenshot && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-          "img",
-          {
-            src: frozenScreenshot,
-            alt: "",
-            "data-buggy-bag": "true",
-            style: {
-              position: "fixed",
-              inset: 0,
-              width: `${w}px`,
-              height: `${h}px`,
-              zIndex: 2,
-              pointerEvents: "none",
-              userSelect: "none"
-            }
-          }
-        ),
         !showExitConfirm && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
           DrawingCanvas,
           {
@@ -32669,7 +32595,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
     window.addEventListener("buggy-bag:draft-changed", checkDraft);
     return () => window.removeEventListener("buggy-bag:draft-changed", checkDraft);
   }, []);
-  const handleBugBtnClick = async () => {
+  const handleBugBtnClick = () => {
     if (activeTool) {
       window.dispatchEvent(new CustomEvent("buggy-bag:request-close"));
       return;
@@ -32695,15 +32621,6 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         }
       }
     }
-    setCapturingFrozen(true);
-    try {
-      const { imageUrl } = await capturePageScreenshot(null);
-      setFrozenScreenshot(imageUrl || null);
-    } catch (e) {
-      console.warn("[BuggyBag] Failed to capture frozen screenshot, continuing without", e);
-      setFrozenScreenshot(null);
-    }
-    setCapturingFrozen(false);
     setActiveTool("pin");
   };
   (0, import_react7.useEffect)(() => {
