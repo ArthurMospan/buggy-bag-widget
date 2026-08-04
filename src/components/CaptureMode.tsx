@@ -607,7 +607,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, c
     // old activation-time base image became stale when a nested scroller or a
     // React-rendered container changed after capture mode was opened.
     const viewport = getCaptureViewport();
-    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas, viewport);
+    const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot(annotationCanvas, viewport);
 
     setIsCapturing(false);
     try { 
@@ -641,6 +641,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, c
       }
     }
     const freshTechContext = collectTechContext(lastElement);
+    freshTechContext.screenshotRenderer = renderer;
     if (designAuditResult) {
       const stripped = {
         fonts: designAuditResult.fonts.map(({value,count}) => ({value,count})),

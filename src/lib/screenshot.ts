@@ -1,5 +1,10 @@
-import { toPng } from 'html-to-image';
 import html2canvas from 'html2canvas';
+import { applyStyle } from 'html-to-image/es/apply-style';
+import { cloneNode } from 'html-to-image/es/clone-node';
+import { embedImages } from 'html-to-image/es/embed-images';
+import { embedWebFonts } from 'html-to-image/es/embed-webfonts';
+import type { Options as HtmlToImageOptions } from 'html-to-image/es/types';
+import { createImage, nodeToDataURL } from 'html-to-image/es/util';
 
 export interface CaptureViewport {
   scrollX: number;
@@ -11,7 +16,14 @@ export interface CaptureViewport {
 export interface ScreenshotResult {
   imageUrl: string;
   fallbackUsed: boolean;
+  renderer: ScreenshotRenderer;
 }
+
+export type ScreenshotRenderer =
+  | 'html2canvas'
+  | 'html2canvas-normalized'
+  | 'html-to-image-scroll-aware'
+  | 'failed';
 
 export interface CaptureScrollPosition {
   element: HTMLElement;
@@ -236,17 +248,20 @@ async function renderViewportWithHtml2Canvas(
   }
 }
 
-const MODERN_COLOR_PATTERN = /\b(?:oklch|oklab|lab|lch|color)\([^)]*\)/gi;
+const MODERN_COLOR_FUNCTION_PATTERN = /\b(?:color-mix|oklch|oklab|lab|lch|color)\(/gi;
+const MODERN_COLOR_INTERPOLATION_PATTERN = /\bin\s+(?:oklab|oklch|lab|lch)\s*,/gi;
 const COLOR_BEARING_PROPERTIES = [
   'color',
   'background-color',
   'background-image',
+  'list-style-image',
   'border-top-color',
   'border-right-color',
   'border-bottom-color',
   'border-left-color',
   'outline-color',
   'text-decoration-color',
+  '-webkit-text-stroke-color',
   'column-rule-color',
   'caret-color',
   'accent-color',
@@ -282,6 +297,42 @@ function normalizeUnsupportedColors(clonedDocument: Document): void {
     return normalized;
   };
 
+  const hasModernColor = (value: string): boolean => {
+    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
+    MODERN_COLOR_INTERPOLATION_PATTERN.lastIndex = 0;
+    const result = MODERN_COLOR_FUNCTION_PATTERN.test(value) || MODERN_COLOR_INTERPOLATION_PATTERN.test(value);
+    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
+    MODERN_COLOR_INTERPOLATION_PATTERN.lastIndex = 0;
+    return result;
+  };
+
+  const normalizeValue = (value: string): string => {
+    // A simple `[^)]*` regexp truncates nested color-mix()/calc() values.
+    // Walk balanced parentheses so the browser can resolve the complete
+    // modern color function to an rgba pixel.
+    let source = value.replace(MODERN_COLOR_INTERPOLATION_PATTERN, '');
+    let result = '';
+    let cursor = 0;
+    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = MODERN_COLOR_FUNCTION_PATTERN.exec(source))) {
+      const start = match.index;
+      let depth = 1;
+      let end = MODERN_COLOR_FUNCTION_PATTERN.lastIndex;
+      while (end < source.length && depth > 0) {
+        if (source[end] === '(') depth += 1;
+        else if (source[end] === ')') depth -= 1;
+        end += 1;
+      }
+      if (depth !== 0) break;
+      result += source.slice(cursor, start) + toRgba(source.slice(start, end));
+      cursor = end;
+      MODERN_COLOR_FUNCTION_PATTERN.lastIndex = end;
+    }
+    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
+    return result + source.slice(cursor);
+  };
+
   clonedDocument.querySelectorAll<HTMLElement>('*').forEach(element => {
     const computed = view.getComputedStyle(element);
     // Modern colors also occur in gradients, SVG fill/stroke and filters;
@@ -289,22 +340,46 @@ function normalizeUnsupportedColors(clonedDocument: Document): void {
     // preserve nested scroll state.
     COLOR_BEARING_PROPERTIES.forEach(property => {
       const value = computed.getPropertyValue(property);
-      if (!value || !MODERN_COLOR_PATTERN.test(value)) {
-        MODERN_COLOR_PATTERN.lastIndex = 0;
-        return;
-      }
-      MODERN_COLOR_PATTERN.lastIndex = 0;
-      const normalized = value.replace(MODERN_COLOR_PATTERN, match => toRgba(match));
-      MODERN_COLOR_PATTERN.lastIndex = 0;
-      element.style.setProperty(property, normalized, 'important');
+      if (!value || !hasModernColor(value)) return;
+      element.style.setProperty(property, normalizeValue(value), 'important');
     });
+  });
+}
+
+function applyScrollOffsetsToForeignObjectClone(
+  clonedRoot: HTMLElement,
+  positions: MarkedScrollPosition[],
+): void {
+  const translateChildren = (container: HTMLElement, scrollLeft: number, scrollTop: number) => {
+    Array.from(container.children).forEach(child => {
+      if (!(child instanceof HTMLElement) && !(child instanceof SVGElement)) return;
+      const existingTransform = child.style.transform && child.style.transform !== 'none'
+        ? child.style.transform
+        : '';
+      // Keep both the child's existing individual translate and its transform
+      // matrix; add the baked scroll movement as one more transform function.
+      child.style.setProperty(
+        'transform',
+        `translate(${-scrollLeft}px, ${-scrollTop}px)${existingTransform ? ` ${existingTransform}` : ''}`,
+        'important',
+      );
+      child.style.setProperty('transform-origin', 'top left', 'important');
+    });
+  };
+
+  positions.forEach(({ id, scrollLeft, scrollTop }) => {
+    if (scrollLeft === 0 && scrollTop === 0) return;
+    const clone = clonedRoot.querySelector<HTMLElement>(
+      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`,
+    );
+    if (!clone) return;
+    translateChildren(clone, scrollLeft, scrollTop);
   });
 }
 
 async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise<string> {
   const transparentPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-
-  return toPng(document.documentElement, {
+  const options: HtmlToImageOptions = {
     width: viewport.width,
     height: viewport.height,
     style: {
@@ -321,7 +396,32 @@ async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise
       if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'VIDEO') return false;
       return true;
     },
-  });
+  };
+
+  const scrollPositions = markScrollPositions();
+  try {
+    // html-to-image normally serializes a deep clone but drops runtime
+    // scrollTop/scrollLeft. Build that clone ourselves, then bake every
+    // scroll offset into transforms before it becomes an SVG foreignObject.
+    const clonedRoot = await cloneNode(document.documentElement, options, true);
+    if (!clonedRoot) throw new Error('Unable to clone document for screenshot fallback');
+    applyScrollOffsetsToForeignObjectClone(clonedRoot, scrollPositions);
+    await embedWebFonts(clonedRoot, options);
+    await embedImages(clonedRoot, options);
+    applyStyle(clonedRoot, options);
+
+    const svg = await nodeToDataURL(clonedRoot, viewport.width, viewport.height);
+    const image = await createImage(svg);
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Unable to create screenshot fallback canvas');
+    context.drawImage(image, 0, 0, viewport.width, viewport.height);
+    return canvas.toDataURL('image/png');
+  } finally {
+    clearScrollPositionMarks(scrollPositions);
+  }
 }
 
 /**
@@ -347,6 +447,7 @@ export async function capturePageScreenshot(
 
   let imageUrl = '';
   let fallbackUsed = false;
+  let renderer: ScreenshotRenderer = 'failed';
   try {
     let pageDataUrl = '';
 
@@ -354,15 +455,18 @@ export async function capturePageScreenshot(
       // Browser-backed DOM rendering keeps fixed/sticky elements and the exact
       // scrolled viewport in the same coordinate system as the drawing canvas.
       pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
+      renderer = 'html2canvas';
     } catch (tier1Err) {
       console.warn('[BuggyBag] Tier 1 screenshot failed, normalizing modern CSS colors...', tier1Err);
-      fallbackUsed = true;
 
       try {
         pageDataUrl = await renderViewportWithHtml2Canvas(viewport, true);
+        renderer = 'html2canvas-normalized';
       } catch (tier2Err) {
-        console.warn('[BuggyBag] Tier 2 screenshot failed, trying safe mode...', tier2Err);
+        console.warn('[BuggyBag] Tier 2 screenshot failed, trying scroll-aware safe mode...', tier2Err);
+        fallbackUsed = true;
         pageDataUrl = await renderViewportWithHtmlToImage(viewport);
+        renderer = 'html-to-image-scroll-aware';
       }
     }
 
@@ -400,7 +504,7 @@ export async function capturePageScreenshot(
     imageUrl = await compressDataUrl(imageUrl);
   }
 
-  return { imageUrl, fallbackUsed };
+  return { imageUrl, fallbackUsed, renderer };
 }
 
 /**

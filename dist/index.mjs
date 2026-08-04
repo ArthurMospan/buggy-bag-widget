@@ -30276,17 +30276,20 @@ async function renderViewportWithHtml2Canvas(viewport, normalizeModernColors) {
     clearScrollPositionMarks(scrollPositions);
   }
 }
-var MODERN_COLOR_PATTERN = /\b(?:oklch|oklab|lab|lch|color)\([^)]*\)/gi;
+var MODERN_COLOR_FUNCTION_PATTERN = /\b(?:color-mix|oklch|oklab|lab|lch|color)\(/gi;
+var MODERN_COLOR_INTERPOLATION_PATTERN = /\bin\s+(?:oklab|oklch|lab|lch)\s*,/gi;
 var COLOR_BEARING_PROPERTIES = [
   "color",
   "background-color",
   "background-image",
+  "list-style-image",
   "border-top-color",
   "border-right-color",
   "border-bottom-color",
   "border-left-color",
   "outline-color",
   "text-decoration-color",
+  "-webkit-text-stroke-color",
   "column-rule-color",
   "caret-color",
   "accent-color",
@@ -30319,24 +30322,71 @@ function normalizeUnsupportedColors(clonedDocument) {
     colorCache.set(color, normalized);
     return normalized;
   };
+  const hasModernColor = (value) => {
+    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
+    MODERN_COLOR_INTERPOLATION_PATTERN.lastIndex = 0;
+    const result = MODERN_COLOR_FUNCTION_PATTERN.test(value) || MODERN_COLOR_INTERPOLATION_PATTERN.test(value);
+    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
+    MODERN_COLOR_INTERPOLATION_PATTERN.lastIndex = 0;
+    return result;
+  };
+  const normalizeValue = (value) => {
+    let source = value.replace(MODERN_COLOR_INTERPOLATION_PATTERN, "");
+    let result = "";
+    let cursor = 0;
+    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
+    let match;
+    while (match = MODERN_COLOR_FUNCTION_PATTERN.exec(source)) {
+      const start = match.index;
+      let depth = 1;
+      let end = MODERN_COLOR_FUNCTION_PATTERN.lastIndex;
+      while (end < source.length && depth > 0) {
+        if (source[end] === "(") depth += 1;
+        else if (source[end] === ")") depth -= 1;
+        end += 1;
+      }
+      if (depth !== 0) break;
+      result += source.slice(cursor, start) + toRgba(source.slice(start, end));
+      cursor = end;
+      MODERN_COLOR_FUNCTION_PATTERN.lastIndex = end;
+    }
+    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
+    return result + source.slice(cursor);
+  };
   clonedDocument.querySelectorAll("*").forEach((element) => {
     const computed = view.getComputedStyle(element);
     COLOR_BEARING_PROPERTIES.forEach((property) => {
       const value = computed.getPropertyValue(property);
-      if (!value || !MODERN_COLOR_PATTERN.test(value)) {
-        MODERN_COLOR_PATTERN.lastIndex = 0;
-        return;
-      }
-      MODERN_COLOR_PATTERN.lastIndex = 0;
-      const normalized = value.replace(MODERN_COLOR_PATTERN, (match) => toRgba(match));
-      MODERN_COLOR_PATTERN.lastIndex = 0;
-      element.style.setProperty(property, normalized, "important");
+      if (!value || !hasModernColor(value)) return;
+      element.style.setProperty(property, normalizeValue(value), "important");
     });
+  });
+}
+function applyScrollOffsetsToForeignObjectClone(clonedRoot, positions) {
+  const translateChildren = (container, scrollLeft, scrollTop) => {
+    Array.from(container.children).forEach((child) => {
+      if (!(child instanceof HTMLElement) && !(child instanceof SVGElement)) return;
+      const existingTransform = child.style.transform && child.style.transform !== "none" ? child.style.transform : "";
+      child.style.setProperty(
+        "transform",
+        `translate(${-scrollLeft}px, ${-scrollTop}px)${existingTransform ? ` ${existingTransform}` : ""}`,
+        "important"
+      );
+      child.style.setProperty("transform-origin", "top left", "important");
+    });
+  };
+  positions.forEach(({ id, scrollLeft, scrollTop }) => {
+    if (scrollLeft === 0 && scrollTop === 0) return;
+    const clone = clonedRoot.querySelector(
+      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`
+    );
+    if (!clone) return;
+    translateChildren(clone, scrollLeft, scrollTop);
   });
 }
 async function renderViewportWithHtmlToImage(viewport) {
   const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-  return toPng(document.documentElement, {
+  const options = {
     width: viewport.width,
     height: viewport.height,
     style: {
@@ -30353,7 +30403,27 @@ async function renderViewportWithHtmlToImage(viewport) {
       if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "VIDEO") return false;
       return true;
     }
-  });
+  };
+  const scrollPositions = markScrollPositions();
+  try {
+    const clonedRoot = await cloneNode(document.documentElement, options, true);
+    if (!clonedRoot) throw new Error("Unable to clone document for screenshot fallback");
+    applyScrollOffsetsToForeignObjectClone(clonedRoot, scrollPositions);
+    await embedWebFonts(clonedRoot, options);
+    await embedImages(clonedRoot, options);
+    applyStyle(clonedRoot, options);
+    const svg = await nodeToDataURL(clonedRoot, viewport.width, viewport.height);
+    const image = await createImage(svg);
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Unable to create screenshot fallback canvas");
+    context.drawImage(image, 0, 0, viewport.width, viewport.height);
+    return canvas.toDataURL("image/png");
+  } finally {
+    clearScrollPositionMarks(scrollPositions);
+  }
 }
 async function capturePageScreenshot(annotationCanvas, viewport = getCaptureViewport()) {
   let annotationDataUrl = null;
@@ -30365,18 +30435,22 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
   }
   let imageUrl = "";
   let fallbackUsed = false;
+  let renderer = "failed";
   try {
     let pageDataUrl = "";
     try {
       pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
+      renderer = "html2canvas";
     } catch (tier1Err) {
       console.warn("[BuggyBag] Tier 1 screenshot failed, normalizing modern CSS colors...", tier1Err);
-      fallbackUsed = true;
       try {
         pageDataUrl = await renderViewportWithHtml2Canvas(viewport, true);
+        renderer = "html2canvas-normalized";
       } catch (tier2Err) {
-        console.warn("[BuggyBag] Tier 2 screenshot failed, trying safe mode...", tier2Err);
+        console.warn("[BuggyBag] Tier 2 screenshot failed, trying scroll-aware safe mode...", tier2Err);
+        fallbackUsed = true;
         pageDataUrl = await renderViewportWithHtmlToImage(viewport);
+        renderer = "html-to-image-scroll-aware";
       }
     }
     if (annotationDataUrl) {
@@ -30416,7 +30490,7 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
   if (imageUrl) {
     imageUrl = await compressDataUrl(imageUrl);
   }
-  return { imageUrl, fallbackUsed };
+  return { imageUrl, fallbackUsed, renderer };
 }
 async function compressDataUrl(dataUrl, quality = 0.82, maxDimension = 1920) {
   if (!dataUrl || !dataUrl.startsWith("data:image")) return dataUrl;
@@ -30989,7 +31063,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, captureS
     const host = document.querySelector("#buggy-bag-host");
     const annotationCanvas = host?.shadowRoot?.querySelector("canvas") ?? null;
     const viewport = getCaptureViewport();
-    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas, viewport);
+    const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot(annotationCanvas, viewport);
     setIsCapturing(false);
     try {
       localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
@@ -31019,6 +31093,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, captureS
       }
     }
     const freshTechContext = collectTechContext(lastElement);
+    freshTechContext.screenshotRenderer = renderer;
     if (designAuditResult) {
       const stripped = {
         fonts: designAuditResult.fonts.map(({ value, count }) => ({ value, count })),
@@ -32474,7 +32549,7 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
     if (!pin || sending) return;
     setSending(true);
     try {
-      const { imageUrl, fallbackUsed } = await capturePageScreenshot();
+      const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot();
       const shapeId = `pin-${Date.now()}`;
       const shape = {
         id: shapeId,
@@ -32485,6 +32560,7 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
         elementContext: pin.elementContext ?? void 0
       };
       const techContext = collectTechContext(pin.element);
+      techContext.screenshotRenderer = renderer;
       let text = description.trim() || "\u0411\u0435\u0437 \u043E\u043F\u0438\u0441\u0443";
       if (fallbackUsed) {
         text += "\n\n\u26A0\uFE0F \u0423\u0432\u0430\u0433\u0430: \u0426\u0435\u0439 \u0441\u043A\u0440\u0456\u043D\u0448\u043E\u0442 \u0431\u0443\u043B\u043E \u0437\u0440\u043E\u0431\u043B\u0435\u043D\u043E \u0443 \u0441\u043F\u0440\u043E\u0449\u0435\u043D\u043E\u043C\u0443 \u0440\u0435\u0436\u0438\u043C\u0456 (fallback), \u0442\u043E\u043C\u0443 \u0434\u0435\u044F\u043A\u0456 \u0448\u0440\u0438\u0444\u0442\u0438 \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u0438\u043D\u043A\u0438 \u043C\u043E\u0436\u0443\u0442\u044C \u0431\u0443\u0442\u0438 \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456 \u0447\u0435\u0440\u0435\u0437 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F \u0431\u0435\u0437\u043F\u0435\u043A\u0438 \u0441\u0430\u0439\u0442\u0443 (CORS).";
@@ -32777,7 +32853,7 @@ function isRealMobileDevice() {
 }
 
 // src/styles.gen.ts
-var styles = ".container {\r\n    width: 100%\n}\r\n@media (min-width: 640px) {\r\n    .container {\r\n        max-width: 640px\n    }\n}\r\n@media (min-width: 768px) {\r\n    .container {\r\n        max-width: 768px\n    }\n}\r\n@media (min-width: 1024px) {\r\n    .container {\r\n        max-width: 1024px\n    }\n}\r\n@media (min-width: 1280px) {\r\n    .container {\r\n        max-width: 1280px\n    }\n}\r\n@media (min-width: 1536px) {\r\n    .container {\r\n        max-width: 1536px\n    }\n}\r\n.sr-only {\r\n    position: absolute;\r\n    width: 1px;\r\n    height: 1px;\r\n    padding: 0;\r\n    margin: -1px;\r\n    overflow: hidden;\r\n    clip: rect(0, 0, 0, 0);\r\n    white-space: nowrap;\r\n    border-width: 0\n}\r\n.visible {\r\n    visibility: visible\n}\r\n.static {\r\n    position: static\n}\r\n.fixed {\r\n    position: fixed\n}\r\n.absolute {\r\n    position: absolute\n}\r\n.relative {\r\n    position: relative\n}\r\n.inset-0 {\r\n    inset: 0px\n}\r\n.z-\\[9998\\] {\r\n    z-index: 9998\n}\r\n.mx-4 {\r\n    margin-left: 1rem;\r\n    margin-right: 1rem\n}\r\n.block {\r\n    display: block\n}\r\n.inline-block {\r\n    display: inline-block\n}\r\n.flex {\r\n    display: flex\n}\r\n.inline-flex {\r\n    display: inline-flex\n}\r\n.hidden {\r\n    display: none\n}\r\n.h-\\[28px\\] {\r\n    height: 28px\n}\r\n.h-\\[32px\\] {\r\n    height: 32px\n}\r\n.h-\\[36px\\] {\r\n    height: 36px\n}\r\n.max-h-\\[calc\\(100vh-200px\\)\\] {\r\n    max-height: calc(100vh - 200px)\n}\r\n.w-\\[32px\\] {\r\n    width: 32px\n}\r\n.w-full {\r\n    width: 100%\n}\r\n.max-w-\\[1200px\\] {\r\n    max-width: 1200px\n}\r\n.max-w-\\[480px\\] {\r\n    max-width: 480px\n}\r\n.max-w-\\[640px\\] {\r\n    max-width: 640px\n}\r\n.max-w-\\[900px\\] {\r\n    max-width: 900px\n}\r\n.flex-shrink {\r\n    flex-shrink: 1\n}\r\n.shrink-0 {\r\n    flex-shrink: 0\n}\r\n.transform {\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.resize {\r\n    resize: both\n}\r\n.items-start {\r\n    align-items: flex-start\n}\r\n.items-center {\r\n    align-items: center\n}\r\n.justify-center {\r\n    justify-content: center\n}\r\n.justify-between {\r\n    justify-content: space-between\n}\r\n.gap-\\[6px\\] {\r\n    gap: 6px\n}\r\n.overflow-y-auto {\r\n    overflow-y: auto\n}\r\n.truncate {\r\n    overflow: hidden;\r\n    text-overflow: ellipsis;\r\n    white-space: nowrap\n}\r\n.break-all {\r\n    word-break: break-all\n}\r\n.rounded-\\[10px\\] {\r\n    border-radius: 10px\n}\r\n.rounded-\\[16px\\] {\r\n    border-radius: 16px\n}\r\n.rounded-\\[24px\\] {\r\n    border-radius: 24px\n}\r\n.rounded-\\[8px\\] {\r\n    border-radius: 8px\n}\r\n.border {\r\n    border-width: 1px\n}\r\n.border-b {\r\n    border-bottom-width: 1px\n}\r\n.border-\\[\\#f0f0f0\\] {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\r\n.bg-\\[\\#1f1f1f\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#ef4444\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f0f0f0\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f4f4f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f5f5f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black\\/40 {\r\n    background-color: rgb(0 0 0 / 0.4)\n}\r\n.bg-transparent {\r\n    background-color: transparent\n}\r\n.bg-white {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\r\n.p-0 {\r\n    padding: 0px\n}\r\n.p-1 {\r\n    padding: 0.25rem\n}\r\n.p-\\[12px\\] {\r\n    padding: 12px\n}\r\n.p-\\[16px\\] {\r\n    padding: 16px\n}\r\n.p-\\[20px\\] {\r\n    padding: 20px\n}\r\n.p-\\[24px\\] {\r\n    padding: 24px\n}\r\n.px-6 {\r\n    padding-left: 1.5rem;\r\n    padding-right: 1.5rem\n}\r\n.px-\\[12px\\] {\r\n    padding-left: 12px;\r\n    padding-right: 12px\n}\r\n.px-\\[16px\\] {\r\n    padding-left: 16px;\r\n    padding-right: 16px\n}\r\n.px-\\[18px\\] {\r\n    padding-left: 18px;\r\n    padding-right: 18px\n}\r\n.py-5 {\r\n    padding-top: 1.25rem;\r\n    padding-bottom: 1.25rem\n}\r\n.pb-4 {\r\n    padding-bottom: 1rem\n}\r\n.pt-12 {\r\n    padding-top: 3rem\n}\r\n.pt-6 {\r\n    padding-top: 1.5rem\n}\r\n.text-\\[12px\\] {\r\n    font-size: 12px\n}\r\n.text-\\[13px\\] {\r\n    font-size: 13px\n}\r\n.text-\\[18px\\] {\r\n    font-size: 18px\n}\r\n.font-bold {\r\n    font-weight: 700\n}\r\n.uppercase {\r\n    text-transform: uppercase\n}\r\n.leading-none {\r\n    line-height: 1\n}\r\n.text-\\[\\#1f1f1f\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.text-\\[\\#9a9a9a\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\r\n.text-white {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\r\n.shadow {\r\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\r\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\r\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.outline {\r\n    outline-style: solid\n}\r\n.ring {\r\n    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\r\n    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);\r\n    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)\n}\r\n.blur {\r\n    --tw-blur: blur(8px);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.invert {\r\n    --tw-invert: invert(100%);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.filter {\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.backdrop-blur-sm {\r\n    --tw-backdrop-blur: blur(4px);\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.backdrop-filter {\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.transition {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-colors {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.ease-in-out {\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)\n}\r\n.ease-out {\r\n    transition-timing-function: cubic-bezier(0, 0, 0.2, 1)\n}\r\n.hover\\:bg-\\[\\#303030\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#dc2626\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.focus\\:outline-none:focus {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.disabled\\:cursor-not-allowed:disabled {\r\n    cursor: not-allowed\n}\r\n.disabled\\:opacity-50:disabled {\r\n    opacity: 0.5\n}\r\n";
+var styles = ".container {\r\n    width: 100%\n}\r\n@media (min-width: 640px) {\r\n    .container {\r\n        max-width: 640px\n    }\n}\r\n@media (min-width: 768px) {\r\n    .container {\r\n        max-width: 768px\n    }\n}\r\n@media (min-width: 1024px) {\r\n    .container {\r\n        max-width: 1024px\n    }\n}\r\n@media (min-width: 1280px) {\r\n    .container {\r\n        max-width: 1280px\n    }\n}\r\n@media (min-width: 1536px) {\r\n    .container {\r\n        max-width: 1536px\n    }\n}\r\n.sr-only {\r\n    position: absolute;\r\n    width: 1px;\r\n    height: 1px;\r\n    padding: 0;\r\n    margin: -1px;\r\n    overflow: hidden;\r\n    clip: rect(0, 0, 0, 0);\r\n    white-space: nowrap;\r\n    border-width: 0\n}\r\n.visible {\r\n    visibility: visible\n}\r\n.static {\r\n    position: static\n}\r\n.fixed {\r\n    position: fixed\n}\r\n.absolute {\r\n    position: absolute\n}\r\n.relative {\r\n    position: relative\n}\r\n.inset-0 {\r\n    inset: 0px\n}\r\n.z-\\[9998\\] {\r\n    z-index: 9998\n}\r\n.mx-4 {\r\n    margin-left: 1rem;\r\n    margin-right: 1rem\n}\r\n.block {\r\n    display: block\n}\r\n.inline-block {\r\n    display: inline-block\n}\r\n.inline {\r\n    display: inline\n}\r\n.flex {\r\n    display: flex\n}\r\n.inline-flex {\r\n    display: inline-flex\n}\r\n.hidden {\r\n    display: none\n}\r\n.h-\\[28px\\] {\r\n    height: 28px\n}\r\n.h-\\[32px\\] {\r\n    height: 32px\n}\r\n.h-\\[36px\\] {\r\n    height: 36px\n}\r\n.max-h-\\[calc\\(100vh-200px\\)\\] {\r\n    max-height: calc(100vh - 200px)\n}\r\n.w-\\[32px\\] {\r\n    width: 32px\n}\r\n.w-full {\r\n    width: 100%\n}\r\n.max-w-\\[1200px\\] {\r\n    max-width: 1200px\n}\r\n.max-w-\\[480px\\] {\r\n    max-width: 480px\n}\r\n.max-w-\\[640px\\] {\r\n    max-width: 640px\n}\r\n.max-w-\\[900px\\] {\r\n    max-width: 900px\n}\r\n.flex-shrink {\r\n    flex-shrink: 1\n}\r\n.shrink-0 {\r\n    flex-shrink: 0\n}\r\n.transform {\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.resize {\r\n    resize: both\n}\r\n.items-start {\r\n    align-items: flex-start\n}\r\n.items-center {\r\n    align-items: center\n}\r\n.justify-center {\r\n    justify-content: center\n}\r\n.justify-between {\r\n    justify-content: space-between\n}\r\n.gap-\\[6px\\] {\r\n    gap: 6px\n}\r\n.overflow-y-auto {\r\n    overflow-y: auto\n}\r\n.truncate {\r\n    overflow: hidden;\r\n    text-overflow: ellipsis;\r\n    white-space: nowrap\n}\r\n.break-all {\r\n    word-break: break-all\n}\r\n.rounded-\\[10px\\] {\r\n    border-radius: 10px\n}\r\n.rounded-\\[16px\\] {\r\n    border-radius: 16px\n}\r\n.rounded-\\[24px\\] {\r\n    border-radius: 24px\n}\r\n.rounded-\\[8px\\] {\r\n    border-radius: 8px\n}\r\n.border {\r\n    border-width: 1px\n}\r\n.border-b {\r\n    border-bottom-width: 1px\n}\r\n.border-\\[\\#f0f0f0\\] {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\r\n.bg-\\[\\#1f1f1f\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#ef4444\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f0f0f0\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f4f4f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f5f5f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black\\/40 {\r\n    background-color: rgb(0 0 0 / 0.4)\n}\r\n.bg-transparent {\r\n    background-color: transparent\n}\r\n.bg-white {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\r\n.p-0 {\r\n    padding: 0px\n}\r\n.p-1 {\r\n    padding: 0.25rem\n}\r\n.p-\\[12px\\] {\r\n    padding: 12px\n}\r\n.p-\\[16px\\] {\r\n    padding: 16px\n}\r\n.p-\\[20px\\] {\r\n    padding: 20px\n}\r\n.p-\\[24px\\] {\r\n    padding: 24px\n}\r\n.px-6 {\r\n    padding-left: 1.5rem;\r\n    padding-right: 1.5rem\n}\r\n.px-\\[12px\\] {\r\n    padding-left: 12px;\r\n    padding-right: 12px\n}\r\n.px-\\[16px\\] {\r\n    padding-left: 16px;\r\n    padding-right: 16px\n}\r\n.px-\\[18px\\] {\r\n    padding-left: 18px;\r\n    padding-right: 18px\n}\r\n.py-5 {\r\n    padding-top: 1.25rem;\r\n    padding-bottom: 1.25rem\n}\r\n.pb-4 {\r\n    padding-bottom: 1rem\n}\r\n.pt-12 {\r\n    padding-top: 3rem\n}\r\n.pt-6 {\r\n    padding-top: 1.5rem\n}\r\n.text-\\[12px\\] {\r\n    font-size: 12px\n}\r\n.text-\\[13px\\] {\r\n    font-size: 13px\n}\r\n.text-\\[18px\\] {\r\n    font-size: 18px\n}\r\n.font-bold {\r\n    font-weight: 700\n}\r\n.uppercase {\r\n    text-transform: uppercase\n}\r\n.leading-none {\r\n    line-height: 1\n}\r\n.text-\\[\\#1f1f1f\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.text-\\[\\#9a9a9a\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\r\n.text-white {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\r\n.shadow {\r\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\r\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\r\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.outline {\r\n    outline-style: solid\n}\r\n.ring {\r\n    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\r\n    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);\r\n    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)\n}\r\n.blur {\r\n    --tw-blur: blur(8px);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.invert {\r\n    --tw-invert: invert(100%);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.filter {\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.backdrop-blur-sm {\r\n    --tw-backdrop-blur: blur(4px);\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.backdrop-filter {\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.transition {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-colors {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.ease-in-out {\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)\n}\r\n.ease-out {\r\n    transition-timing-function: cubic-bezier(0, 0, 0.2, 1)\n}\r\n.hover\\:bg-\\[\\#303030\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#dc2626\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.focus\\:outline-none:focus {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.disabled\\:cursor-not-allowed:disabled {\r\n    cursor: not-allowed\n}\r\n.disabled\\:opacity-50:disabled {\r\n    opacity: 0.5\n}\r\n";
 var styles_gen_default = styles;
 
 // src/components/BuggyBag.tsx

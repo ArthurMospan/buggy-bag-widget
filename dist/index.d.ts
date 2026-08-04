@@ -131,6 +131,7 @@ interface TechContext {
     eventLog: EventLogEntry[];
     autoSeverity: BugSeverity;
     designAudit?: DesignAuditResult | null;
+    screenshotRenderer?: 'html2canvas' | 'html2canvas-normalized' | 'html-to-image-scroll-aware' | 'failed';
 }
 interface SubmitBugPayload {
     api_key: string;

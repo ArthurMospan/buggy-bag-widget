@@ -110,6 +110,7 @@ export interface TechContext {
   eventLog: EventLogEntry[];  // last 5min of interactions
   autoSeverity: BugSeverity;
   designAudit?: DesignAuditResult | null;
+  screenshotRenderer?: 'html2canvas' | 'html2canvas-normalized' | 'html-to-image-scroll-aware' | 'failed';
 }
 
 export interface SubmitBugPayload {
