@@ -6,6 +6,7 @@ import { MobileCaptureMode } from './MobileCaptureMode';
 import { initCollector } from '../lib/collector';
 import { detectFavicon } from '../lib/favicon';
 import { isRealMobileDevice } from '../lib/device';
+import { capturePageScreenshot } from '../lib/screenshot';
 import type { SubmitBugPayload, DrawTool } from '../types';
 import widgetStyles from '../styles.gen';
 
@@ -55,6 +56,8 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   const [projectUrl, setProjectUrl] = useState<string | null>(null);
   const [draftCount, setDraftCount] = useState(0);
   const [draftConflict, setDraftConflict] = useState<{ path: string; count: number } | null>(null);
+  const [frozenScreenshot, setFrozenScreenshot] = useState<string | null>(null);
+  const [capturingFrozen, setCapturingFrozen] = useState(false);
 
   useEffect(() => { initCollector(); }, []);
 
@@ -82,7 +85,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
     return () => window.removeEventListener('buggy-bag:draft-changed', checkDraft);
   }, []);
 
-  const handleBugBtnClick = () => {
+  const handleBugBtnClick = async () => {
     if (activeTool) {
       window.dispatchEvent(new CustomEvent('buggy-bag:request-close'));
       return;
@@ -112,6 +115,16 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
         } catch (e) { }
       }
     }
+    // Capture a frozen screenshot BEFORE entering capture mode
+    setCapturingFrozen(true);
+    try {
+      const { imageUrl } = await capturePageScreenshot(null);
+      setFrozenScreenshot(imageUrl || null);
+    } catch (e) {
+      console.warn('[BuggyBag] Failed to capture frozen screenshot, continuing without', e);
+      setFrozenScreenshot(null);
+    }
+    setCapturingFrozen(false);
     setActiveTool('pin');
   };
 
@@ -278,8 +291,9 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
           initialTool={activeTool}
           apiKey={apiKey ?? ''}
           portalUrl={portalUrl}
+          frozenScreenshot={frozenScreenshot}
           onSend={handleSend}
-          onCancel={() => setActiveTool(null)}
+          onCancel={() => { setActiveTool(null); setFrozenScreenshot(null); }}
         />
       )}
 

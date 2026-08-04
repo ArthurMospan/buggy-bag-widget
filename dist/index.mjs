@@ -30235,6 +30235,45 @@ async function capturePageScreenshot(annotationCanvas) {
   }
   return { imageUrl, fallbackUsed };
 }
+async function compositeScreenshot(baseImageUrl, annotationCanvas, viewportWidth, viewportHeight) {
+  let annotationDataUrl = null;
+  if (annotationCanvas) {
+    try {
+      annotationDataUrl = annotationCanvas.toDataURL("image/png");
+    } catch {
+    }
+  }
+  const composite = document.createElement("canvas");
+  composite.width = viewportWidth;
+  composite.height = viewportHeight;
+  const ctx = composite.getContext("2d");
+  if (!ctx) {
+    return { imageUrl: baseImageUrl, fallbackUsed: false };
+  }
+  await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, viewportWidth, viewportHeight);
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = baseImageUrl;
+  });
+  if (annotationDataUrl) {
+    await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = annotationDataUrl;
+    });
+  }
+  let imageUrl = composite.toDataURL("image/png");
+  imageUrl = await compressDataUrl(imageUrl);
+  return { imageUrl, fallbackUsed: false };
+}
 async function compressDataUrl(dataUrl, quality = 0.82, maxDimension = 1920) {
   if (!dataUrl || !dataUrl.startsWith("data:image")) return dataUrl;
   return new Promise((resolve) => {
@@ -30616,7 +30655,7 @@ function disableZoom() {
   }
 }
 var isSafeHref = (h) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
-function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
+function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, onSend, onCancel }) {
   const [tool, setTool] = useState4(initialTool);
   const [shapes, setShapes] = useState4([]);
   const [annotations, setAnnotations] = useState4({});
@@ -30776,7 +30815,17 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
     await new Promise((r) => setTimeout(r, 80));
     const host = document.querySelector("#buggy-bag-host");
     const annotationCanvas = host?.shadowRoot?.querySelector("canvas") ?? null;
-    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas);
+    let imageUrl;
+    let fallbackUsed = false;
+    if (frozenScreenshot) {
+      const result = await compositeScreenshot(frozenScreenshot, annotationCanvas, w, h);
+      imageUrl = result.imageUrl;
+      fallbackUsed = result.fallbackUsed;
+    } else {
+      const result = await capturePageScreenshot(annotationCanvas);
+      imageUrl = result.imageUrl;
+      fallbackUsed = result.fallbackUsed;
+    }
     setIsCapturing(false);
     try {
       localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
@@ -30843,7 +30892,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
       description: finalDescription,
       tech_context: freshTechContext
     });
-  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult, frozenScreenshot]);
   const handleCloseRequest = useCallback2(() => {
     if (shapes.length > 0) {
       setShowExitConfirm(true);
@@ -31625,6 +31674,24 @@ ${issue.message}` }));
             })() })
           ] })
         ] }),
+        frozenScreenshot && /* @__PURE__ */ jsx4(
+          "img",
+          {
+            src: frozenScreenshot,
+            alt: "",
+            "data-buggy-bag": "true",
+            style: {
+              position: "fixed",
+              inset: 0,
+              width: "100vw",
+              height: "100vh",
+              objectFit: "cover",
+              zIndex: 2,
+              pointerEvents: "none",
+              userSelect: "none"
+            }
+          }
+        ),
         !showExitConfirm && /* @__PURE__ */ jsx4(
           DrawingCanvas,
           {
@@ -32570,6 +32637,8 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const [projectUrl, setProjectUrl] = useState6(null);
   const [draftCount, setDraftCount] = useState6(0);
   const [draftConflict, setDraftConflict] = useState6(null);
+  const [frozenScreenshot, setFrozenScreenshot] = useState6(null);
+  const [capturingFrozen, setCapturingFrozen] = useState6(false);
   useEffect5(() => {
     initCollector();
   }, []);
@@ -32595,7 +32664,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
     window.addEventListener("buggy-bag:draft-changed", checkDraft);
     return () => window.removeEventListener("buggy-bag:draft-changed", checkDraft);
   }, []);
-  const handleBugBtnClick = () => {
+  const handleBugBtnClick = async () => {
     if (activeTool) {
       window.dispatchEvent(new CustomEvent("buggy-bag:request-close"));
       return;
@@ -32621,6 +32690,15 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         }
       }
     }
+    setCapturingFrozen(true);
+    try {
+      const { imageUrl } = await capturePageScreenshot(null);
+      setFrozenScreenshot(imageUrl || null);
+    } catch (e) {
+      console.warn("[BuggyBag] Failed to capture frozen screenshot, continuing without", e);
+      setFrozenScreenshot(null);
+    }
+    setCapturingFrozen(false);
     setActiveTool("pin");
   };
   useEffect5(() => {
@@ -32779,8 +32857,12 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         initialTool: activeTool,
         apiKey: apiKey ?? "",
         portalUrl,
+        frozenScreenshot,
         onSend: handleSend,
-        onCancel: () => setActiveTool(null)
+        onCancel: () => {
+          setActiveTool(null);
+          setFrozenScreenshot(null);
+        }
       }
     ),
     mobileCapture && /* @__PURE__ */ jsx6(

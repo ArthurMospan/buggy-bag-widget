@@ -134,6 +134,54 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
 }
 
 /**
+ * Composites an annotation canvas on top of an already-captured base screenshot.
+ * Used by the "freeze-page" flow: the page screenshot is taken once at the start
+ * of capture mode, and annotations are overlaid at send time without re-capturing.
+ */
+export async function compositeScreenshot(
+  baseImageUrl: string,
+  annotationCanvas: HTMLCanvasElement | null,
+  viewportWidth: number,
+  viewportHeight: number,
+): Promise<{ imageUrl: string; fallbackUsed: boolean }> {
+  let annotationDataUrl: string | null = null;
+  if (annotationCanvas) {
+    try { annotationDataUrl = annotationCanvas.toDataURL('image/png'); } catch { /* tainted canvas */ }
+  }
+
+  const composite = document.createElement('canvas');
+  composite.width = viewportWidth;
+  composite.height = viewportHeight;
+  const ctx = composite.getContext('2d');
+
+  if (!ctx) {
+    return { imageUrl: baseImageUrl, fallbackUsed: false };
+  }
+
+  // Draw the frozen page screenshot
+  await new Promise<void>(resolve => {
+    const img = new Image();
+    img.onload = () => { ctx.drawImage(img, 0, 0, viewportWidth, viewportHeight); resolve(); };
+    img.onerror = () => resolve();
+    img.src = baseImageUrl;
+  });
+
+  // Draw annotations on top
+  if (annotationDataUrl) {
+    await new Promise<void>(resolve => {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
+      img.onerror = () => resolve();
+      img.src = annotationDataUrl!;
+    });
+  }
+
+  let imageUrl = composite.toDataURL('image/png');
+  imageUrl = await compressDataUrl(imageUrl);
+  return { imageUrl, fallbackUsed: false };
+}
+
+/**
  * Downscales and compresses a Data URL image to WebP/JPEG format (0.82 quality, max dimension 1920px).
  * Reduces payload size from ~5-8 MB down to ~150-250 KB (95% size reduction).
  */

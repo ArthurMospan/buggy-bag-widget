@@ -4,12 +4,13 @@ import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditRe
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
-import { capturePageScreenshot } from '../lib/screenshot';
+import { capturePageScreenshot, compositeScreenshot } from '../lib/screenshot';
 
 interface CaptureModeProps {
   initialTool: DrawTool;
   apiKey: string;
   portalUrl?: string;
+  frozenScreenshot?: string | null;
   onSend: (payload: SubmitBugPayload) => void;
   onCancel: () => void;
 }
@@ -390,7 +391,7 @@ function disableZoom() {
 
 const isSafeHref = (h?: string) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
 
-export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }: CaptureModeProps) {
+export function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, onSend, onCancel }: CaptureModeProps) {
   const [tool, setTool]         = useState<DrawTool>(initialTool);
   const [shapes, setShapes]     = useState<DrawShape[]>([]);
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
@@ -566,7 +567,20 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
     const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
     const annotationCanvas = host?.shadowRoot?.querySelector('canvas') ?? null;
 
-    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas);
+    let imageUrl: string;
+    let fallbackUsed = false;
+
+    if (frozenScreenshot) {
+      // Freeze-page flow: composite annotations onto the pre-captured screenshot
+      const result = await compositeScreenshot(frozenScreenshot, annotationCanvas, w, h);
+      imageUrl = result.imageUrl;
+      fallbackUsed = result.fallbackUsed;
+    } else {
+      // Legacy fallback: capture page screenshot at send time
+      const result = await capturePageScreenshot(annotationCanvas);
+      imageUrl = result.imageUrl;
+      fallbackUsed = result.fallbackUsed;
+    }
 
     setIsCapturing(false);
     try { 
@@ -574,7 +588,6 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       window.dispatchEvent(new CustomEvent('buggy-bag:draft-changed'));
     } catch {}
 
-    // Fresh snapshot at send time — captures everything that happened during drawing.
     // Resolve the DOM element under the last shape's anchor point so tech_context.component is populated.
     let lastElement: HTMLElement | null = null;
     if (shapes.length > 0) {
@@ -640,7 +653,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
       description: finalDescription,
       tech_context: freshTechContext
     });
-  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult, frozenScreenshot]);
 
   const handleCloseRequest = useCallback(() => {
     if (shapes.length > 0) { setShowExitConfirm(true); } 
@@ -1240,6 +1253,25 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }
             </div>
           </div>
         </div>
+      )}
+
+      {/* Frozen page screenshot — covers real page so user annotates a static snapshot */}
+      {frozenScreenshot && (
+        <img
+          src={frozenScreenshot}
+          alt=""
+          data-buggy-bag="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            width: '100vw',
+            height: '100vh',
+            objectFit: 'cover',
+            zIndex: 2,
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        />
       )}
 
       {/* Drawing canvas — ALWAYS rendered (visible behind popup too) */}
