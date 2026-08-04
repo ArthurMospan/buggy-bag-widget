@@ -30414,8 +30414,20 @@ function applyScrollOffsetsToForeignObjectClone(clonedRoot, positions) {
     translateChildren(clone, scrollLeft, scrollTop);
   });
 }
+function resolvePageBackgroundColor() {
+  for (const element of [document.documentElement, document.body]) {
+    if (!element) continue;
+    const color = window.getComputedStyle(element).backgroundColor;
+    if (!color || color === "transparent") continue;
+    const alpha = color.match(/^rgba\([^)]*,\s*([\d.]+)\s*\)$/);
+    if (alpha && Number(alpha[1]) === 0) continue;
+    return color;
+  }
+  return "#ffffff";
+}
 async function renderViewportWithHtmlToImage(viewport) {
   const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  const backgroundColor = resolvePageBackgroundColor();
   const options = {
     width: viewport.width,
     height: viewport.height,
@@ -30427,7 +30439,6 @@ async function renderViewportWithHtmlToImage(viewport) {
     },
     pixelRatio: 1,
     imagePlaceholder: transparentPixel,
-    skipFonts: true,
     filter: (node) => {
       if (node.id === "buggy-bag-host" || node.hasAttribute?.("data-buggy-bag-standalone-root")) return false;
       if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "VIDEO") return false;
@@ -30437,7 +30448,7 @@ async function renderViewportWithHtmlToImage(viewport) {
   const scrollPositions = markScrollPositions();
   try {
     const clonedRoot = await cloneNode(document.documentElement, options, true);
-    if (!clonedRoot) throw new Error("Unable to clone document for screenshot fallback");
+    if (!clonedRoot) throw new Error("Unable to clone document for screenshot");
     applyScrollOffsetsToForeignObjectClone(clonedRoot, scrollPositions);
     await embedWebFonts(clonedRoot, options);
     await embedImages(clonedRoot, options);
@@ -30448,7 +30459,9 @@ async function renderViewportWithHtmlToImage(viewport) {
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("Unable to create screenshot fallback canvas");
+    if (!context) throw new Error("Unable to create screenshot canvas");
+    context.fillStyle = backgroundColor;
+    context.fillRect(0, 0, viewport.width, viewport.height);
     context.drawImage(image, 0, 0, viewport.width, viewport.height);
     return canvas.toDataURL("image/png");
   } finally {
@@ -30469,18 +30482,18 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
   try {
     let pageDataUrl = "";
     try {
-      pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
-      renderer = "html2canvas";
+      pageDataUrl = await renderViewportWithHtmlToImage(viewport);
+      renderer = "html-to-image-scroll-aware";
     } catch (tier1Err) {
-      console.warn("[BuggyBag] Tier 1 screenshot failed, normalizing modern CSS colors...", tier1Err);
+      console.warn("[BuggyBag] Tier 1 screenshot failed, falling back to html2canvas...", tier1Err);
+      fallbackUsed = true;
       try {
+        pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
+        renderer = "html2canvas";
+      } catch (tier2Err) {
+        console.warn("[BuggyBag] Tier 2 screenshot failed, normalizing modern CSS colors...", tier2Err);
         pageDataUrl = await renderViewportWithHtml2Canvas(viewport, true);
         renderer = "html2canvas-normalized";
-      } catch (tier2Err) {
-        console.warn("[BuggyBag] Tier 2 screenshot failed, trying scroll-aware safe mode...", tier2Err);
-        fallbackUsed = true;
-        pageDataUrl = await renderViewportWithHtmlToImage(viewport);
-        renderer = "html-to-image-scroll-aware";
       }
     }
     if (annotationDataUrl) {

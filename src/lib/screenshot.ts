@@ -20,9 +20,9 @@ export interface ScreenshotResult {
 }
 
 export type ScreenshotRenderer =
+  | 'html-to-image-scroll-aware'
   | 'html2canvas'
   | 'html2canvas-normalized'
-  | 'html-to-image-scroll-aware'
   | 'failed';
 
 export interface CaptureScrollPosition {
@@ -428,8 +428,39 @@ function applyScrollOffsetsToForeignObjectClone(
   });
 }
 
+/**
+ * A page's canvas background comes from `<html>`, or from `<body>` when the
+ * root paints nothing (CSS background propagation). An SVG foreignObject has
+ * no such propagation, so resolve the colour ourselves and paint it under the
+ * frame — otherwise a page that relies on the browser default renders as a
+ * transparent PNG and turns black once compressed to WebP/JPEG.
+ */
+function resolvePageBackgroundColor(): string {
+  for (const element of [document.documentElement, document.body]) {
+    if (!element) continue;
+    const color = window.getComputedStyle(element).backgroundColor;
+    if (!color || color === 'transparent') continue;
+    const alpha = color.match(/^rgba\([^)]*,\s*([\d.]+)\s*\)$/);
+    if (alpha && Number(alpha[1]) === 0) continue;
+    return color;
+  }
+  return '#ffffff';
+}
+
+/**
+ * Primary renderer: the browser itself paints the DOM through an SVG
+ * foreignObject, so shadows, filters, modern colour functions and text
+ * metrics come out exactly as they look on screen. html2canvas cannot do
+ * this — it re-implements CSS painting in JS and silently drops whatever it
+ * does not support.
+ *
+ * The scroll offset is applied as a `transform`, never as a margin: a
+ * transform moves the painted pixels without touching layout, which is what
+ * keeps the frame in the same coordinate system as the annotation canvas.
+ */
 async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise<string> {
   const transparentPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  const backgroundColor = resolvePageBackgroundColor();
   const options: HtmlToImageOptions = {
     width: viewport.width,
     height: viewport.height,
@@ -441,9 +472,10 @@ async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise
     },
     pixelRatio: 1,
     imagePlaceholder: transparentPixel,
-    skipFonts: true,
     filter: (node: HTMLElement) => {
       if (node.id === 'buggy-bag-host' || node.hasAttribute?.('data-buggy-bag-standalone-root')) return false;
+      // cloneNode inlines every computed style, so the page keeps its looks
+      // without <link>; an IFRAME/VIDEO cannot paint inside a foreignObject.
       if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'VIDEO') return false;
       return true;
     },
@@ -455,7 +487,7 @@ async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise
     // scrollTop/scrollLeft. Build that clone ourselves, then bake every
     // scroll offset into transforms before it becomes an SVG foreignObject.
     const clonedRoot = await cloneNode(document.documentElement, options, true);
-    if (!clonedRoot) throw new Error('Unable to clone document for screenshot fallback');
+    if (!clonedRoot) throw new Error('Unable to clone document for screenshot');
     applyScrollOffsetsToForeignObjectClone(clonedRoot, scrollPositions);
     await embedWebFonts(clonedRoot, options);
     await embedImages(clonedRoot, options);
@@ -467,7 +499,9 @@ async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const context = canvas.getContext('2d');
-    if (!context) throw new Error('Unable to create screenshot fallback canvas');
+    if (!context) throw new Error('Unable to create screenshot canvas');
+    context.fillStyle = backgroundColor;
+    context.fillRect(0, 0, viewport.width, viewport.height);
     context.drawImage(image, 0, 0, viewport.width, viewport.height);
     return canvas.toDataURL('image/png');
   } finally {
@@ -503,21 +537,24 @@ export async function capturePageScreenshot(
     let pageDataUrl = '';
 
     try {
-      // Browser-backed DOM rendering keeps fixed/sticky elements and the exact
-      // scrolled viewport in the same coordinate system as the drawing canvas.
-      pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
-      renderer = 'html2canvas';
+      // Tier 1: the browser paints the DOM itself, so the report looks like
+      // the page actually looked. This is the only renderer that reproduces
+      // shadows, filters and modern colour functions faithfully.
+      pageDataUrl = await renderViewportWithHtmlToImage(viewport);
+      renderer = 'html-to-image-scroll-aware';
     } catch (tier1Err) {
-      console.warn('[BuggyBag] Tier 1 screenshot failed, normalizing modern CSS colors...', tier1Err);
+      console.warn('[BuggyBag] Tier 1 screenshot failed, falling back to html2canvas...', tier1Err);
+      fallbackUsed = true;
 
       try {
+        // Tier 2/3 repaint CSS in JS and lose visual fidelity, but they cope
+        // with documents a foreignObject cannot serialize (tainted resources).
+        pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
+        renderer = 'html2canvas';
+      } catch (tier2Err) {
+        console.warn('[BuggyBag] Tier 2 screenshot failed, normalizing modern CSS colors...', tier2Err);
         pageDataUrl = await renderViewportWithHtml2Canvas(viewport, true);
         renderer = 'html2canvas-normalized';
-      } catch (tier2Err) {
-        console.warn('[BuggyBag] Tier 2 screenshot failed, trying scroll-aware safe mode...', tier2Err);
-        fallbackUsed = true;
-        pageDataUrl = await renderViewportWithHtmlToImage(viewport);
-        renderer = 'html-to-image-scroll-aware';
       }
     }
 
