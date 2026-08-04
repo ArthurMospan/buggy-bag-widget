@@ -6,8 +6,8 @@ import { MobileCaptureMode } from './MobileCaptureMode';
 import { initCollector } from '../lib/collector';
 import { detectFavicon } from '../lib/favicon';
 import { isRealMobileDevice } from '../lib/device';
-import { capturePageScreenshot, getCaptureScrollPositions, getCaptureViewport } from '../lib/screenshot';
-import type { CaptureScrollPosition, CaptureViewport, ScreenshotResult } from '../lib/screenshot';
+import { getCaptureScrollPositions, getCaptureViewport, preserveTransientOverlays } from '../lib/screenshot';
+import type { CaptureScrollPosition, CaptureViewport } from '../lib/screenshot';
 import type { SubmitBugPayload, DrawTool } from '../types';
 import widgetStyles from '../styles.gen';
 
@@ -20,7 +20,7 @@ export interface BuggyBagProps {
 interface CaptureSession {
   viewport: CaptureViewport;
   scrollPositions: CaptureScrollPosition[];
-  screenshot: Promise<ScreenshotResult>;
+  cleanupPreservedState: () => void;
 }
 
 function BugIcon() {
@@ -65,6 +65,8 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   const [draftConflict, setDraftConflict] = useState<{ path: string; count: number } | null>(null);
   const [captureSession, setCaptureSession] = useState<CaptureSession | null>(null);
 
+  useEffect(() => () => captureSession?.cleanupPreservedState(), [captureSession]);
+
   useEffect(() => { initCollector(); }, []);
 
   // Count drafts for badge
@@ -94,10 +96,8 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   const beginDesktopCapture = useCallback(() => {
     const viewport = getCaptureViewport();
     const scrollPositions = getCaptureScrollPositions();
-    // Start cloning the page in the same pointer event that opened the widget.
-    // This preserves an open custom dropdown and records the exact scroll frame.
-    const screenshot = capturePageScreenshot(null, viewport);
-    setCaptureSession({ viewport, scrollPositions, screenshot });
+    const cleanupPreservedState = preserveTransientOverlays();
+    setCaptureSession({ viewport, scrollPositions, cleanupPreservedState });
     setActiveTool('pin');
   }, []);
 
@@ -316,7 +316,6 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
           initialTool={activeTool}
           apiKey={apiKey ?? ''}
           portalUrl={portalUrl}
-          initialScreenshot={captureSession?.screenshot}
           captureViewport={captureSession?.viewport}
           captureScrollPositions={captureSession?.scrollPositions}
           onSend={handleSend}

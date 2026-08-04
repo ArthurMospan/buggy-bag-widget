@@ -4,14 +4,13 @@ import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditRe
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
-import { capturePageScreenshot, compositeScreenshot, getCaptureScrollPositions, getCaptureViewport } from '../lib/screenshot';
-import type { CaptureScrollPosition, CaptureViewport, ScreenshotResult } from '../lib/screenshot';
+import { capturePageScreenshot, getCaptureScrollPositions, getCaptureViewport } from '../lib/screenshot';
+import type { CaptureScrollPosition, CaptureViewport } from '../lib/screenshot';
 
 interface CaptureModeProps {
   initialTool: DrawTool;
   apiKey: string;
   portalUrl?: string;
-  initialScreenshot?: Promise<ScreenshotResult>;
   captureViewport?: CaptureViewport;
   captureScrollPositions?: CaptureScrollPosition[];
   onSend: (payload: SubmitBugPayload) => void;
@@ -394,7 +393,7 @@ function disableZoom() {
 
 const isSafeHref = (h?: string) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
 
-export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captureViewport, captureScrollPositions, onSend, onCancel }: CaptureModeProps) {
+export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, captureScrollPositions, onSend, onCancel }: CaptureModeProps) {
   const [tool, setTool]         = useState<DrawTool>(initialTool);
   const [shapes, setShapes]     = useState<DrawShape[]>([]);
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
@@ -604,17 +603,11 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot,
     const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
     const annotationCanvas = host?.shadowRoot?.querySelector('canvas') ?? null;
 
-    const viewport = captureViewport ?? getCaptureViewport();
-    let result: ScreenshotResult;
-    if (initialScreenshot) {
-      const base = await initialScreenshot;
-      result = base.imageUrl
-        ? await compositeScreenshot(base, annotationCanvas, viewport)
-        : await capturePageScreenshot(annotationCanvas, viewport);
-    } else {
-      result = await capturePageScreenshot(annotationCanvas, viewport);
-    }
-    const { imageUrl, fallbackUsed } = result;
+    // Capture the live page and the annotation canvas in the same frame. The
+    // old activation-time base image became stale when a nested scroller or a
+    // React-rendered container changed after capture mode was opened.
+    const viewport = getCaptureViewport();
+    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas, viewport);
 
     setIsCapturing(false);
     try { 
@@ -688,7 +681,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot,
       description: finalDescription,
       tech_context: freshTechContext
     });
-  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult, initialScreenshot, captureViewport]);
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
 
   const handleCloseRequest = useCallback(() => {
     if (shapes.length > 0) { setShowExitConfirm(true); } 
@@ -779,9 +772,16 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot,
   // Keyboard hotkeys: 1=pin 2=rect 3=arrow 4=measure, Ctrl+S=send
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't fire when user is typing in an input/textarea
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === 'textarea' || tag === 'input') return;
+      // Events leaving our Shadow DOM are retargeted to #buggy-bag-host, so
+      // e.target cannot tell whether the user is actually typing in the
+      // annotation textarea. Inspect the original composed path instead.
+      const isTyping = e.composedPath().some(target => {
+        if (!(target instanceof HTMLElement)) return false;
+        const tag = target.tagName.toLowerCase();
+        return tag === 'textarea' || tag === 'input' || tag === 'select' ||
+          target.isContentEditable || target.getAttribute('role') === 'textbox';
+      });
+      if (isTyping) return;
       if (e.ctrlKey || e.metaKey) {
         if (e.code === 'KeyS' || e.key.toLowerCase() === 's') { e.preventDefault(); if (shapes.length > 0) handleSend(); }
         return;
@@ -802,7 +802,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot,
         if (e.code === 'KeyL') { e.preventDefault(); toggleDebug('zoom'); }
         if (e.code === 'KeyM' && !isInIframe) { e.preventDefault(); toggleDebug('responsive'); }
       }
-      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) {
         e.preventDefault();
       }
     };

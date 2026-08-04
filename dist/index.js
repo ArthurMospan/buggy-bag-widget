@@ -30157,41 +30157,154 @@ function getCaptureScrollPositions() {
 function isWidgetElement(element) {
   return element.id === "buggy-bag-host" || element.hasAttribute("data-buggy-bag-standalone-root");
 }
-async function renderViewportWithHtml2Canvas(viewport, normalizeModernColors) {
-  const canvas = await (0, import_html2canvas.default)(document.documentElement, {
-    width: viewport.width,
-    height: viewport.height,
-    x: viewport.scrollX,
-    y: viewport.scrollY,
-    scrollX: viewport.scrollX,
-    scrollY: viewport.scrollY,
-    windowWidth: viewport.width,
-    windowHeight: viewport.height,
-    scale: 1,
-    useCORS: true,
-    allowTaint: false,
-    backgroundColor: null,
-    foreignObjectRendering: false,
-    imageTimeout: 5e3,
-    logging: false,
-    ignoreElements: isWidgetElement,
-    onclone: normalizeModernColors ? normalizeUnsupportedColors : void 0
-  });
-  return canvas.toDataURL("image/png");
+var TRANSIENT_OVERLAY_SELECTORS = [
+  '[role="menu"]',
+  '[role="listbox"]',
+  '[role="tree"]',
+  "[data-radix-popper-content-wrapper]",
+  '[data-state="open"]'
+].join(",");
+function isVisibleOverlay(element) {
+  if (element.closest("[data-buggy-bag]")) return false;
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+  if (element.matches('[role="menu"], [role="listbox"], [role="tree"]') && !element.matches("[data-radix-popper-content-wrapper]") && !element.closest('[data-state="open"]') && style.position !== "absolute" && style.position !== "fixed") return false;
+  if (element.matches('[data-state="open"]') && !element.matches('[role="menu"], [role="listbox"], [role="tree"], [data-radix-popper-content-wrapper]')) {
+    return style.position === "absolute" || style.position === "fixed";
+  }
+  return true;
 }
-var COLOR_PROPERTIES = [
+function copyComputedStyles(source, clone) {
+  const sourceNodes = [source, ...Array.from(source.querySelectorAll("*"))];
+  const cloneNodes = [clone, ...Array.from(clone.querySelectorAll("*"))];
+  sourceNodes.forEach((node, index) => {
+    const target = cloneNodes[index];
+    if (!target) return;
+    const computed = window.getComputedStyle(node);
+    Array.from(computed).forEach((property) => {
+      target.style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+    });
+    target.style.setProperty("animation", "none", "important");
+    target.style.setProperty("transition", "none", "important");
+  });
+}
+function preserveTransientOverlays() {
+  const candidates = Array.from(document.querySelectorAll(TRANSIENT_OVERLAY_SELECTORS)).filter(isVisibleOverlay);
+  document.querySelectorAll('[aria-expanded="true"][aria-controls]').forEach((trigger) => {
+    trigger.getAttribute("aria-controls")?.split(/\s+/).forEach((id) => {
+      const controlled = document.getElementById(id);
+      if (controlled && isVisibleOverlay(controlled) && !candidates.includes(controlled)) candidates.push(controlled);
+    });
+  });
+  const topLevelCandidates = candidates.filter(
+    (candidate) => !candidates.some((other) => other !== candidate && other.contains(candidate))
+  );
+  if (topLevelCandidates.length === 0) return () => {
+  };
+  const holder = document.createElement("div");
+  holder.setAttribute("data-buggy-bag", "preserved-overlay");
+  holder.setAttribute("aria-hidden", "true");
+  holder.style.cssText = "position:fixed;inset:0;z-index:2147483000;pointer-events:none;overflow:visible;";
+  topLevelCandidates.forEach((source) => {
+    const rect = source.getBoundingClientRect();
+    const clone = source.cloneNode(true);
+    clone.querySelectorAll("script").forEach((script) => script.remove());
+    copyComputedStyles(source, clone);
+    clone.style.setProperty("position", "fixed", "important");
+    clone.style.setProperty("inset", "auto", "important");
+    clone.style.setProperty("left", `${rect.left}px`, "important");
+    clone.style.setProperty("top", `${rect.top}px`, "important");
+    clone.style.setProperty("width", `${rect.width}px`, "important");
+    clone.style.setProperty("height", `${rect.height}px`, "important");
+    clone.style.setProperty("margin", "0", "important");
+    clone.style.setProperty("transform", "none", "important");
+    clone.style.setProperty("pointer-events", "none", "important");
+    holder.appendChild(clone);
+  });
+  document.body.appendChild(holder);
+  return () => holder.remove();
+}
+var SCROLL_SNAPSHOT_ATTRIBUTE = "data-buggy-bag-scroll-snapshot";
+var scrollSnapshotSequence = 0;
+function markScrollPositions() {
+  return getCaptureScrollPositions().map((position, index) => {
+    const id = `${++scrollSnapshotSequence}-${index}`;
+    const previousAttribute = position.element.getAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
+    position.element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, id);
+    return { ...position, id, previousAttribute };
+  });
+}
+function restoreClonedScrollPositions(clonedDocument, positions) {
+  positions.forEach(({ id, scrollLeft, scrollTop }) => {
+    const clone = clonedDocument.querySelector(
+      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`
+    );
+    if (!clone) return;
+    clone.scrollLeft = scrollLeft;
+    clone.scrollTop = scrollTop;
+  });
+}
+function clearScrollPositionMarks(positions) {
+  positions.forEach(({ element, previousAttribute }) => {
+    if (previousAttribute === null) element.removeAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
+    else element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, previousAttribute);
+  });
+}
+async function renderViewportWithHtml2Canvas(viewport, normalizeModernColors) {
+  const scrollPositions = markScrollPositions();
+  try {
+    const canvas = await (0, import_html2canvas.default)(document.documentElement, {
+      width: viewport.width,
+      height: viewport.height,
+      x: viewport.scrollX,
+      y: viewport.scrollY,
+      scrollX: viewport.scrollX,
+      scrollY: viewport.scrollY,
+      windowWidth: viewport.width,
+      windowHeight: viewport.height,
+      scale: 1,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: null,
+      foreignObjectRendering: false,
+      imageTimeout: 5e3,
+      logging: false,
+      ignoreElements: isWidgetElement,
+      onclone: (clonedDocument) => {
+        if (normalizeModernColors) normalizeUnsupportedColors(clonedDocument);
+        restoreClonedScrollPositions(clonedDocument, scrollPositions);
+      }
+    });
+    return canvas.toDataURL("image/png");
+  } finally {
+    clearScrollPositionMarks(scrollPositions);
+  }
+}
+var MODERN_COLOR_PATTERN = /\b(?:oklch|oklab|lab|lch|color)\([^)]*\)/gi;
+var COLOR_BEARING_PROPERTIES = [
   "color",
   "background-color",
+  "background-image",
   "border-top-color",
   "border-right-color",
   "border-bottom-color",
   "border-left-color",
   "outline-color",
   "text-decoration-color",
+  "column-rule-color",
+  "caret-color",
+  "accent-color",
   "box-shadow",
-  "text-shadow"
+  "text-shadow",
+  "filter",
+  "fill",
+  "stroke",
+  "flood-color",
+  "lighting-color",
+  "stop-color"
 ];
-var MODERN_COLOR_PATTERN = /\b(?:oklch|oklab|lab|lch|color)\([^)]*\)/gi;
 function normalizeUnsupportedColors(clonedDocument) {
   const colorCache = /* @__PURE__ */ new Map();
   const converter = clonedDocument.createElement("canvas");
@@ -30214,7 +30327,7 @@ function normalizeUnsupportedColors(clonedDocument) {
   };
   clonedDocument.querySelectorAll("*").forEach((element) => {
     const computed = view.getComputedStyle(element);
-    COLOR_PROPERTIES.forEach((property) => {
+    COLOR_BEARING_PROPERTIES.forEach((property) => {
       const value = computed.getPropertyValue(property);
       if (!value || !MODERN_COLOR_PATTERN.test(value)) {
         MODERN_COLOR_PATTERN.lastIndex = 0;
@@ -30310,35 +30423,6 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
     imageUrl = await compressDataUrl(imageUrl);
   }
   return { imageUrl, fallbackUsed };
-}
-async function compositeScreenshot(base, annotationCanvas, viewport) {
-  if (!base.imageUrl || !annotationCanvas) return base;
-  let annotationDataUrl = "";
-  try {
-    annotationDataUrl = annotationCanvas.toDataURL("image/png");
-  } catch {
-    return base;
-  }
-  const composite = document.createElement("canvas");
-  composite.width = viewport.width;
-  composite.height = viewport.height;
-  const ctx = composite.getContext("2d");
-  if (!ctx) return base;
-  const draw = (source) => new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, viewport.width, viewport.height);
-      resolve();
-    };
-    img.onerror = () => resolve();
-    img.src = source;
-  });
-  await draw(base.imageUrl);
-  await draw(annotationDataUrl);
-  return {
-    imageUrl: await compressDataUrl(composite.toDataURL("image/png")),
-    fallbackUsed: base.fallbackUsed
-  };
 }
 async function compressDataUrl(dataUrl, quality = 0.82, maxDimension = 1920) {
   if (!dataUrl || !dataUrl.startsWith("data:image")) return dataUrl;
@@ -30721,7 +30805,7 @@ function disableZoom() {
   }
 }
 var isSafeHref = (h) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
-function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captureViewport, captureScrollPositions, onSend, onCancel }) {
+function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, captureScrollPositions, onSend, onCancel }) {
   const [tool, setTool] = (0, import_react5.useState)(initialTool);
   const [shapes, setShapes] = (0, import_react5.useState)([]);
   const [annotations, setAnnotations] = (0, import_react5.useState)({});
@@ -30910,15 +30994,8 @@ function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captur
     await new Promise((r) => setTimeout(r, 80));
     const host = document.querySelector("#buggy-bag-host");
     const annotationCanvas = host?.shadowRoot?.querySelector("canvas") ?? null;
-    const viewport = captureViewport ?? getCaptureViewport();
-    let result;
-    if (initialScreenshot) {
-      const base = await initialScreenshot;
-      result = base.imageUrl ? await compositeScreenshot(base, annotationCanvas, viewport) : await capturePageScreenshot(annotationCanvas, viewport);
-    } else {
-      result = await capturePageScreenshot(annotationCanvas, viewport);
-    }
-    const { imageUrl, fallbackUsed } = result;
+    const viewport = getCaptureViewport();
+    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas, viewport);
     setIsCapturing(false);
     try {
       localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
@@ -30985,7 +31062,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captur
       description: finalDescription,
       tech_context: freshTechContext
     });
-  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult, initialScreenshot, captureViewport]);
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
   const handleCloseRequest = (0, import_react5.useCallback)(() => {
     if (shapes.length > 0) {
       setShowExitConfirm(true);
@@ -31075,8 +31152,12 @@ function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captur
   }, []);
   (0, import_react5.useEffect)(() => {
     const handler = (e) => {
-      const tag = e.target?.tagName?.toLowerCase();
-      if (tag === "textarea" || tag === "input") return;
+      const isTyping = e.composedPath().some((target) => {
+        if (!(target instanceof HTMLElement)) return false;
+        const tag = target.tagName.toLowerCase();
+        return tag === "textarea" || tag === "input" || tag === "select" || target.isContentEditable || target.getAttribute("role") === "textbox";
+      });
+      if (isTyping) return;
       if (e.ctrlKey || e.metaKey) {
         if (e.code === "KeyS" || e.key.toLowerCase() === "s") {
           e.preventDefault();
@@ -31136,7 +31217,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captur
           toggleDebug("responsive");
         }
       }
-      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key)) {
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) {
         e.preventDefault();
       }
     };
@@ -32724,6 +32805,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const [draftCount, setDraftCount] = (0, import_react7.useState)(0);
   const [draftConflict, setDraftConflict] = (0, import_react7.useState)(null);
   const [captureSession, setCaptureSession] = (0, import_react7.useState)(null);
+  (0, import_react7.useEffect)(() => () => captureSession?.cleanupPreservedState(), [captureSession]);
   (0, import_react7.useEffect)(() => {
     initCollector();
   }, []);
@@ -32752,8 +32834,8 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const beginDesktopCapture = (0, import_react7.useCallback)(() => {
     const viewport = getCaptureViewport();
     const scrollPositions = getCaptureScrollPositions();
-    const screenshot = capturePageScreenshot(null, viewport);
-    setCaptureSession({ viewport, scrollPositions, screenshot });
+    const cleanupPreservedState = preserveTransientOverlays();
+    setCaptureSession({ viewport, scrollPositions, cleanupPreservedState });
     setActiveTool("pin");
   }, []);
   const handleBugBtnClick = (0, import_react7.useCallback)(() => {
@@ -32956,7 +33038,6 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         initialTool: activeTool,
         apiKey: apiKey ?? "",
         portalUrl,
-        initialScreenshot: captureSession?.screenshot,
         captureViewport: captureSession?.viewport,
         captureScrollPositions: captureSession?.scrollPositions,
         onSend: handleSend,
