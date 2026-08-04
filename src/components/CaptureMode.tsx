@@ -4,7 +4,7 @@ import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditRe
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
-import { capturePageScreenshot, getCaptureScrollPositions, getCaptureViewport } from '../lib/screenshot';
+import { buildImageRecovery, capturePageScreenshot, getCaptureScrollPositions, getCaptureViewport } from '../lib/screenshot';
 import type { CaptureScrollPosition, CaptureViewport } from '../lib/screenshot';
 
 interface CaptureModeProps {
@@ -434,7 +434,11 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, c
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
   const [auditHoveredElements, setAuditHoveredElements] = useState<HTMLElement[]>([]);
   const [lastCopiedColor, setLastCopiedColor] = useState<string | null>(null);
-  const dragRef = useRef<'code' | 'bug' | 'audit' | null>(null);
+  const dragRef = useRef<{
+    type: 'code' | 'bug' | 'audit';
+    pointerId: number;
+    element: HTMLElement;
+  } | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const kebabRef = useRef<HTMLDivElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -607,7 +611,12 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, c
     // old activation-time base image became stale when a nested scroller or a
     // React-rendered container changed after capture mode was opened.
     const viewport = getCaptureViewport();
-    const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot(annotationCanvas, viewport);
+    const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot(
+      annotationCanvas,
+      viewport,
+      undefined,
+      buildImageRecovery(apiKey, portalUrl),
+    );
 
     setIsCapturing(false);
     try { 
@@ -858,22 +867,49 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, c
     return res;
   }, []);
 
-  // Draggable windows logic
+  // Draggable windows logic.
+  //
+  // Plain window mousemove/mouseup loses the release whenever the pointer ends
+  // up somewhere the document never hears about — outside the browser window,
+  // over an embedded frame, or once a native selection drag has begun. The
+  // panel then follows the cursor forever with no button held. Pointer capture
+  // guarantees this element receives the whole gesture, and the buttons check
+  // below ends the drag even if a release is still somehow missed.
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (dragRef.current === 'code') setCodeWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
-      else if (dragRef.current === 'bug') setBugWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
-      else if (dragRef.current === 'audit') setAuditWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
+    const onMove = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      if (e.buttons === 0) { endDrag(e); return; }
+      const pos = { x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y };
+      if (drag.type === 'code') setCodeWinPos(pos);
+      else if (drag.type === 'bug') setBugWinPos(pos);
+      else setAuditWinPos(pos);
     };
-    const onUp = () => { dragRef.current = null; };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    const endDrag = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      try { drag.element.releasePointerCapture(drag.pointerId); } catch { /* already released */ }
+      dragRef.current = null;
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', endDrag);
+      window.removeEventListener('pointercancel', endDrag);
+    };
   }, []);
 
-  const startDrag = (e: React.MouseEvent, type: 'code' | 'bug' | 'audit') => {
-    dragRef.current = type;
-    const rect = (e.currentTarget as HTMLElement).closest('[data-buggy-bag]')?.getBoundingClientRect();
+  const startDrag = (e: React.PointerEvent, type: 'code' | 'bug' | 'audit') => {
+    if (e.button !== 0) return;
+    const element = e.currentTarget as HTMLElement;
+    // Stops the browser from starting a text selection or a native drag, both
+    // of which can swallow the release.
+    e.preventDefault();
+    try { element.setPointerCapture(e.pointerId); } catch { /* unsupported pointer */ }
+    dragRef.current = { type, pointerId: e.pointerId, element };
+    const rect = element.closest('[data-buggy-bag]')?.getBoundingClientRect();
     if (rect) dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
@@ -1046,7 +1082,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, c
           zIndex: 10015,
         }}>
           {/* Header (Draggable on desktop; fixed bottom-sheet on narrow viewports) */}
-          <div onMouseDown={isNarrowViewport ? undefined : (e => startDrag(e, 'code'))} style={{
+          <div onPointerDown={isNarrowViewport ? undefined : (e => startDrag(e, 'code'))} style={{
             padding: '16px 20px', cursor: isNarrowViewport ? 'default' : 'grab', background: 'rgba(255,255,255,0.03)',
             borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>
@@ -1100,7 +1136,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, c
           zIndex: 10015,
         }}>
           {/* Header (Draggable on desktop; fixed bottom-sheet on narrow viewports) */}
-          <div onMouseDown={isNarrowViewport ? undefined : (e => startDrag(e, 'bug'))} style={{
+          <div onPointerDown={isNarrowViewport ? undefined : (e => startDrag(e, 'bug'))} style={{
             padding: '16px 20px', cursor: isNarrowViewport ? 'default' : 'grab', background: 'rgba(255,255,255,0.03)',
             borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>
@@ -1215,7 +1251,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, c
           zIndex: 10015,
         }}>
           {/* Header */}
-          <div onMouseDown={isNarrowViewport ? undefined : (e => startDrag(e, 'audit'))} style={{
+          <div onPointerDown={isNarrowViewport ? undefined : (e => startDrag(e, 'audit'))} style={{
             padding: '16px 20px', cursor: isNarrowViewport ? 'default' : 'grab', background: 'rgba(255,255,255,0.03)',
             borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>

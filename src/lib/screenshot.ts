@@ -85,6 +85,129 @@ export function getCaptureScrollPositions(): CaptureScrollPosition[] {
   return positions;
 }
 
+/** Walk the light DOM plus every shadow root, the same way the cloner does. */
+function forEachElement(visit: (element: HTMLElement) => void): void {
+  const walk = (root: Document | ShadowRoot) => {
+    root.querySelectorAll<HTMLElement>('*').forEach(element => {
+      if (isWidgetElement(element)) return;
+      visit(element);
+      if (element.shadowRoot) walk(element.shadowRoot);
+    });
+  };
+  walk(document);
+}
+
+/* ------------------------------------------------------------------ *
+ * ::placeholder
+ *
+ * html-to-image copies computed styles onto each cloned node, but a
+ * placeholder's colour lives on the ::placeholder pseudo-element and the
+ * cloner only reproduces ::before and ::after. The cloned input therefore
+ * falls back to inheriting its own `color`, which is usually the near-black
+ * input text colour — a light grey "Search…" comes back almost black.
+ *
+ * Tag the real inputs, then ship a stylesheet inside the clone that restores
+ * each one's real placeholder appearance.
+ * ------------------------------------------------------------------ */
+
+const PLACEHOLDER_ATTRIBUTE = 'data-buggy-bag-placeholder';
+let placeholderSequence = 0;
+
+interface MarkedPlaceholder {
+  element: HTMLElement;
+  previousAttribute: string | null;
+  rule: string;
+}
+
+const PLACEHOLDER_PROPERTIES = [
+  'color',
+  // The cloner writes every computed property inline, and an input carries
+  // -webkit-text-fill-color set to its own text colour. ::placeholder inherits
+  // it, and that property beats `color` when the glyphs are painted — restore
+  // `color` alone and the placeholder still comes out near-black.
+  '-webkit-text-fill-color',
+  'opacity',
+  'font-family',
+  'font-size',
+  'font-style',
+  'font-weight',
+  'letter-spacing',
+  'text-transform',
+] as const;
+
+function markPlaceholders(): MarkedPlaceholder[] {
+  const marked: MarkedPlaceholder[] = [];
+
+  forEachElement(element => {
+    if (!(element instanceof HTMLInputElement) && !(element instanceof HTMLTextAreaElement)) return;
+    if (!element.placeholder) return;
+
+    const pseudo = window.getComputedStyle(element, '::placeholder');
+    const declarations = PLACEHOLDER_PROPERTIES
+      .map(property => {
+        const value = pseudo.getPropertyValue(property);
+        return value ? `${property}: ${value} !important;` : '';
+      })
+      .filter(Boolean)
+      .join(' ');
+    if (!declarations) return;
+
+    const id = `${++placeholderSequence}`;
+    const previousAttribute = element.getAttribute(PLACEHOLDER_ATTRIBUTE);
+    element.setAttribute(PLACEHOLDER_ATTRIBUTE, id);
+    marked.push({
+      element,
+      previousAttribute,
+      rule: `[${PLACEHOLDER_ATTRIBUTE}="${id}"]::placeholder { ${declarations} }`,
+    });
+  });
+
+  return marked;
+}
+
+function applyPlaceholderStyles(clonedRoot: HTMLElement, marked: MarkedPlaceholder[]): void {
+  if (marked.length === 0) return;
+  const style = document.createElement('style');
+  style.textContent = marked.map(({ rule }) => rule).join('\n');
+  clonedRoot.insertBefore(style, clonedRoot.firstChild);
+}
+
+function clearPlaceholderMarks(marked: MarkedPlaceholder[]): void {
+  marked.forEach(({ element, previousAttribute }) => {
+    if (previousAttribute === null) element.removeAttribute(PLACEHOLDER_ATTRIBUTE);
+    else element.setAttribute(PLACEHOLDER_ATTRIBUTE, previousAttribute);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * backface-visibility
+ *
+ * An SVG foreignObject rasterises without a 3D scene, so `preserve-3d` and
+ * `backface-visibility` are ignored and the *back* face of a flip card is
+ * painted over the front one — a logo silently becomes the wrong logo.
+ *
+ * The cloner writes every computed property inline, so the clone already
+ * carries both the transform matrix and backface-visibility. An element whose
+ * own matrix has a negative m33 has been turned away from the viewer; the
+ * browser would not have painted it, so neither should we.
+ * ------------------------------------------------------------------ */
+
+function hideBackFacingElements(clonedRoot: HTMLElement): void {
+  const candidates = [clonedRoot, ...Array.from(clonedRoot.querySelectorAll<HTMLElement>('*'))];
+  candidates.forEach(element => {
+    if (element.style.backfaceVisibility !== 'hidden') return;
+    const transform = element.style.transform;
+    if (!transform || transform === 'none') return;
+    const numbers = transform.match(/matrix3d\(([^)]+)\)/);
+    if (!numbers) return;
+    const parts = numbers[1].split(',').map(value => Number(value.trim()));
+    if (parts.length !== 16 || parts.some(Number.isNaN)) return;
+    // m33 is the third basis vector's z component; negative means the face
+    // now points away from the camera.
+    if (parts[10] < 0) element.style.setProperty('visibility', 'hidden', 'important');
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Fix 1 of 2 — nested scroll
  *
@@ -268,6 +391,94 @@ function resolvePageBackgroundColor(): string {
   return '#ffffff';
 }
 
+/* ------------------------------------------------------------------ *
+ * Images the browser refuses to hand over
+ *
+ * html-to-image does not read pixels off the rendered <img>; it re-fetches
+ * the URL and inlines the bytes. A host that serves images happily to an
+ * <img> tag but sends no Access-Control-Allow-Origin fails that fetch, and
+ * the library substitutes `imagePlaceholder` — a transparent pixel. The
+ * avatar disappears without trace and the report quietly lies.
+ *
+ * Two recoveries, in order: re-fetch through the portal (server-side fetch is
+ * not subject to CORS), and failing that, leave a visible marker so a missing
+ * image reads as missing rather than as empty space.
+ * ------------------------------------------------------------------ */
+
+export interface ImageRecovery {
+  /** Portal origin, e.g. https://buggy-bag.vercel.app */
+  portalUrl: string;
+  apiKey: string;
+}
+
+/** Both halves are required; without either one there is nothing to retry against. */
+export function buildImageRecovery(apiKey?: string, portalUrl?: string): ImageRecovery | null {
+  if (!apiKey || !portalUrl) return null;
+  return { apiKey, portalUrl };
+}
+
+const ORIGINAL_SRC_ATTRIBUTE = 'data-buggy-bag-src';
+
+function rememberImageSources(clonedRoot: HTMLElement): void {
+  clonedRoot.querySelectorAll<HTMLImageElement>('img').forEach(image => {
+    const src = image.src;
+    if (src && !src.startsWith('data:')) image.setAttribute(ORIGINAL_SRC_ATTRIBUTE, src);
+  });
+}
+
+async function proxyImageAsDataUrl(url: string, recovery: ImageRecovery): Promise<string | null> {
+  try {
+    const endpoint = `${recovery.portalUrl.replace(/\/$/, '')}/api/image-proxy`
+      + `?url=${encodeURIComponent(url)}&api_key=${encodeURIComponent(recovery.apiKey)}`;
+    const response = await fetch(endpoint);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob.type.startsWith('image/')) return null;
+    return await new Promise<string | null>(resolve => {
+      const reader = new FileReader();
+      reader.onerror = () => resolve(null);
+      reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function markImageAsUnavailable(image: HTMLImageElement): void {
+  // A dashed outline over a neutral fill reads as "there was an image here",
+  // which is what the reporter needs to know. Keep the element's own box so
+  // nothing around it shifts.
+  image.style.setProperty('background-color', 'rgba(148, 148, 148, 0.18)', 'important');
+  image.style.setProperty('outline', '1px dashed rgba(120, 120, 120, 0.65)', 'important');
+  image.style.setProperty('outline-offset', '-1px', 'important');
+}
+
+async function recoverBlockedImages(
+  clonedRoot: HTMLElement,
+  recovery: ImageRecovery | null,
+): Promise<number> {
+  const blocked = Array.from(clonedRoot.querySelectorAll<HTMLImageElement>(`img[${ORIGINAL_SRC_ATTRIBUTE}]`))
+    .filter(image => !image.src || image.src === TRANSPARENT_PIXEL);
+
+  let recovered = 0;
+  await Promise.all(blocked.map(async image => {
+    const original = image.getAttribute(ORIGINAL_SRC_ATTRIBUTE)!;
+    const dataUrl = recovery ? await proxyImageAsDataUrl(original, recovery) : null;
+    if (dataUrl) {
+      image.src = dataUrl;
+      recovered += 1;
+    } else {
+      markImageAsUnavailable(image);
+    }
+  }));
+
+  clonedRoot.querySelectorAll(`[${ORIGINAL_SRC_ATTRIBUTE}]`)
+    .forEach(element => element.removeAttribute(ORIGINAL_SRC_ATTRIBUTE));
+
+  return recovered;
+}
+
 /**
  * Runs the same pipeline `html-to-image`'s `toPng` does, with one extra step:
  * the nested scroll offsets are baked into the clone before it is serialized.
@@ -278,15 +489,23 @@ async function renderTier(
   viewport: CaptureViewport,
   scrollPositions: CaptureScrollPosition[],
   options: HtmlToImageOptions,
+  recovery: ImageRecovery | null,
 ): Promise<string> {
   const backgroundColor = resolvePageBackgroundColor();
   const marked = markScrollPositions(scrollPositions);
+  const markedPlaceholders = markPlaceholders();
   try {
     const clonedRoot = await cloneNode(document.body, options, true);
     if (!clonedRoot) throw new Error('Unable to clone document for screenshot');
     applyScrollOffsetsToClone(clonedRoot, marked);
+    hideBackFacingElements(clonedRoot);
+    applyPlaceholderStyles(clonedRoot, markedPlaceholders);
+    rememberImageSources(clonedRoot);
     await embedWebFonts(clonedRoot, options);
     await embedImages(clonedRoot, options);
+    // Runs after embedImages: that is the point at which a blocked fetch has
+    // already been turned into the transparent placeholder we look for.
+    await recoverBlockedImages(clonedRoot, recovery);
     applyStyle(clonedRoot, options);
 
     const svg = await nodeToDataURL(clonedRoot, viewport.width, viewport.height);
@@ -302,6 +521,7 @@ async function renderTier(
     return canvas.toDataURL('image/png');
   } finally {
     clearScrollPositionMarks(marked);
+    clearPlaceholderMarks(markedPlaceholders);
   }
 }
 
@@ -334,6 +554,7 @@ export async function capturePageScreenshot(
   annotationCanvas?: HTMLCanvasElement | null,
   viewport: CaptureViewport = getCaptureViewport(),
   scrollPositions: CaptureScrollPosition[] = getCaptureScrollPositions(),
+  recovery: ImageRecovery | null = null,
 ): Promise<ScreenshotResult> {
   const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
 
@@ -364,7 +585,7 @@ export async function capturePageScreenshot(
           }
           return true;
         },
-      });
+      }, recovery);
       renderer = 'html-to-image';
     } catch (tier1Err) {
       console.warn('[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...', tier1Err);
@@ -379,7 +600,7 @@ export async function capturePageScreenshot(
             if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'IMG' || node.tagName === 'VIDEO') return false;
             return true;
           },
-        });
+        }, recovery);
         renderer = 'html-to-image-no-media';
       } catch (tier2Err) {
         console.warn('[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...', tier2Err);
@@ -392,7 +613,7 @@ export async function capturePageScreenshot(
             if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'IMG' || node.tagName === 'VIDEO' || node.tagName === 'SVG') return false;
             return true;
           },
-        });
+        }, recovery);
         renderer = 'html-to-image-safe';
       }
     }

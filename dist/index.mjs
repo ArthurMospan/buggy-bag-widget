@@ -30151,6 +30151,80 @@ function getCaptureScrollPositions() {
   visit(document);
   return positions;
 }
+function forEachElement(visit) {
+  const walk = (root) => {
+    root.querySelectorAll("*").forEach((element) => {
+      if (isWidgetElement(element)) return;
+      visit(element);
+      if (element.shadowRoot) walk(element.shadowRoot);
+    });
+  };
+  walk(document);
+}
+var PLACEHOLDER_ATTRIBUTE = "data-buggy-bag-placeholder";
+var placeholderSequence = 0;
+var PLACEHOLDER_PROPERTIES = [
+  "color",
+  // The cloner writes every computed property inline, and an input carries
+  // -webkit-text-fill-color set to its own text colour. ::placeholder inherits
+  // it, and that property beats `color` when the glyphs are painted — restore
+  // `color` alone and the placeholder still comes out near-black.
+  "-webkit-text-fill-color",
+  "opacity",
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "letter-spacing",
+  "text-transform"
+];
+function markPlaceholders() {
+  const marked = [];
+  forEachElement((element) => {
+    if (!(element instanceof HTMLInputElement) && !(element instanceof HTMLTextAreaElement)) return;
+    if (!element.placeholder) return;
+    const pseudo = window.getComputedStyle(element, "::placeholder");
+    const declarations = PLACEHOLDER_PROPERTIES.map((property) => {
+      const value = pseudo.getPropertyValue(property);
+      return value ? `${property}: ${value} !important;` : "";
+    }).filter(Boolean).join(" ");
+    if (!declarations) return;
+    const id = `${++placeholderSequence}`;
+    const previousAttribute = element.getAttribute(PLACEHOLDER_ATTRIBUTE);
+    element.setAttribute(PLACEHOLDER_ATTRIBUTE, id);
+    marked.push({
+      element,
+      previousAttribute,
+      rule: `[${PLACEHOLDER_ATTRIBUTE}="${id}"]::placeholder { ${declarations} }`
+    });
+  });
+  return marked;
+}
+function applyPlaceholderStyles(clonedRoot, marked) {
+  if (marked.length === 0) return;
+  const style = document.createElement("style");
+  style.textContent = marked.map(({ rule }) => rule).join("\n");
+  clonedRoot.insertBefore(style, clonedRoot.firstChild);
+}
+function clearPlaceholderMarks(marked) {
+  marked.forEach(({ element, previousAttribute }) => {
+    if (previousAttribute === null) element.removeAttribute(PLACEHOLDER_ATTRIBUTE);
+    else element.setAttribute(PLACEHOLDER_ATTRIBUTE, previousAttribute);
+  });
+}
+function hideBackFacingElements(clonedRoot) {
+  const candidates = [clonedRoot, ...Array.from(clonedRoot.querySelectorAll("*"))];
+  candidates.forEach((element) => {
+    if (element.style.backfaceVisibility !== "hidden") return;
+    const transform = element.style.transform;
+    if (!transform || transform === "none") return;
+    const numbers = transform.match(/matrix3d\(([^)]+)\)/);
+    if (!numbers) return;
+    const parts = numbers[1].split(",").map((value) => Number(value.trim()));
+    if (parts.length !== 16 || parts.some(Number.isNaN)) return;
+    if (parts[10] < 0) element.style.setProperty("visibility", "hidden", "important");
+  });
+}
 var SCROLL_SNAPSHOT_ATTRIBUTE = "data-buggy-bag-scroll-snapshot";
 var scrollSnapshotSequence = 0;
 function markScrollPositions(positions) {
@@ -30267,15 +30341,69 @@ function resolvePageBackgroundColor() {
   }
   return "#ffffff";
 }
-async function renderTier(viewport, scrollPositions, options) {
+function buildImageRecovery(apiKey, portalUrl) {
+  if (!apiKey || !portalUrl) return null;
+  return { apiKey, portalUrl };
+}
+var ORIGINAL_SRC_ATTRIBUTE = "data-buggy-bag-src";
+function rememberImageSources(clonedRoot) {
+  clonedRoot.querySelectorAll("img").forEach((image) => {
+    const src = image.src;
+    if (src && !src.startsWith("data:")) image.setAttribute(ORIGINAL_SRC_ATTRIBUTE, src);
+  });
+}
+async function proxyImageAsDataUrl(url, recovery) {
+  try {
+    const endpoint = `${recovery.portalUrl.replace(/\/$/, "")}/api/image-proxy?url=${encodeURIComponent(url)}&api_key=${encodeURIComponent(recovery.apiKey)}`;
+    const response = await fetch(endpoint);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob.type.startsWith("image/")) return null;
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onerror = () => resolve(null);
+      reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+function markImageAsUnavailable(image) {
+  image.style.setProperty("background-color", "rgba(148, 148, 148, 0.18)", "important");
+  image.style.setProperty("outline", "1px dashed rgba(120, 120, 120, 0.65)", "important");
+  image.style.setProperty("outline-offset", "-1px", "important");
+}
+async function recoverBlockedImages(clonedRoot, recovery) {
+  const blocked = Array.from(clonedRoot.querySelectorAll(`img[${ORIGINAL_SRC_ATTRIBUTE}]`)).filter((image) => !image.src || image.src === TRANSPARENT_PIXEL);
+  let recovered = 0;
+  await Promise.all(blocked.map(async (image) => {
+    const original = image.getAttribute(ORIGINAL_SRC_ATTRIBUTE);
+    const dataUrl = recovery ? await proxyImageAsDataUrl(original, recovery) : null;
+    if (dataUrl) {
+      image.src = dataUrl;
+      recovered += 1;
+    } else {
+      markImageAsUnavailable(image);
+    }
+  }));
+  clonedRoot.querySelectorAll(`[${ORIGINAL_SRC_ATTRIBUTE}]`).forEach((element) => element.removeAttribute(ORIGINAL_SRC_ATTRIBUTE));
+  return recovered;
+}
+async function renderTier(viewport, scrollPositions, options, recovery) {
   const backgroundColor = resolvePageBackgroundColor();
   const marked = markScrollPositions(scrollPositions);
+  const markedPlaceholders = markPlaceholders();
   try {
     const clonedRoot = await cloneNode(document.body, options, true);
     if (!clonedRoot) throw new Error("Unable to clone document for screenshot");
     applyScrollOffsetsToClone(clonedRoot, marked);
+    hideBackFacingElements(clonedRoot);
+    applyPlaceholderStyles(clonedRoot, markedPlaceholders);
+    rememberImageSources(clonedRoot);
     await embedWebFonts(clonedRoot, options);
     await embedImages(clonedRoot, options);
+    await recoverBlockedImages(clonedRoot, recovery);
     applyStyle(clonedRoot, options);
     const svg = await nodeToDataURL(clonedRoot, viewport.width, viewport.height);
     const image = await createImage(svg);
@@ -30290,6 +30418,7 @@ async function renderTier(viewport, scrollPositions, options) {
     return canvas.toDataURL("image/png");
   } finally {
     clearScrollPositionMarks(marked);
+    clearPlaceholderMarks(markedPlaceholders);
   }
 }
 function baseOptions(viewport) {
@@ -30304,7 +30433,7 @@ function baseOptions(viewport) {
     imagePlaceholder: TRANSPARENT_PIXEL
   };
 }
-async function capturePageScreenshot(annotationCanvas, viewport = getCaptureViewport(), scrollPositions = getCaptureScrollPositions()) {
+async function capturePageScreenshot(annotationCanvas, viewport = getCaptureViewport(), scrollPositions = getCaptureScrollPositions(), recovery = null) {
   const host = document.querySelector("#buggy-bag-host");
   let annotationDataUrl = null;
   if (annotationCanvas) {
@@ -30331,7 +30460,7 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
           }
           return true;
         }
-      });
+      }, recovery);
       renderer = "html-to-image";
     } catch (tier1Err) {
       console.warn("[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...", tier1Err);
@@ -30344,7 +30473,7 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
             if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "IMG" || node.tagName === "VIDEO") return false;
             return true;
           }
-        });
+        }, recovery);
         renderer = "html-to-image-no-media";
       } catch (tier2Err) {
         console.warn("[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...", tier2Err);
@@ -30356,7 +30485,7 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
             if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "IMG" || node.tagName === "VIDEO" || node.tagName === "SVG") return false;
             return true;
           }
-        });
+        }, recovery);
         renderer = "html-to-image-safe";
       }
     }
@@ -30972,7 +31101,12 @@ function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, captureS
     const host = document.querySelector("#buggy-bag-host");
     const annotationCanvas = host?.shadowRoot?.querySelector("canvas") ?? null;
     const viewport = getCaptureViewport();
-    const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot(annotationCanvas, viewport);
+    const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot(
+      annotationCanvas,
+      viewport,
+      void 0,
+      buildImageRecovery(apiKey, portalUrl)
+    );
     setIsCapturing(false);
     try {
       localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
@@ -31242,23 +31376,45 @@ function CaptureMode({ initialTool, apiKey, portalUrl, captureViewport, captureS
   }, []);
   useEffect4(() => {
     const onMove = (e) => {
-      if (dragRef.current === "code") setCodeWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
-      else if (dragRef.current === "bug") setBugWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
-      else if (dragRef.current === "audit") setAuditWinPos({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
+      const drag = dragRef.current;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      if (e.buttons === 0) {
+        endDrag(e);
+        return;
+      }
+      const pos = { x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y };
+      if (drag.type === "code") setCodeWinPos(pos);
+      else if (drag.type === "bug") setBugWinPos(pos);
+      else setAuditWinPos(pos);
     };
-    const onUp = () => {
+    const endDrag = (e) => {
+      const drag = dragRef.current;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      try {
+        drag.element.releasePointerCapture(drag.pointerId);
+      } catch {
+      }
       dragRef.current = null;
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
     return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointercancel", endDrag);
     };
   }, []);
   const startDrag = (e, type) => {
-    dragRef.current = type;
-    const rect = e.currentTarget.closest("[data-buggy-bag]")?.getBoundingClientRect();
+    if (e.button !== 0) return;
+    const element = e.currentTarget;
+    e.preventDefault();
+    try {
+      element.setPointerCapture(e.pointerId);
+    } catch {
+    }
+    dragRef.current = { type, pointerId: e.pointerId, element };
+    const rect = element.closest("[data-buggy-bag]")?.getBoundingClientRect();
     if (rect) dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
   const highlightHtml = (str) => {
@@ -31436,7 +31592,7 @@ ${issue.message}` }));
           flexDirection: "column",
           zIndex: 10015
         }, children: [
-          /* @__PURE__ */ jsxs3("div", { onMouseDown: isNarrowViewport ? void 0 : ((e) => startDrag(e, "code")), style: {
+          /* @__PURE__ */ jsxs3("div", { onPointerDown: isNarrowViewport ? void 0 : ((e) => startDrag(e, "code")), style: {
             padding: "16px 20px",
             cursor: isNarrowViewport ? "default" : "grab",
             background: "rgba(255,255,255,0.03)",
@@ -31512,7 +31668,7 @@ ${issue.message}` }));
           flexDirection: "column",
           zIndex: 10015
         }, children: [
-          /* @__PURE__ */ jsxs3("div", { onMouseDown: isNarrowViewport ? void 0 : ((e) => startDrag(e, "bug")), style: {
+          /* @__PURE__ */ jsxs3("div", { onPointerDown: isNarrowViewport ? void 0 : ((e) => startDrag(e, "bug")), style: {
             padding: "16px 20px",
             cursor: isNarrowViewport ? "default" : "grab",
             background: "rgba(255,255,255,0.03)",
@@ -31678,7 +31834,7 @@ ${issue.message}` }));
           flexDirection: "column",
           zIndex: 10015
         }, children: [
-          /* @__PURE__ */ jsxs3("div", { onMouseDown: isNarrowViewport ? void 0 : ((e) => startDrag(e, "audit")), style: {
+          /* @__PURE__ */ jsxs3("div", { onPointerDown: isNarrowViewport ? void 0 : ((e) => startDrag(e, "audit")), style: {
             padding: "16px 20px",
             cursor: isNarrowViewport ? "default" : "grab",
             background: "rgba(255,255,255,0.03)",
@@ -32437,7 +32593,7 @@ function resolvePageElement(x, y) {
     (el) => !el.closest?.("[data-buggy-bag]") && el !== document.documentElement && el !== document.body
   ) ?? null;
 }
-function MobileCaptureMode({ apiKey, onSend, onCancel }) {
+function MobileCaptureMode({ apiKey, portalUrl, onSend, onCancel }) {
   const [pin, setPin] = useState5(null);
   const [description, setDescription] = useState5("");
   const [sending, setSending] = useState5(false);
@@ -32458,7 +32614,12 @@ function MobileCaptureMode({ apiKey, onSend, onCancel }) {
     if (!pin || sending) return;
     setSending(true);
     try {
-      const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot();
+      const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot(
+        null,
+        void 0,
+        void 0,
+        buildImageRecovery(apiKey, portalUrl)
+      );
       const shapeId = `pin-${Date.now()}`;
       const shape = {
         id: shapeId,
@@ -32762,7 +32923,7 @@ function isRealMobileDevice() {
 }
 
 // src/styles.gen.ts
-var styles = ".container {\r\n    width: 100%\n}\r\n@media (min-width: 640px) {\r\n    .container {\r\n        max-width: 640px\n    }\n}\r\n@media (min-width: 768px) {\r\n    .container {\r\n        max-width: 768px\n    }\n}\r\n@media (min-width: 1024px) {\r\n    .container {\r\n        max-width: 1024px\n    }\n}\r\n@media (min-width: 1280px) {\r\n    .container {\r\n        max-width: 1280px\n    }\n}\r\n@media (min-width: 1536px) {\r\n    .container {\r\n        max-width: 1536px\n    }\n}\r\n.sr-only {\r\n    position: absolute;\r\n    width: 1px;\r\n    height: 1px;\r\n    padding: 0;\r\n    margin: -1px;\r\n    overflow: hidden;\r\n    clip: rect(0, 0, 0, 0);\r\n    white-space: nowrap;\r\n    border-width: 0\n}\r\n.visible {\r\n    visibility: visible\n}\r\n.static {\r\n    position: static\n}\r\n.fixed {\r\n    position: fixed\n}\r\n.absolute {\r\n    position: absolute\n}\r\n.relative {\r\n    position: relative\n}\r\n.inset-0 {\r\n    inset: 0px\n}\r\n.z-\\[9998\\] {\r\n    z-index: 9998\n}\r\n.mx-4 {\r\n    margin-left: 1rem;\r\n    margin-right: 1rem\n}\r\n.block {\r\n    display: block\n}\r\n.inline-block {\r\n    display: inline-block\n}\r\n.inline {\r\n    display: inline\n}\r\n.flex {\r\n    display: flex\n}\r\n.inline-flex {\r\n    display: inline-flex\n}\r\n.hidden {\r\n    display: none\n}\r\n.h-\\[28px\\] {\r\n    height: 28px\n}\r\n.h-\\[32px\\] {\r\n    height: 32px\n}\r\n.h-\\[36px\\] {\r\n    height: 36px\n}\r\n.max-h-\\[calc\\(100vh-200px\\)\\] {\r\n    max-height: calc(100vh - 200px)\n}\r\n.w-\\[32px\\] {\r\n    width: 32px\n}\r\n.w-full {\r\n    width: 100%\n}\r\n.max-w-\\[1200px\\] {\r\n    max-width: 1200px\n}\r\n.max-w-\\[480px\\] {\r\n    max-width: 480px\n}\r\n.max-w-\\[640px\\] {\r\n    max-width: 640px\n}\r\n.max-w-\\[900px\\] {\r\n    max-width: 900px\n}\r\n.flex-shrink {\r\n    flex-shrink: 1\n}\r\n.shrink-0 {\r\n    flex-shrink: 0\n}\r\n.transform {\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.resize {\r\n    resize: both\n}\r\n.items-start {\r\n    align-items: flex-start\n}\r\n.items-center {\r\n    align-items: center\n}\r\n.justify-center {\r\n    justify-content: center\n}\r\n.justify-between {\r\n    justify-content: space-between\n}\r\n.gap-\\[6px\\] {\r\n    gap: 6px\n}\r\n.overflow-y-auto {\r\n    overflow-y: auto\n}\r\n.truncate {\r\n    overflow: hidden;\r\n    text-overflow: ellipsis;\r\n    white-space: nowrap\n}\r\n.break-all {\r\n    word-break: break-all\n}\r\n.rounded-\\[10px\\] {\r\n    border-radius: 10px\n}\r\n.rounded-\\[16px\\] {\r\n    border-radius: 16px\n}\r\n.rounded-\\[24px\\] {\r\n    border-radius: 24px\n}\r\n.rounded-\\[8px\\] {\r\n    border-radius: 8px\n}\r\n.border {\r\n    border-width: 1px\n}\r\n.border-b {\r\n    border-bottom-width: 1px\n}\r\n.border-\\[\\#f0f0f0\\] {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\r\n.bg-\\[\\#1f1f1f\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#ef4444\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f0f0f0\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f4f4f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f5f5f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black\\/40 {\r\n    background-color: rgb(0 0 0 / 0.4)\n}\r\n.bg-transparent {\r\n    background-color: transparent\n}\r\n.bg-white {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\r\n.p-0 {\r\n    padding: 0px\n}\r\n.p-1 {\r\n    padding: 0.25rem\n}\r\n.p-\\[12px\\] {\r\n    padding: 12px\n}\r\n.p-\\[16px\\] {\r\n    padding: 16px\n}\r\n.p-\\[20px\\] {\r\n    padding: 20px\n}\r\n.p-\\[24px\\] {\r\n    padding: 24px\n}\r\n.px-6 {\r\n    padding-left: 1.5rem;\r\n    padding-right: 1.5rem\n}\r\n.px-\\[12px\\] {\r\n    padding-left: 12px;\r\n    padding-right: 12px\n}\r\n.px-\\[16px\\] {\r\n    padding-left: 16px;\r\n    padding-right: 16px\n}\r\n.px-\\[18px\\] {\r\n    padding-left: 18px;\r\n    padding-right: 18px\n}\r\n.py-5 {\r\n    padding-top: 1.25rem;\r\n    padding-bottom: 1.25rem\n}\r\n.pb-4 {\r\n    padding-bottom: 1rem\n}\r\n.pt-12 {\r\n    padding-top: 3rem\n}\r\n.pt-6 {\r\n    padding-top: 1.5rem\n}\r\n.text-\\[12px\\] {\r\n    font-size: 12px\n}\r\n.text-\\[13px\\] {\r\n    font-size: 13px\n}\r\n.text-\\[18px\\] {\r\n    font-size: 18px\n}\r\n.font-bold {\r\n    font-weight: 700\n}\r\n.uppercase {\r\n    text-transform: uppercase\n}\r\n.leading-none {\r\n    line-height: 1\n}\r\n.text-\\[\\#1f1f1f\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.text-\\[\\#9a9a9a\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\r\n.text-white {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\r\n.shadow {\r\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\r\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\r\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.outline {\r\n    outline-style: solid\n}\r\n.ring {\r\n    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\r\n    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);\r\n    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)\n}\r\n.blur {\r\n    --tw-blur: blur(8px);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.invert {\r\n    --tw-invert: invert(100%);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.filter {\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.backdrop-blur-sm {\r\n    --tw-backdrop-blur: blur(4px);\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.backdrop-filter {\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.transition {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-colors {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.ease-in-out {\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)\n}\r\n.ease-out {\r\n    transition-timing-function: cubic-bezier(0, 0, 0.2, 1)\n}\r\n.hover\\:bg-\\[\\#303030\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#dc2626\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.focus\\:outline-none:focus {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.disabled\\:cursor-not-allowed:disabled {\r\n    cursor: not-allowed\n}\r\n.disabled\\:opacity-50:disabled {\r\n    opacity: 0.5\n}\r\n";
+var styles = ".container {\r\n    width: 100%\n}\r\n@media (min-width: 640px) {\r\n    .container {\r\n        max-width: 640px\n    }\n}\r\n@media (min-width: 768px) {\r\n    .container {\r\n        max-width: 768px\n    }\n}\r\n@media (min-width: 1024px) {\r\n    .container {\r\n        max-width: 1024px\n    }\n}\r\n@media (min-width: 1280px) {\r\n    .container {\r\n        max-width: 1280px\n    }\n}\r\n@media (min-width: 1536px) {\r\n    .container {\r\n        max-width: 1536px\n    }\n}\r\n.sr-only {\r\n    position: absolute;\r\n    width: 1px;\r\n    height: 1px;\r\n    padding: 0;\r\n    margin: -1px;\r\n    overflow: hidden;\r\n    clip: rect(0, 0, 0, 0);\r\n    white-space: nowrap;\r\n    border-width: 0\n}\r\n.visible {\r\n    visibility: visible\n}\r\n.static {\r\n    position: static\n}\r\n.fixed {\r\n    position: fixed\n}\r\n.absolute {\r\n    position: absolute\n}\r\n.relative {\r\n    position: relative\n}\r\n.inset-0 {\r\n    inset: 0px\n}\r\n.z-\\[9998\\] {\r\n    z-index: 9998\n}\r\n.mx-4 {\r\n    margin-left: 1rem;\r\n    margin-right: 1rem\n}\r\n.block {\r\n    display: block\n}\r\n.inline-block {\r\n    display: inline-block\n}\r\n.inline {\r\n    display: inline\n}\r\n.flex {\r\n    display: flex\n}\r\n.inline-flex {\r\n    display: inline-flex\n}\r\n.hidden {\r\n    display: none\n}\r\n.h-\\[28px\\] {\r\n    height: 28px\n}\r\n.h-\\[32px\\] {\r\n    height: 32px\n}\r\n.h-\\[36px\\] {\r\n    height: 36px\n}\r\n.max-h-\\[calc\\(100vh-200px\\)\\] {\r\n    max-height: calc(100vh - 200px)\n}\r\n.w-\\[32px\\] {\r\n    width: 32px\n}\r\n.w-full {\r\n    width: 100%\n}\r\n.max-w-\\[1200px\\] {\r\n    max-width: 1200px\n}\r\n.max-w-\\[480px\\] {\r\n    max-width: 480px\n}\r\n.max-w-\\[640px\\] {\r\n    max-width: 640px\n}\r\n.max-w-\\[900px\\] {\r\n    max-width: 900px\n}\r\n.flex-shrink {\r\n    flex-shrink: 1\n}\r\n.shrink-0 {\r\n    flex-shrink: 0\n}\r\n.\\!transform {\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)) !important\n}\r\n.transform {\r\n    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))\n}\r\n.resize {\r\n    resize: both\n}\r\n.items-start {\r\n    align-items: flex-start\n}\r\n.items-center {\r\n    align-items: center\n}\r\n.justify-center {\r\n    justify-content: center\n}\r\n.justify-between {\r\n    justify-content: space-between\n}\r\n.gap-\\[6px\\] {\r\n    gap: 6px\n}\r\n.overflow-y-auto {\r\n    overflow-y: auto\n}\r\n.truncate {\r\n    overflow: hidden;\r\n    text-overflow: ellipsis;\r\n    white-space: nowrap\n}\r\n.break-all {\r\n    word-break: break-all\n}\r\n.rounded-\\[10px\\] {\r\n    border-radius: 10px\n}\r\n.rounded-\\[16px\\] {\r\n    border-radius: 16px\n}\r\n.rounded-\\[24px\\] {\r\n    border-radius: 24px\n}\r\n.rounded-\\[8px\\] {\r\n    border-radius: 8px\n}\r\n.border {\r\n    border-width: 1px\n}\r\n.border-b {\r\n    border-bottom-width: 1px\n}\r\n.border-\\[\\#f0f0f0\\] {\r\n    --tw-border-opacity: 1;\r\n    border-color: rgb(240 240 240 / var(--tw-border-opacity, 1))\n}\r\n.bg-\\[\\#1f1f1f\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(31 31 31 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#ef4444\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f0f0f0\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f4f4f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-\\[\\#f5f5f5\\] {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(245 245 245 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1))\n}\r\n.bg-black\\/40 {\r\n    background-color: rgb(0 0 0 / 0.4)\n}\r\n.bg-transparent {\r\n    background-color: transparent\n}\r\n.bg-white {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1))\n}\r\n.p-0 {\r\n    padding: 0px\n}\r\n.p-1 {\r\n    padding: 0.25rem\n}\r\n.p-\\[12px\\] {\r\n    padding: 12px\n}\r\n.p-\\[16px\\] {\r\n    padding: 16px\n}\r\n.p-\\[20px\\] {\r\n    padding: 20px\n}\r\n.p-\\[24px\\] {\r\n    padding: 24px\n}\r\n.px-6 {\r\n    padding-left: 1.5rem;\r\n    padding-right: 1.5rem\n}\r\n.px-\\[12px\\] {\r\n    padding-left: 12px;\r\n    padding-right: 12px\n}\r\n.px-\\[16px\\] {\r\n    padding-left: 16px;\r\n    padding-right: 16px\n}\r\n.px-\\[18px\\] {\r\n    padding-left: 18px;\r\n    padding-right: 18px\n}\r\n.py-5 {\r\n    padding-top: 1.25rem;\r\n    padding-bottom: 1.25rem\n}\r\n.pb-4 {\r\n    padding-bottom: 1rem\n}\r\n.pt-12 {\r\n    padding-top: 3rem\n}\r\n.pt-6 {\r\n    padding-top: 1.5rem\n}\r\n.text-\\[12px\\] {\r\n    font-size: 12px\n}\r\n.text-\\[13px\\] {\r\n    font-size: 13px\n}\r\n.text-\\[18px\\] {\r\n    font-size: 18px\n}\r\n.font-bold {\r\n    font-weight: 700\n}\r\n.uppercase {\r\n    text-transform: uppercase\n}\r\n.leading-none {\r\n    line-height: 1\n}\r\n.text-\\[\\#1f1f1f\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.text-\\[\\#9a9a9a\\] {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(154 154 154 / var(--tw-text-opacity, 1))\n}\r\n.text-white {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(255 255 255 / var(--tw-text-opacity, 1))\n}\r\n.shadow {\r\n    --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);\r\n    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.shadow-\\[0_25px_50px_rgba\\(0\\2c 0\\2c 0\\2c 0\\.15\\)\\] {\r\n    --tw-shadow: 0 25px 50px rgba(0,0,0,0.15);\r\n    --tw-shadow-colored: 0 25px 50px var(--tw-shadow-color);\r\n    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)\n}\r\n.outline {\r\n    outline-style: solid\n}\r\n.ring {\r\n    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);\r\n    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);\r\n    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)\n}\r\n.blur {\r\n    --tw-blur: blur(8px);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.invert {\r\n    --tw-invert: invert(100%);\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.filter {\r\n    filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)\n}\r\n.backdrop-blur-sm {\r\n    --tw-backdrop-blur: blur(4px);\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.backdrop-filter {\r\n    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)\n}\r\n.transition {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.transition-colors {\r\n    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\r\n    transition-duration: 150ms\n}\r\n.ease-in-out {\r\n    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)\n}\r\n.ease-out {\r\n    transition-timing-function: cubic-bezier(0, 0, 0.2, 1)\n}\r\n.hover\\:bg-\\[\\#303030\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(48 48 48 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#dc2626\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#ebebeb\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(235 235 235 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f0f0f0\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(240 240 240 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:bg-\\[\\#f4f4f5\\]:hover {\r\n    --tw-bg-opacity: 1;\r\n    background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1))\n}\r\n.hover\\:text-\\[\\#1f1f1f\\]:hover {\r\n    --tw-text-opacity: 1;\r\n    color: rgb(31 31 31 / var(--tw-text-opacity, 1))\n}\r\n.focus\\:outline-none:focus {\r\n    outline: 2px solid transparent;\r\n    outline-offset: 2px\n}\r\n.disabled\\:cursor-not-allowed:disabled {\r\n    cursor: not-allowed\n}\r\n.disabled\\:opacity-50:disabled {\r\n    opacity: 0.5\n}\r\n";
 var styles_gen_default = styles;
 
 // src/components/BuggyBag.tsx

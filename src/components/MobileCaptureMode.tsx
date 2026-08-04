@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import type { DrawShape, PinElementContext, SubmitBugPayload } from '../types';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
-import { capturePageScreenshot } from '../lib/screenshot';
+import { buildImageRecovery, capturePageScreenshot } from '../lib/screenshot';
 
 interface MobileCaptureModeProps {
   apiKey: string;
@@ -35,7 +35,7 @@ function resolvePageElement(x: number, y: number): HTMLElement | null {
  * getPinElementContext / capturePageScreenshot), so the portal renders these
  * reports identically to desktop ones.
  */
-export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureModeProps) {
+export function MobileCaptureMode({ apiKey, portalUrl, onSend, onCancel }: MobileCaptureModeProps) {
   const [pin, setPin] = useState<PendingPin | null>(null);
   const [description, setDescription] = useState('');
   const [sending, setSending] = useState(false);
@@ -62,7 +62,12 @@ export function MobileCaptureMode({ apiKey, onSend, onCancel }: MobileCaptureMod
     try {
       // capturePageScreenshot hides the whole widget host (this UI included)
       // while it snapshots, so the pin marker / sheet never end up in the shot.
-      const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot();
+      const { imageUrl, fallbackUsed, renderer } = await capturePageScreenshot(
+        null,
+        undefined,
+        undefined,
+        buildImageRecovery(apiKey, portalUrl),
+      );
       const shapeId = `pin-${Date.now()}`;
       const shape: DrawShape = {
         id: shapeId,
