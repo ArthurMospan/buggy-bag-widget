@@ -20,7 +20,9 @@
   ],
   "license": "MIT",
   "scripts": {
+    "predev": "node scripts/patch-html2canvas.cjs",
     "dev": "tsup --watch",
+    "prebuild": "node scripts/patch-html2canvas.cjs",
     "build": "tsup",
     "postbuild": "node -e \"require('fs').copyFileSync('dist/buggy-bag-standalone.global.js', '../buggy-bag-portal/public/buggy-bag-standalone.js')\"",
     "prepublishOnly": "npm run build"
@@ -31,7 +33,7 @@
   },
   "dependencies": {
     "html-to-image": "1.11.13",
-    "html2canvas": "^1.4.1",
+    "html2canvas": "1.4.1",
     "konva": "^9.3.19",
     "lucide-react": "^0.468.0",
     "react-konva": "^18.2.10",

@@ -213,11 +213,34 @@ function clearScrollPositionMarks(positions: MarkedScrollPosition[]): void {
   });
 }
 
+const HTML2CANVAS_FONT_METRICS_IMAGE =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+/**
+ * html2canvas measures every font baseline with a temporary inline image.
+ * Tailwind Preflight changes all images to `display: block`, which makes that
+ * probe sit on the next line and shifts every canvas-painted glyph downward.
+ * Scope the reset to html2canvas's exact private 1x1 probe so page images are
+ * never changed, even for a frame.
+ */
+function installHtml2CanvasFontMetricsReset(): () => void {
+  const style = document.createElement('style');
+  style.setAttribute('data-buggy-bag', 'html2canvas-font-metrics-reset');
+  style.textContent = `
+    body > div[style*="visibility: hidden"] > img[src="${HTML2CANVAS_FONT_METRICS_IMAGE}"] {
+      display: inline-block !important;
+    }
+  `;
+  document.head.appendChild(style);
+  return () => style.remove();
+}
+
 async function renderViewportWithHtml2Canvas(
   viewport: CaptureViewport,
   normalizeModernColors: boolean,
 ): Promise<string> {
   const scrollPositions = markScrollPositions();
+  const removeFontMetricsReset = installHtml2CanvasFontMetricsReset();
   try {
     const canvas = await html2canvas(document.documentElement, {
       width: viewport.width,
@@ -244,6 +267,7 @@ async function renderViewportWithHtml2Canvas(
 
     return canvas.toDataURL('image/png');
   } finally {
+    removeFontMetricsReset();
     clearScrollPositionMarks(scrollPositions);
   }
 }
@@ -333,15 +357,42 @@ function normalizeUnsupportedColors(clonedDocument: Document): void {
     return result + source.slice(cursor);
   };
 
-  clonedDocument.querySelectorAll<HTMLElement>('*').forEach(element => {
+  const elements = Array.from(clonedDocument.querySelectorAll<HTMLElement>('*'));
+
+  elements.forEach(element => {
     const computed = view.getComputedStyle(element);
+    const updates: Array<{ property: string; value: string }> = [];
     // Modern colors also occur in gradients, SVG fill/stroke and filters;
     // leaving one behind can force the html-to-image safe mode that cannot
     // preserve nested scroll state.
     COLOR_BEARING_PROPERTIES.forEach(property => {
-      const value = computed.getPropertyValue(property);
-      if (!value || !hasModernColor(value)) return;
-      element.style.setProperty(property, normalizeValue(value), 'important');
+      const originalValue = computed.getPropertyValue(property);
+      if (!originalValue) return;
+      let normalizedValue = hasModernColor(originalValue)
+        ? normalizeValue(originalValue)
+        : originalValue;
+      if (normalizedValue !== originalValue) {
+        updates.push({ property, value: normalizedValue });
+      }
+    });
+
+    if (updates.length === 0) return;
+
+    // A cloned element can restart transition-colors from its original oklab
+    // value. Disable transitions only on elements we actually normalize; a
+    // page-wide reset would move unrelated animated layout and annotations.
+    const transitioned = computed.transitionProperty
+      .split(',')
+      .map(property => property.trim());
+    const needsTransitionGuard = transitioned.includes('all') || updates.some(({ property }) =>
+      transitioned.includes(property) ||
+      (property.startsWith('border-') && transitioned.includes('border-color')),
+    );
+    if (needsTransitionGuard) {
+      element.style.setProperty('transition', 'none', 'important');
+    }
+    updates.forEach(({ property, value }) => {
+      element.style.setProperty(property, value, 'important');
     });
   });
 }

@@ -30252,8 +30252,21 @@ function clearScrollPositionMarks(positions) {
     else element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, previousAttribute);
   });
 }
+var HTML2CANVAS_FONT_METRICS_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+function installHtml2CanvasFontMetricsReset() {
+  const style = document.createElement("style");
+  style.setAttribute("data-buggy-bag", "html2canvas-font-metrics-reset");
+  style.textContent = `
+    body > div[style*="visibility: hidden"] > img[src="${HTML2CANVAS_FONT_METRICS_IMAGE}"] {
+      display: inline-block !important;
+    }
+  `;
+  document.head.appendChild(style);
+  return () => style.remove();
+}
 async function renderViewportWithHtml2Canvas(viewport, normalizeModernColors) {
   const scrollPositions = markScrollPositions();
+  const removeFontMetricsReset = installHtml2CanvasFontMetricsReset();
   try {
     const canvas = await (0, import_html2canvas.default)(document.documentElement, {
       width: viewport.width,
@@ -30279,6 +30292,7 @@ async function renderViewportWithHtml2Canvas(viewport, normalizeModernColors) {
     });
     return canvas.toDataURL("image/png");
   } finally {
+    removeFontMetricsReset();
     clearScrollPositionMarks(scrollPositions);
   }
 }
@@ -30359,12 +30373,28 @@ function normalizeUnsupportedColors(clonedDocument) {
     MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
     return result + source.slice(cursor);
   };
-  clonedDocument.querySelectorAll("*").forEach((element) => {
+  const elements = Array.from(clonedDocument.querySelectorAll("*"));
+  elements.forEach((element) => {
     const computed = view.getComputedStyle(element);
+    const updates = [];
     COLOR_BEARING_PROPERTIES.forEach((property) => {
-      const value = computed.getPropertyValue(property);
-      if (!value || !hasModernColor(value)) return;
-      element.style.setProperty(property, normalizeValue(value), "important");
+      const originalValue = computed.getPropertyValue(property);
+      if (!originalValue) return;
+      let normalizedValue = hasModernColor(originalValue) ? normalizeValue(originalValue) : originalValue;
+      if (normalizedValue !== originalValue) {
+        updates.push({ property, value: normalizedValue });
+      }
+    });
+    if (updates.length === 0) return;
+    const transitioned = computed.transitionProperty.split(",").map((property) => property.trim());
+    const needsTransitionGuard = transitioned.includes("all") || updates.some(
+      ({ property }) => transitioned.includes(property) || property.startsWith("border-") && transitioned.includes("border-color")
+    );
+    if (needsTransitionGuard) {
+      element.style.setProperty("transition", "none", "important");
+    }
+    updates.forEach(({ property, value }) => {
+      element.style.setProperty(property, value, "important");
     });
   });
 }
