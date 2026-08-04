@@ -6,7 +6,6 @@ import { MobileCaptureMode } from './MobileCaptureMode';
 import { initCollector } from '../lib/collector';
 import { detectFavicon } from '../lib/favicon';
 import { isRealMobileDevice } from '../lib/device';
-import { capturePageScreenshot } from '../lib/screenshot';
 import type { SubmitBugPayload, DrawTool } from '../types';
 import widgetStyles from '../styles.gen';
 
@@ -56,8 +55,6 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
   const [projectUrl, setProjectUrl] = useState<string | null>(null);
   const [draftCount, setDraftCount] = useState(0);
   const [draftConflict, setDraftConflict] = useState<{ path: string; count: number } | null>(null);
-  const [frozenScreenshot, setFrozenScreenshot] = useState<string | null>(null);
-  const [capturingFrozen, setCapturingFrozen] = useState(false);
 
   useEffect(() => { initCollector(); }, []);
 
@@ -115,7 +112,6 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
         } catch (e) { }
       }
     }
-    
     setActiveTool('pin');
   };
 
@@ -282,9 +278,8 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
           initialTool={activeTool}
           apiKey={apiKey ?? ''}
           portalUrl={portalUrl}
-          frozenScreenshot={frozenScreenshot}
           onSend={handleSend}
-          onCancel={() => { setActiveTool(null); setFrozenScreenshot(null); }}
+          onCancel={() => setActiveTool(null)}
         />
       )}
 

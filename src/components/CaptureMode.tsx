@@ -4,13 +4,12 @@ import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditRe
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
-import { capturePageScreenshot, compositeScreenshot } from '../lib/screenshot';
+import { capturePageScreenshot } from '../lib/screenshot';
 
 interface CaptureModeProps {
   initialTool: DrawTool;
   apiKey: string;
   portalUrl?: string;
-  frozenScreenshot?: string | null;
   onSend: (payload: SubmitBugPayload) => void;
   onCancel: () => void;
 }
@@ -391,7 +390,7 @@ function disableZoom() {
 
 const isSafeHref = (h?: string) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
 
-export function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, onSend, onCancel }: CaptureModeProps) {
+export function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }: CaptureModeProps) {
   const [tool, setTool]         = useState<DrawTool>(initialTool);
   const [shapes, setShapes]     = useState<DrawShape[]>([]);
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
@@ -567,13 +566,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, 
     const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
     const annotationCanvas = host?.shadowRoot?.querySelector('canvas') ?? null;
 
-    let imageUrl = '';
-    let fallbackUsed = false;
-
-    // Capture page screenshot at send time
-    const result = await capturePageScreenshot(annotationCanvas);
-    imageUrl = result.imageUrl;
-    fallbackUsed = result.fallbackUsed;
+    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas);
 
     setIsCapturing(false);
     try { 
@@ -581,6 +574,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, 
       window.dispatchEvent(new CustomEvent('buggy-bag:draft-changed'));
     } catch {}
 
+    // Fresh snapshot at send time — captures everything that happened during drawing.
     // Resolve the DOM element under the last shape's anchor point so tech_context.component is populated.
     let lastElement: HTMLElement | null = null;
     if (shapes.length > 0) {
@@ -646,7 +640,7 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, 
       description: finalDescription,
       tech_context: freshTechContext
     });
-  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult, frozenScreenshot]);
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
 
   const handleCloseRequest = useCallback(() => {
     if (shapes.length > 0) { setShowExitConfirm(true); } 
@@ -1247,8 +1241,6 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, 
           </div>
         </div>
       )}
-
-
 
       {/* Drawing canvas — ALWAYS rendered (visible behind popup too) */}
       {!showExitConfirm && (

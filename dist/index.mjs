@@ -30137,9 +30137,13 @@ async function capturePageScreenshot(annotationCanvas) {
     const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     let pageDataUrl = "";
     try {
-      pageDataUrl = await toPng(document.documentElement, {
+      pageDataUrl = await toPng(document.body, {
         width: window.innerWidth,
         height: window.innerHeight,
+        style: {
+          marginTop: `-${window.scrollY}px`,
+          marginLeft: `-${window.scrollX}px`
+        },
         pixelRatio: 1,
         imagePlaceholder: transparentPixel,
         filter: (node) => {
@@ -30155,9 +30159,13 @@ async function capturePageScreenshot(annotationCanvas) {
       console.warn("[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...", tier1Err);
       fallbackUsed = true;
       try {
-        pageDataUrl = await toPng(document.documentElement, {
+        pageDataUrl = await toPng(document.body, {
           width: window.innerWidth,
           height: window.innerHeight,
+          style: {
+            marginTop: `-${window.scrollY}px`,
+            marginLeft: `-${window.scrollX}px`
+          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           filter: (node) => {
@@ -30168,9 +30176,13 @@ async function capturePageScreenshot(annotationCanvas) {
         });
       } catch (tier2Err) {
         console.warn("[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...", tier2Err);
-        pageDataUrl = await toPng(document.documentElement, {
+        pageDataUrl = await toPng(document.body, {
           width: window.innerWidth,
           height: window.innerHeight,
+          style: {
+            marginTop: `-${window.scrollY}px`,
+            marginLeft: `-${window.scrollX}px`
+          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           skipFonts: true,
@@ -30604,7 +30616,7 @@ function disableZoom() {
   }
 }
 var isSafeHref = (h) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
-function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, onSend, onCancel }) {
+function CaptureMode({ initialTool, apiKey, portalUrl, onSend, onCancel }) {
   const [tool, setTool] = useState4(initialTool);
   const [shapes, setShapes] = useState4([]);
   const [annotations, setAnnotations] = useState4({});
@@ -30764,11 +30776,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, onSend,
     await new Promise((r) => setTimeout(r, 80));
     const host = document.querySelector("#buggy-bag-host");
     const annotationCanvas = host?.shadowRoot?.querySelector("canvas") ?? null;
-    let imageUrl = "";
-    let fallbackUsed = false;
-    const result = await capturePageScreenshot(annotationCanvas);
-    imageUrl = result.imageUrl;
-    fallbackUsed = result.fallbackUsed;
+    const { imageUrl, fallbackUsed } = await capturePageScreenshot(annotationCanvas);
     setIsCapturing(false);
     try {
       localStorage.removeItem(`BUGGY_BAG_DRAFT_${window.location.pathname}`);
@@ -30835,7 +30843,7 @@ function CaptureMode({ initialTool, apiKey, portalUrl, frozenScreenshot, onSend,
       description: finalDescription,
       tech_context: freshTechContext
     });
-  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult, frozenScreenshot]);
+  }, [shapes, annotations, shapeAttachments, apiKey, onSend, sending, designAuditResult]);
   const handleCloseRequest = useCallback2(() => {
     if (shapes.length > 0) {
       setShowExitConfirm(true);
@@ -32562,8 +32570,6 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   const [projectUrl, setProjectUrl] = useState6(null);
   const [draftCount, setDraftCount] = useState6(0);
   const [draftConflict, setDraftConflict] = useState6(null);
-  const [frozenScreenshot, setFrozenScreenshot] = useState6(null);
-  const [capturingFrozen, setCapturingFrozen] = useState6(false);
   useEffect5(() => {
     initCollector();
   }, []);
@@ -32773,12 +32779,8 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         initialTool: activeTool,
         apiKey: apiKey ?? "",
         portalUrl,
-        frozenScreenshot,
         onSend: handleSend,
-        onCancel: () => {
-          setActiveTool(null);
-          setFrozenScreenshot(null);
-        }
+        onCancel: () => setActiveTool(null)
       }
     ),
     mobileCapture && /* @__PURE__ */ jsx6(

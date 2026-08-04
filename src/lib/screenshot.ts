@@ -33,9 +33,13 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
     
     try {
       // Tier 1: High quality, fetch everything (except favicons which are always skipped)
-      pageDataUrl = await toPng(document.documentElement, {
+      pageDataUrl = await toPng(document.body, {
         width: window.innerWidth,
         height: window.innerHeight,
+        style: {
+          marginTop: `-${window.scrollY}px`,
+          marginLeft: `-${window.scrollX}px`,
+        },
         pixelRatio: 1,
         imagePlaceholder: transparentPixel,
         filter: (node: HTMLElement) => {
@@ -53,9 +57,13 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
       
       try {
         // Tier 2: Strip risky elements (images, iframes, stylesheets) but PRESERVE fonts
-        pageDataUrl = await toPng(document.documentElement, {
+        pageDataUrl = await toPng(document.body, {
           width: window.innerWidth,
           height: window.innerHeight,
+          style: {
+            marginTop: `-${window.scrollY}px`,
+            marginLeft: `-${window.scrollX}px`,
+          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           filter: (node: HTMLElement) => {
@@ -67,9 +75,13 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
       } catch (tier2Err) {
         console.warn('[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...', tier2Err);
         // Tier 3: Absolute fallback, strip EVERYTHING including fonts
-        pageDataUrl = await toPng(document.documentElement, {
+        pageDataUrl = await toPng(document.body, {
           width: window.innerWidth,
           height: window.innerHeight,
+          style: {
+            marginTop: `-${window.scrollY}px`,
+            marginLeft: `-${window.scrollX}px`,
+          },
           pixelRatio: 1,
           imagePlaceholder: transparentPixel,
           skipFonts: true,
@@ -119,54 +131,6 @@ export async function capturePageScreenshot(annotationCanvas?: HTMLCanvasElement
   }
 
   return { imageUrl, fallbackUsed };
-}
-
-/**
- * Composites an annotation canvas on top of an already-captured base screenshot.
- * Used by the "freeze-page" flow: the page screenshot is taken once at the start
- * of capture mode, and annotations are overlaid at send time without re-capturing.
- */
-export async function compositeScreenshot(
-  baseImageUrl: string,
-  annotationCanvas: HTMLCanvasElement | null,
-  viewportWidth: number,
-  viewportHeight: number,
-): Promise<{ imageUrl: string; fallbackUsed: boolean }> {
-  let annotationDataUrl: string | null = null;
-  if (annotationCanvas) {
-    try { annotationDataUrl = annotationCanvas.toDataURL('image/png'); } catch { /* tainted canvas */ }
-  }
-
-  const composite = document.createElement('canvas');
-  composite.width = viewportWidth;
-  composite.height = viewportHeight;
-  const ctx = composite.getContext('2d');
-
-  if (!ctx) {
-    return { imageUrl: baseImageUrl, fallbackUsed: false };
-  }
-
-  // Draw the frozen page screenshot
-  await new Promise<void>(resolve => {
-    const img = new Image();
-    img.onload = () => { ctx.drawImage(img, 0, 0, viewportWidth, viewportHeight); resolve(); };
-    img.onerror = () => resolve();
-    img.src = baseImageUrl;
-  });
-
-  // Draw annotations on top
-  if (annotationDataUrl) {
-    await new Promise<void>(resolve => {
-      const img = new Image();
-      img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
-      img.onerror = () => resolve();
-      img.src = annotationDataUrl!;
-    });
-  }
-
-  let imageUrl = composite.toDataURL('image/png');
-  imageUrl = await compressDataUrl(imageUrl);
-  return { imageUrl, fallbackUsed: false };
 }
 
 /**
