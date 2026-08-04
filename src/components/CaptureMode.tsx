@@ -4,8 +4,8 @@ import type { DrawShape, DrawTool, SubmitBugPayload, DebugOverlay, DesignAuditRe
 import { DrawingCanvas } from './DrawingCanvas';
 import { ShapeAnnotation } from './ShapeAnnotation';
 import { collectTechContext, getPinElementContext } from '../lib/collector';
-import { capturePageScreenshot, compositeScreenshot, getCaptureViewport } from '../lib/screenshot';
-import type { CaptureViewport, ScreenshotResult } from '../lib/screenshot';
+import { capturePageScreenshot, compositeScreenshot, getCaptureScrollPositions, getCaptureViewport } from '../lib/screenshot';
+import type { CaptureScrollPosition, CaptureViewport, ScreenshotResult } from '../lib/screenshot';
 
 interface CaptureModeProps {
   initialTool: DrawTool;
@@ -13,6 +13,7 @@ interface CaptureModeProps {
   portalUrl?: string;
   initialScreenshot?: Promise<ScreenshotResult>;
   captureViewport?: CaptureViewport;
+  captureScrollPositions?: CaptureScrollPosition[];
   onSend: (payload: SubmitBugPayload) => void;
   onCancel: () => void;
 }
@@ -393,7 +394,7 @@ function disableZoom() {
 
 const isSafeHref = (h?: string) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
 
-export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captureViewport, onSend, onCancel }: CaptureModeProps) {
+export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captureViewport, captureScrollPositions, onSend, onCancel }: CaptureModeProps) {
   const [tool, setTool]         = useState<DrawTool>(initialTool);
   const [shapes, setShapes]     = useState<DrawShape[]>([]);
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
@@ -447,18 +448,35 @@ export function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot,
   // scroll position so fixed canvas coordinates cannot drift from its frame.
   useEffect(() => {
     const lockedViewport = captureViewport ?? getCaptureViewport();
+    const lockedElements = captureScrollPositions ?? getCaptureScrollPositions();
     let restoring = false;
     const restoreScroll = () => {
       if (restoring) return;
-      if (window.scrollX === lockedViewport.scrollX && window.scrollY === lockedViewport.scrollY) return;
+
+      const windowMoved = window.scrollX !== lockedViewport.scrollX || window.scrollY !== lockedViewport.scrollY;
+      const movedElements = lockedElements.filter(({ element, scrollLeft, scrollTop }) =>
+        element.isConnected && (element.scrollLeft !== scrollLeft || element.scrollTop !== scrollTop)
+      );
+      if (!windowMoved && movedElements.length === 0) return;
+
       restoring = true;
-      window.scrollTo(lockedViewport.scrollX, lockedViewport.scrollY);
+      if (windowMoved) window.scrollTo(lockedViewport.scrollX, lockedViewport.scrollY);
+      movedElements.forEach(({ element, scrollLeft, scrollTop }) => {
+        element.scrollLeft = scrollLeft;
+        element.scrollTop = scrollTop;
+      });
       requestAnimationFrame(() => { restoring = false; });
     };
 
     window.addEventListener('scroll', restoreScroll, { passive: true });
-    return () => window.removeEventListener('scroll', restoreScroll);
-  }, [captureViewport]);
+    lockedElements.forEach(({ element }) => element.addEventListener('scroll', restoreScroll, { passive: true }));
+    restoreScroll();
+
+    return () => {
+      window.removeEventListener('scroll', restoreScroll);
+      lockedElements.forEach(({ element }) => element.removeEventListener('scroll', restoreScroll));
+    };
+  }, [captureViewport, captureScrollPositions]);
 
   const handleShapeComplete = useCallback(async (shape: DrawShape) => {
     // Compute anchor point per shape type so every annotation carries DOM context

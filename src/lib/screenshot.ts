@@ -13,6 +13,12 @@ export interface ScreenshotResult {
   fallbackUsed: boolean;
 }
 
+export interface CaptureScrollPosition {
+  element: HTMLElement;
+  scrollLeft: number;
+  scrollTop: number;
+}
+
 export function getCaptureViewport(): CaptureViewport {
   return {
     scrollX: window.scrollX,
@@ -20,6 +26,41 @@ export function getCaptureViewport(): CaptureViewport {
     width: window.innerWidth,
     height: window.innerHeight,
   };
+}
+
+/**
+ * Snapshot every independently scrollable container in the inspected page.
+ * A report's drawing canvas uses viewport coordinates, so allowing any of
+ * these containers to move after the base screenshot is captured would put
+ * the page pixels and annotations into different coordinate systems.
+ */
+export function getCaptureScrollPositions(): CaptureScrollPosition[] {
+  const positions: CaptureScrollPosition[] = [];
+  const documentScroller = document.scrollingElement;
+
+  const visit = (root: Document | ShadowRoot) => {
+    root.querySelectorAll<HTMLElement>('*').forEach(element => {
+      if (isWidgetElement(element)) return;
+
+      if (
+        element !== documentScroller &&
+        element !== document.documentElement &&
+        element !== document.body &&
+        (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth)
+      ) {
+        positions.push({
+          element,
+          scrollLeft: element.scrollLeft,
+          scrollTop: element.scrollTop,
+        });
+      }
+
+      if (element.shadowRoot) visit(element.shadowRoot);
+    });
+  };
+
+  visit(document);
+  return positions;
 }
 
 function isWidgetElement(element: Element): boolean {

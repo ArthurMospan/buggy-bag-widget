@@ -6,8 +6,8 @@ import { MobileCaptureMode } from './MobileCaptureMode';
 import { initCollector } from '../lib/collector';
 import { detectFavicon } from '../lib/favicon';
 import { isRealMobileDevice } from '../lib/device';
-import { capturePageScreenshot, getCaptureViewport } from '../lib/screenshot';
-import type { CaptureViewport, ScreenshotResult } from '../lib/screenshot';
+import { capturePageScreenshot, getCaptureScrollPositions, getCaptureViewport } from '../lib/screenshot';
+import type { CaptureScrollPosition, CaptureViewport, ScreenshotResult } from '../lib/screenshot';
 import type { SubmitBugPayload, DrawTool } from '../types';
 import widgetStyles from '../styles.gen';
 
@@ -19,6 +19,7 @@ export interface BuggyBagProps {
 
 interface CaptureSession {
   viewport: CaptureViewport;
+  scrollPositions: CaptureScrollPosition[];
   screenshot: Promise<ScreenshotResult>;
 }
 
@@ -92,10 +93,11 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
 
   const beginDesktopCapture = useCallback(() => {
     const viewport = getCaptureViewport();
+    const scrollPositions = getCaptureScrollPositions();
     // Start cloning the page in the same pointer event that opened the widget.
     // This preserves an open custom dropdown and records the exact scroll frame.
     const screenshot = capturePageScreenshot(null, viewport);
-    setCaptureSession({ viewport, screenshot });
+    setCaptureSession({ viewport, scrollPositions, screenshot });
     setActiveTool('pin');
   }, []);
 
@@ -316,6 +318,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }: BuggyBagProps) {
           portalUrl={portalUrl}
           initialScreenshot={captureSession?.screenshot}
           captureViewport={captureSession?.viewport}
+          captureScrollPositions={captureSession?.scrollPositions}
           onSend={handleSend}
           onCancel={() => { setActiveTool(null); setCaptureSession(null); }}
         />

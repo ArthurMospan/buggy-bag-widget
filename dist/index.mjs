@@ -30129,6 +30129,25 @@ function getCaptureViewport() {
     height: window.innerHeight
   };
 }
+function getCaptureScrollPositions() {
+  const positions = [];
+  const documentScroller = document.scrollingElement;
+  const visit = (root) => {
+    root.querySelectorAll("*").forEach((element) => {
+      if (isWidgetElement(element)) return;
+      if (element !== documentScroller && element !== document.documentElement && element !== document.body && (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth)) {
+        positions.push({
+          element,
+          scrollLeft: element.scrollLeft,
+          scrollTop: element.scrollTop
+        });
+      }
+      if (element.shadowRoot) visit(element.shadowRoot);
+    });
+  };
+  visit(document);
+  return positions;
+}
 function isWidgetElement(element) {
   return element.id === "buggy-bag-host" || element.hasAttribute("data-buggy-bag-standalone-root");
 }
@@ -30696,7 +30715,7 @@ function disableZoom() {
   }
 }
 var isSafeHref = (h) => !!h && /^(https?:|mailto:|tel:|\/|#)/i.test(h);
-function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captureViewport, onSend, onCancel }) {
+function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captureViewport, captureScrollPositions, onSend, onCancel }) {
   const [tool, setTool] = useState4(initialTool);
   const [shapes, setShapes] = useState4([]);
   const [annotations, setAnnotations] = useState4({});
@@ -30739,19 +30758,33 @@ function CaptureMode({ initialTool, apiKey, portalUrl, initialScreenshot, captur
   const h = typeof window !== "undefined" ? window.innerHeight : 800;
   useEffect4(() => {
     const lockedViewport = captureViewport ?? getCaptureViewport();
+    const lockedElements = captureScrollPositions ?? getCaptureScrollPositions();
     let restoring = false;
     const restoreScroll = () => {
       if (restoring) return;
-      if (window.scrollX === lockedViewport.scrollX && window.scrollY === lockedViewport.scrollY) return;
+      const windowMoved = window.scrollX !== lockedViewport.scrollX || window.scrollY !== lockedViewport.scrollY;
+      const movedElements = lockedElements.filter(
+        ({ element, scrollLeft, scrollTop }) => element.isConnected && (element.scrollLeft !== scrollLeft || element.scrollTop !== scrollTop)
+      );
+      if (!windowMoved && movedElements.length === 0) return;
       restoring = true;
-      window.scrollTo(lockedViewport.scrollX, lockedViewport.scrollY);
+      if (windowMoved) window.scrollTo(lockedViewport.scrollX, lockedViewport.scrollY);
+      movedElements.forEach(({ element, scrollLeft, scrollTop }) => {
+        element.scrollLeft = scrollLeft;
+        element.scrollTop = scrollTop;
+      });
       requestAnimationFrame(() => {
         restoring = false;
       });
     };
     window.addEventListener("scroll", restoreScroll, { passive: true });
-    return () => window.removeEventListener("scroll", restoreScroll);
-  }, [captureViewport]);
+    lockedElements.forEach(({ element }) => element.addEventListener("scroll", restoreScroll, { passive: true }));
+    restoreScroll();
+    return () => {
+      window.removeEventListener("scroll", restoreScroll);
+      lockedElements.forEach(({ element }) => element.removeEventListener("scroll", restoreScroll));
+    };
+  }, [captureViewport, captureScrollPositions]);
   const handleShapeComplete = useCallback2(async (shape) => {
     let anchorX;
     let anchorY;
@@ -32712,8 +32745,9 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
   }, []);
   const beginDesktopCapture = useCallback4(() => {
     const viewport = getCaptureViewport();
+    const scrollPositions = getCaptureScrollPositions();
     const screenshot = capturePageScreenshot(null, viewport);
-    setCaptureSession({ viewport, screenshot });
+    setCaptureSession({ viewport, scrollPositions, screenshot });
     setActiveTool("pin");
   }, []);
   const handleBugBtnClick = useCallback4(() => {
@@ -32918,6 +32952,7 @@ function BuggyBagInner({ apiEndpoint, apiKey, portalUrl }) {
         portalUrl,
         initialScreenshot: captureSession?.screenshot,
         captureViewport: captureSession?.viewport,
+        captureScrollPositions: captureSession?.scrollPositions,
         onSend: handleSend,
         onCancel: () => {
           setActiveTool(null);
