@@ -30120,7 +30120,6 @@ function collectTechContext(clickedElement) {
 }
 
 // src/lib/screenshot.ts
-import html2canvas from "html2canvas";
 function getCaptureViewport() {
   return {
     scrollX: window.scrollX,
@@ -30128,6 +30127,10 @@ function getCaptureViewport() {
     width: window.innerWidth,
     height: window.innerHeight
   };
+}
+function isWidgetElement(node) {
+  const element = node;
+  return element.id === "buggy-bag-host" || element.hasAttribute?.("data-buggy-bag-standalone-root") === true;
 }
 function getCaptureScrollPositions() {
   const positions = [];
@@ -30148,8 +30151,40 @@ function getCaptureScrollPositions() {
   visit(document);
   return positions;
 }
-function isWidgetElement(element) {
-  return element.id === "buggy-bag-host" || element.hasAttribute("data-buggy-bag-standalone-root");
+var SCROLL_SNAPSHOT_ATTRIBUTE = "data-buggy-bag-scroll-snapshot";
+var scrollSnapshotSequence = 0;
+function markScrollPositions(positions) {
+  return positions.map((position, index) => {
+    const id = `${++scrollSnapshotSequence}-${index}`;
+    const previousAttribute = position.element.getAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
+    position.element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, id);
+    return { ...position, id, previousAttribute };
+  });
+}
+function clearScrollPositionMarks(positions) {
+  positions.forEach(({ element, previousAttribute }) => {
+    if (previousAttribute === null) element.removeAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
+    else element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, previousAttribute);
+  });
+}
+function applyScrollOffsetsToClone(clonedRoot, positions) {
+  positions.forEach(({ id, scrollLeft, scrollTop }) => {
+    if (scrollLeft === 0 && scrollTop === 0) return;
+    const clone = clonedRoot.querySelector(
+      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`
+    );
+    if (!clone) return;
+    Array.from(clone.children).forEach((child) => {
+      if (!(child instanceof HTMLElement) && !(child instanceof SVGElement)) return;
+      const existing = child.style.transform && child.style.transform !== "none" ? ` ${child.style.transform}` : "";
+      child.style.setProperty(
+        "transform",
+        `translate(${-scrollLeft}px, ${-scrollTop}px)${existing}`,
+        "important"
+      );
+      child.style.setProperty("transform-origin", "top left", "important");
+    });
+  });
 }
 var TRANSIENT_OVERLAY_SELECTORS = [
   '[role="menu"]',
@@ -30220,200 +30255,7 @@ function preserveTransientOverlays() {
   document.body.appendChild(holder);
   return () => holder.remove();
 }
-var SCROLL_SNAPSHOT_ATTRIBUTE = "data-buggy-bag-scroll-snapshot";
-var scrollSnapshotSequence = 0;
-function markScrollPositions() {
-  return getCaptureScrollPositions().map((position, index) => {
-    const id = `${++scrollSnapshotSequence}-${index}`;
-    const previousAttribute = position.element.getAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
-    position.element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, id);
-    return { ...position, id, previousAttribute };
-  });
-}
-function restoreClonedScrollPositions(clonedDocument, positions) {
-  positions.forEach(({ id, scrollLeft, scrollTop }) => {
-    const clone = clonedDocument.querySelector(
-      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`
-    );
-    if (!clone) return;
-    clone.scrollLeft = scrollLeft;
-    clone.scrollTop = scrollTop;
-  });
-}
-function clearScrollPositionMarks(positions) {
-  positions.forEach(({ element, previousAttribute }) => {
-    if (previousAttribute === null) element.removeAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
-    else element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, previousAttribute);
-  });
-}
-var HTML2CANVAS_FONT_METRICS_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-function installHtml2CanvasFontMetricsReset() {
-  const style = document.createElement("style");
-  style.setAttribute("data-buggy-bag", "html2canvas-font-metrics-reset");
-  style.textContent = `
-    body > div[style*="visibility: hidden"] > img[src="${HTML2CANVAS_FONT_METRICS_IMAGE}"] {
-      display: inline-block !important;
-    }
-  `;
-  document.head.appendChild(style);
-  return () => style.remove();
-}
-async function renderViewportWithHtml2Canvas(viewport, normalizeModernColors) {
-  const scrollPositions = markScrollPositions();
-  const removeFontMetricsReset = installHtml2CanvasFontMetricsReset();
-  try {
-    const canvas = await html2canvas(document.documentElement, {
-      width: viewport.width,
-      height: viewport.height,
-      x: viewport.scrollX,
-      y: viewport.scrollY,
-      scrollX: viewport.scrollX,
-      scrollY: viewport.scrollY,
-      windowWidth: viewport.width,
-      windowHeight: viewport.height,
-      scale: 1,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: null,
-      foreignObjectRendering: false,
-      imageTimeout: 5e3,
-      logging: false,
-      ignoreElements: isWidgetElement,
-      onclone: (clonedDocument) => {
-        if (normalizeModernColors) normalizeUnsupportedColors(clonedDocument);
-        restoreClonedScrollPositions(clonedDocument, scrollPositions);
-      }
-    });
-    return canvas.toDataURL("image/png");
-  } finally {
-    removeFontMetricsReset();
-    clearScrollPositionMarks(scrollPositions);
-  }
-}
-var MODERN_COLOR_FUNCTION_PATTERN = /\b(?:color-mix|oklch|oklab|lab|lch|color)\(/gi;
-var MODERN_COLOR_INTERPOLATION_PATTERN = /\bin\s+(?:oklab|oklch|lab|lch)\s*,/gi;
-var COLOR_BEARING_PROPERTIES = [
-  "color",
-  "background-color",
-  "background-image",
-  "list-style-image",
-  "border-top-color",
-  "border-right-color",
-  "border-bottom-color",
-  "border-left-color",
-  "outline-color",
-  "text-decoration-color",
-  "-webkit-text-stroke-color",
-  "column-rule-color",
-  "caret-color",
-  "accent-color",
-  "box-shadow",
-  "text-shadow",
-  "filter",
-  "fill",
-  "stroke",
-  "flood-color",
-  "lighting-color",
-  "stop-color"
-];
-function normalizeUnsupportedColors(clonedDocument) {
-  const colorCache = /* @__PURE__ */ new Map();
-  const converter = clonedDocument.createElement("canvas");
-  converter.width = 1;
-  converter.height = 1;
-  const ctx = converter.getContext("2d", { willReadFrequently: true });
-  const view = clonedDocument.defaultView;
-  if (!ctx || !view) return;
-  const toRgba = (color) => {
-    const cached = colorCache.get(color);
-    if (cached) return cached;
-    ctx.clearRect(0, 0, 1, 1);
-    ctx.fillStyle = "#000";
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, 1, 1);
-    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-    const normalized = `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
-    colorCache.set(color, normalized);
-    return normalized;
-  };
-  const hasModernColor = (value) => {
-    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
-    MODERN_COLOR_INTERPOLATION_PATTERN.lastIndex = 0;
-    const result = MODERN_COLOR_FUNCTION_PATTERN.test(value) || MODERN_COLOR_INTERPOLATION_PATTERN.test(value);
-    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
-    MODERN_COLOR_INTERPOLATION_PATTERN.lastIndex = 0;
-    return result;
-  };
-  const normalizeValue = (value) => {
-    let source = value.replace(MODERN_COLOR_INTERPOLATION_PATTERN, "");
-    let result = "";
-    let cursor = 0;
-    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
-    let match;
-    while (match = MODERN_COLOR_FUNCTION_PATTERN.exec(source)) {
-      const start = match.index;
-      let depth = 1;
-      let end = MODERN_COLOR_FUNCTION_PATTERN.lastIndex;
-      while (end < source.length && depth > 0) {
-        if (source[end] === "(") depth += 1;
-        else if (source[end] === ")") depth -= 1;
-        end += 1;
-      }
-      if (depth !== 0) break;
-      result += source.slice(cursor, start) + toRgba(source.slice(start, end));
-      cursor = end;
-      MODERN_COLOR_FUNCTION_PATTERN.lastIndex = end;
-    }
-    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
-    return result + source.slice(cursor);
-  };
-  const elements = Array.from(clonedDocument.querySelectorAll("*"));
-  elements.forEach((element) => {
-    const computed = view.getComputedStyle(element);
-    const updates = [];
-    COLOR_BEARING_PROPERTIES.forEach((property) => {
-      const originalValue = computed.getPropertyValue(property);
-      if (!originalValue) return;
-      let normalizedValue = hasModernColor(originalValue) ? normalizeValue(originalValue) : originalValue;
-      if (normalizedValue !== originalValue) {
-        updates.push({ property, value: normalizedValue });
-      }
-    });
-    if (updates.length === 0) return;
-    const transitioned = computed.transitionProperty.split(",").map((property) => property.trim());
-    const needsTransitionGuard = transitioned.includes("all") || updates.some(
-      ({ property }) => transitioned.includes(property) || property.startsWith("border-") && transitioned.includes("border-color")
-    );
-    if (needsTransitionGuard) {
-      element.style.setProperty("transition", "none", "important");
-    }
-    updates.forEach(({ property, value }) => {
-      element.style.setProperty(property, value, "important");
-    });
-  });
-}
-function applyScrollOffsetsToForeignObjectClone(clonedRoot, positions) {
-  const translateChildren = (container, scrollLeft, scrollTop) => {
-    Array.from(container.children).forEach((child) => {
-      if (!(child instanceof HTMLElement) && !(child instanceof SVGElement)) return;
-      const existingTransform = child.style.transform && child.style.transform !== "none" ? child.style.transform : "";
-      child.style.setProperty(
-        "transform",
-        `translate(${-scrollLeft}px, ${-scrollTop}px)${existingTransform ? ` ${existingTransform}` : ""}`,
-        "important"
-      );
-      child.style.setProperty("transform-origin", "top left", "important");
-    });
-  };
-  positions.forEach(({ id, scrollLeft, scrollTop }) => {
-    if (scrollLeft === 0 && scrollTop === 0) return;
-    const clone = clonedRoot.querySelector(
-      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`
-    );
-    if (!clone) return;
-    translateChildren(clone, scrollLeft, scrollTop);
-  });
-}
+var TRANSPARENT_PIXEL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 function resolvePageBackgroundColor() {
   for (const element of [document.documentElement, document.body]) {
     if (!element) continue;
@@ -30425,31 +30267,13 @@ function resolvePageBackgroundColor() {
   }
   return "#ffffff";
 }
-async function renderViewportWithHtmlToImage(viewport) {
-  const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+async function renderTier(viewport, scrollPositions, options) {
   const backgroundColor = resolvePageBackgroundColor();
-  const options = {
-    width: viewport.width,
-    height: viewport.height,
-    style: {
-      transform: `translate(${-viewport.scrollX}px, ${-viewport.scrollY}px)`,
-      transformOrigin: "top left",
-      width: `${Math.max(document.documentElement.scrollWidth, viewport.width)}px`,
-      height: `${Math.max(document.documentElement.scrollHeight, viewport.height)}px`
-    },
-    pixelRatio: 1,
-    imagePlaceholder: transparentPixel,
-    filter: (node) => {
-      if (node.id === "buggy-bag-host" || node.hasAttribute?.("data-buggy-bag-standalone-root")) return false;
-      if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "VIDEO") return false;
-      return true;
-    }
-  };
-  const scrollPositions = markScrollPositions();
+  const marked = markScrollPositions(scrollPositions);
   try {
-    const clonedRoot = await cloneNode(document.documentElement, options, true);
+    const clonedRoot = await cloneNode(document.body, options, true);
     if (!clonedRoot) throw new Error("Unable to clone document for screenshot");
-    applyScrollOffsetsToForeignObjectClone(clonedRoot, scrollPositions);
+    applyScrollOffsetsToClone(clonedRoot, marked);
     await embedWebFonts(clonedRoot, options);
     await embedImages(clonedRoot, options);
     applyStyle(clonedRoot, options);
@@ -30465,10 +30289,23 @@ async function renderViewportWithHtmlToImage(viewport) {
     context.drawImage(image, 0, 0, viewport.width, viewport.height);
     return canvas.toDataURL("image/png");
   } finally {
-    clearScrollPositionMarks(scrollPositions);
+    clearScrollPositionMarks(marked);
   }
 }
-async function capturePageScreenshot(annotationCanvas, viewport = getCaptureViewport()) {
+function baseOptions(viewport) {
+  return {
+    width: viewport.width,
+    height: viewport.height,
+    style: {
+      marginTop: `-${viewport.scrollY}px`,
+      marginLeft: `-${viewport.scrollX}px`
+    },
+    pixelRatio: 1,
+    imagePlaceholder: TRANSPARENT_PIXEL
+  };
+}
+async function capturePageScreenshot(annotationCanvas, viewport = getCaptureViewport(), scrollPositions = getCaptureScrollPositions()) {
+  const host = document.querySelector("#buggy-bag-host");
   let annotationDataUrl = null;
   if (annotationCanvas) {
     try {
@@ -30476,24 +30313,51 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
     } catch {
     }
   }
+  const prevOpacity = host?.style.opacity ?? "";
+  if (host) host.style.opacity = "0";
   let imageUrl = "";
   let fallbackUsed = false;
   let renderer = "failed";
   try {
     let pageDataUrl = "";
     try {
-      pageDataUrl = await renderViewportWithHtmlToImage(viewport);
-      renderer = "html-to-image-scroll-aware";
+      pageDataUrl = await renderTier(viewport, scrollPositions, {
+        ...baseOptions(viewport),
+        filter: (node) => {
+          if (isWidgetElement(node)) return false;
+          if (node.tagName === "LINK") {
+            const rel = node.rel?.toLowerCase() || "";
+            if (rel.includes("icon")) return false;
+          }
+          return true;
+        }
+      });
+      renderer = "html-to-image";
     } catch (tier1Err) {
-      console.warn("[BuggyBag] Tier 1 screenshot failed, falling back to html2canvas...", tier1Err);
+      console.warn("[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...", tier1Err);
       fallbackUsed = true;
       try {
-        pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
-        renderer = "html2canvas";
+        pageDataUrl = await renderTier(viewport, scrollPositions, {
+          ...baseOptions(viewport),
+          filter: (node) => {
+            if (isWidgetElement(node)) return false;
+            if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "IMG" || node.tagName === "VIDEO") return false;
+            return true;
+          }
+        });
+        renderer = "html-to-image-no-media";
       } catch (tier2Err) {
-        console.warn("[BuggyBag] Tier 2 screenshot failed, normalizing modern CSS colors...", tier2Err);
-        pageDataUrl = await renderViewportWithHtml2Canvas(viewport, true);
-        renderer = "html2canvas-normalized";
+        console.warn("[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...", tier2Err);
+        pageDataUrl = await renderTier(viewport, scrollPositions, {
+          ...baseOptions(viewport),
+          skipFonts: true,
+          filter: (node) => {
+            if (isWidgetElement(node)) return false;
+            if (node.tagName === "LINK" || node.tagName === "IFRAME" || node.tagName === "IMG" || node.tagName === "VIDEO" || node.tagName === "SVG") return false;
+            return true;
+          }
+        });
+        renderer = "html-to-image-safe";
       }
     }
     if (annotationDataUrl) {
@@ -30529,6 +30393,8 @@ async function capturePageScreenshot(annotationCanvas, viewport = getCaptureView
     }
   } catch (e) {
     console.warn("[BuggyBag] screenshot completely failed", e);
+  } finally {
+    if (host) host.style.opacity = prevOpacity;
   }
   if (imageUrl) {
     imageUrl = await compressDataUrl(imageUrl);

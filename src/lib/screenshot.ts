@@ -1,4 +1,3 @@
-import html2canvas from 'html2canvas';
 import { applyStyle } from 'html-to-image/es/apply-style';
 import { cloneNode } from 'html-to-image/es/clone-node';
 import { embedImages } from 'html-to-image/es/embed-images';
@@ -20,9 +19,9 @@ export interface ScreenshotResult {
 }
 
 export type ScreenshotRenderer =
-  | 'html-to-image-scroll-aware'
-  | 'html2canvas'
-  | 'html2canvas-normalized'
+  | 'html-to-image'
+  | 'html-to-image-no-media'
+  | 'html-to-image-safe'
   | 'failed';
 
 export interface CaptureScrollPosition {
@@ -38,6 +37,17 @@ export function getCaptureViewport(): CaptureViewport {
     width: window.innerWidth,
     height: window.innerHeight,
   };
+}
+
+/**
+ * html-to-image's `filter` runs against every node in the tree, text and
+ * comment nodes included, so this must not assume an Element is on the other
+ * end — a bare `hasAttribute` call there throws and fails the whole capture.
+ */
+function isWidgetElement(node: Node): boolean {
+  const element = node as Partial<Element>;
+  return element.id === 'buggy-bag-host' ||
+    element.hasAttribute?.('data-buggy-bag-standalone-root') === true;
 }
 
 /**
@@ -75,9 +85,80 @@ export function getCaptureScrollPositions(): CaptureScrollPosition[] {
   return positions;
 }
 
-function isWidgetElement(element: Element): boolean {
-  return element.id === 'buggy-bag-host' || element.hasAttribute('data-buggy-bag-standalone-root');
+/* ------------------------------------------------------------------ *
+ * Fix 1 of 2 — nested scroll
+ *
+ * html-to-image serializes a deep DOM clone, but scrollTop/scrollLeft is
+ * runtime state rather than an attribute, so every scrolled container came
+ * back rewound to the top. In an app whose scrolling lives in a container
+ * rather than the document, that is exactly what made the screenshot show
+ * a different part of the page than the annotations pointed at.
+ * ------------------------------------------------------------------ */
+
+const SCROLL_SNAPSHOT_ATTRIBUTE = 'data-buggy-bag-scroll-snapshot';
+let scrollSnapshotSequence = 0;
+
+interface MarkedScrollPosition extends CaptureScrollPosition {
+  id: string;
+  previousAttribute: string | null;
 }
+
+/** Give every live scroller a short-lived identity so its offset can be
+ *  matched to the corresponding node in the clone. */
+function markScrollPositions(positions: CaptureScrollPosition[]): MarkedScrollPosition[] {
+  return positions.map((position, index) => {
+    const id = `${++scrollSnapshotSequence}-${index}`;
+    const previousAttribute = position.element.getAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
+    position.element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, id);
+    return { ...position, id, previousAttribute };
+  });
+}
+
+function clearScrollPositionMarks(positions: MarkedScrollPosition[]): void {
+  positions.forEach(({ element, previousAttribute }) => {
+    if (previousAttribute === null) element.removeAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
+    else element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, previousAttribute);
+  });
+}
+
+/** Bake each container's scroll offset into a transform on its children, so
+ *  the SVG foreignObject paints the region the user was actually looking at. */
+function applyScrollOffsetsToClone(
+  clonedRoot: HTMLElement,
+  positions: MarkedScrollPosition[],
+): void {
+  positions.forEach(({ id, scrollLeft, scrollTop }) => {
+    if (scrollLeft === 0 && scrollTop === 0) return;
+    const clone = clonedRoot.querySelector<HTMLElement>(
+      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`,
+    );
+    if (!clone) return;
+
+    Array.from(clone.children).forEach(child => {
+      if (!(child instanceof HTMLElement) && !(child instanceof SVGElement)) return;
+      // Keep whatever transform the element already had; add the baked scroll
+      // movement as one more function rather than replacing it.
+      const existing = child.style.transform && child.style.transform !== 'none'
+        ? ` ${child.style.transform}`
+        : '';
+      child.style.setProperty(
+        'transform',
+        `translate(${-scrollLeft}px, ${-scrollTop}px)${existing}`,
+        'important',
+      );
+      child.style.setProperty('transform-origin', 'top left', 'important');
+    });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Fix 2 of 2 — keep an open dropdown on the shot
+ *
+ * The inspected app's outside-click handlers close its menus the moment the
+ * widget is clicked, so the popup the user wanted to report was gone before
+ * the DOM could be cloned. Keep a non-interactive visual copy alive for the
+ * duration of the annotation session.
+ * ------------------------------------------------------------------ */
 
 const TRANSIENT_OVERLAY_SELECTORS = [
   '[role="menu"]',
@@ -120,12 +201,6 @@ function copyComputedStyles(source: HTMLElement, clone: HTMLElement): void {
   });
 }
 
-/**
- * Keep only transient popup pixels (menus/listboxes) visible while the user
- * interacts with the widget. Page outside-click handlers may close the real
- * popup as soon as the annotation canvas is clicked; this visual clone keeps
- * the report faithful without freezing the whole page screenshot.
- */
 export function preserveTransientOverlays(): () => void {
   const candidates = Array.from(document.querySelectorAll<HTMLElement>(TRANSIENT_OVERLAY_SELECTORS))
     .filter(isVisibleOverlay);
@@ -168,272 +243,18 @@ export function preserveTransientOverlays(): () => void {
   return () => holder.remove();
 }
 
-const SCROLL_SNAPSHOT_ATTRIBUTE = 'data-buggy-bag-scroll-snapshot';
-let scrollSnapshotSequence = 0;
+/* ------------------------------------------------------------------ */
 
-interface MarkedScrollPosition extends CaptureScrollPosition {
-  id: string;
-  previousAttribute: string | null;
-}
+const TRANSPARENT_PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 /**
- * html2canvas clones DOM nodes but does not reliably copy an element's
- * runtime scrollTop/scrollLeft, especially when its first render fails on a
- * modern CSS color and the normalized fallback clone is used. Give every
- * live scroller a short-lived identity so onclone can restore the runtime
- * values on the matching cloned node before it is painted.
- */
-function markScrollPositions(): MarkedScrollPosition[] {
-  return getCaptureScrollPositions().map((position, index) => {
-    const id = `${++scrollSnapshotSequence}-${index}`;
-    const previousAttribute = position.element.getAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
-    position.element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, id);
-    return { ...position, id, previousAttribute };
-  });
-}
-
-function restoreClonedScrollPositions(
-  clonedDocument: Document,
-  positions: MarkedScrollPosition[],
-): void {
-  positions.forEach(({ id, scrollLeft, scrollTop }) => {
-    const clone = clonedDocument.querySelector<HTMLElement>(
-      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`,
-    );
-    if (!clone) return;
-    clone.scrollLeft = scrollLeft;
-    clone.scrollTop = scrollTop;
-  });
-}
-
-function clearScrollPositionMarks(positions: MarkedScrollPosition[]): void {
-  positions.forEach(({ element, previousAttribute }) => {
-    if (previousAttribute === null) element.removeAttribute(SCROLL_SNAPSHOT_ATTRIBUTE);
-    else element.setAttribute(SCROLL_SNAPSHOT_ATTRIBUTE, previousAttribute);
-  });
-}
-
-const HTML2CANVAS_FONT_METRICS_IMAGE =
-  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-
-/**
- * html2canvas measures every font baseline with a temporary inline image.
- * Tailwind Preflight changes all images to `display: block`, which makes that
- * probe sit on the next line and shifts every canvas-painted glyph downward.
- * Scope the reset to html2canvas's exact private 1x1 probe so page images are
- * never changed, even for a frame.
- */
-function installHtml2CanvasFontMetricsReset(): () => void {
-  const style = document.createElement('style');
-  style.setAttribute('data-buggy-bag', 'html2canvas-font-metrics-reset');
-  style.textContent = `
-    body > div[style*="visibility: hidden"] > img[src="${HTML2CANVAS_FONT_METRICS_IMAGE}"] {
-      display: inline-block !important;
-    }
-  `;
-  document.head.appendChild(style);
-  return () => style.remove();
-}
-
-async function renderViewportWithHtml2Canvas(
-  viewport: CaptureViewport,
-  normalizeModernColors: boolean,
-): Promise<string> {
-  const scrollPositions = markScrollPositions();
-  const removeFontMetricsReset = installHtml2CanvasFontMetricsReset();
-  try {
-    const canvas = await html2canvas(document.documentElement, {
-      width: viewport.width,
-      height: viewport.height,
-      x: viewport.scrollX,
-      y: viewport.scrollY,
-      scrollX: viewport.scrollX,
-      scrollY: viewport.scrollY,
-      windowWidth: viewport.width,
-      windowHeight: viewport.height,
-      scale: 1,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: null,
-      foreignObjectRendering: false,
-      imageTimeout: 5000,
-      logging: false,
-      ignoreElements: isWidgetElement,
-      onclone: clonedDocument => {
-        if (normalizeModernColors) normalizeUnsupportedColors(clonedDocument);
-        restoreClonedScrollPositions(clonedDocument, scrollPositions);
-      },
-    });
-
-    return canvas.toDataURL('image/png');
-  } finally {
-    removeFontMetricsReset();
-    clearScrollPositionMarks(scrollPositions);
-  }
-}
-
-const MODERN_COLOR_FUNCTION_PATTERN = /\b(?:color-mix|oklch|oklab|lab|lch|color)\(/gi;
-const MODERN_COLOR_INTERPOLATION_PATTERN = /\bin\s+(?:oklab|oklch|lab|lch)\s*,/gi;
-const COLOR_BEARING_PROPERTIES = [
-  'color',
-  'background-color',
-  'background-image',
-  'list-style-image',
-  'border-top-color',
-  'border-right-color',
-  'border-bottom-color',
-  'border-left-color',
-  'outline-color',
-  'text-decoration-color',
-  '-webkit-text-stroke-color',
-  'column-rule-color',
-  'caret-color',
-  'accent-color',
-  'box-shadow',
-  'text-shadow',
-  'filter',
-  'fill',
-  'stroke',
-  'flood-color',
-  'lighting-color',
-  'stop-color',
-] as const;
-
-function normalizeUnsupportedColors(clonedDocument: Document): void {
-  const colorCache = new Map<string, string>();
-  const converter = clonedDocument.createElement('canvas');
-  converter.width = 1;
-  converter.height = 1;
-  const ctx = converter.getContext('2d', { willReadFrequently: true });
-  const view = clonedDocument.defaultView;
-  if (!ctx || !view) return;
-
-  const toRgba = (color: string): string => {
-    const cached = colorCache.get(color);
-    if (cached) return cached;
-    ctx.clearRect(0, 0, 1, 1);
-    ctx.fillStyle = '#000';
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, 1, 1);
-    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-    const normalized = `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
-    colorCache.set(color, normalized);
-    return normalized;
-  };
-
-  const hasModernColor = (value: string): boolean => {
-    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
-    MODERN_COLOR_INTERPOLATION_PATTERN.lastIndex = 0;
-    const result = MODERN_COLOR_FUNCTION_PATTERN.test(value) || MODERN_COLOR_INTERPOLATION_PATTERN.test(value);
-    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
-    MODERN_COLOR_INTERPOLATION_PATTERN.lastIndex = 0;
-    return result;
-  };
-
-  const normalizeValue = (value: string): string => {
-    // A simple `[^)]*` regexp truncates nested color-mix()/calc() values.
-    // Walk balanced parentheses so the browser can resolve the complete
-    // modern color function to an rgba pixel.
-    let source = value.replace(MODERN_COLOR_INTERPOLATION_PATTERN, '');
-    let result = '';
-    let cursor = 0;
-    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = MODERN_COLOR_FUNCTION_PATTERN.exec(source))) {
-      const start = match.index;
-      let depth = 1;
-      let end = MODERN_COLOR_FUNCTION_PATTERN.lastIndex;
-      while (end < source.length && depth > 0) {
-        if (source[end] === '(') depth += 1;
-        else if (source[end] === ')') depth -= 1;
-        end += 1;
-      }
-      if (depth !== 0) break;
-      result += source.slice(cursor, start) + toRgba(source.slice(start, end));
-      cursor = end;
-      MODERN_COLOR_FUNCTION_PATTERN.lastIndex = end;
-    }
-    MODERN_COLOR_FUNCTION_PATTERN.lastIndex = 0;
-    return result + source.slice(cursor);
-  };
-
-  const elements = Array.from(clonedDocument.querySelectorAll<HTMLElement>('*'));
-
-  elements.forEach(element => {
-    const computed = view.getComputedStyle(element);
-    const updates: Array<{ property: string; value: string }> = [];
-    // Modern colors also occur in gradients, SVG fill/stroke and filters;
-    // leaving one behind can force the html-to-image safe mode that cannot
-    // preserve nested scroll state.
-    COLOR_BEARING_PROPERTIES.forEach(property => {
-      const originalValue = computed.getPropertyValue(property);
-      if (!originalValue) return;
-      let normalizedValue = hasModernColor(originalValue)
-        ? normalizeValue(originalValue)
-        : originalValue;
-      if (normalizedValue !== originalValue) {
-        updates.push({ property, value: normalizedValue });
-      }
-    });
-
-    if (updates.length === 0) return;
-
-    // A cloned element can restart transition-colors from its original oklab
-    // value. Disable transitions only on elements we actually normalize; a
-    // page-wide reset would move unrelated animated layout and annotations.
-    const transitioned = computed.transitionProperty
-      .split(',')
-      .map(property => property.trim());
-    const needsTransitionGuard = transitioned.includes('all') || updates.some(({ property }) =>
-      transitioned.includes(property) ||
-      (property.startsWith('border-') && transitioned.includes('border-color')),
-    );
-    if (needsTransitionGuard) {
-      element.style.setProperty('transition', 'none', 'important');
-    }
-    updates.forEach(({ property, value }) => {
-      element.style.setProperty(property, value, 'important');
-    });
-  });
-}
-
-function applyScrollOffsetsToForeignObjectClone(
-  clonedRoot: HTMLElement,
-  positions: MarkedScrollPosition[],
-): void {
-  const translateChildren = (container: HTMLElement, scrollLeft: number, scrollTop: number) => {
-    Array.from(container.children).forEach(child => {
-      if (!(child instanceof HTMLElement) && !(child instanceof SVGElement)) return;
-      const existingTransform = child.style.transform && child.style.transform !== 'none'
-        ? child.style.transform
-        : '';
-      // Keep both the child's existing individual translate and its transform
-      // matrix; add the baked scroll movement as one more transform function.
-      child.style.setProperty(
-        'transform',
-        `translate(${-scrollLeft}px, ${-scrollTop}px)${existingTransform ? ` ${existingTransform}` : ''}`,
-        'important',
-      );
-      child.style.setProperty('transform-origin', 'top left', 'important');
-    });
-  };
-
-  positions.forEach(({ id, scrollLeft, scrollTop }) => {
-    if (scrollLeft === 0 && scrollTop === 0) return;
-    const clone = clonedRoot.querySelector<HTMLElement>(
-      `[${SCROLL_SNAPSHOT_ATTRIBUTE}="${id}"]`,
-    );
-    if (!clone) return;
-    translateChildren(clone, scrollLeft, scrollTop);
-  });
-}
-
-/**
- * A page's canvas background comes from `<html>`, or from `<body>` when the
- * root paints nothing (CSS background propagation). An SVG foreignObject has
- * no such propagation, so resolve the colour ourselves and paint it under the
- * frame — otherwise a page that relies on the browser default renders as a
- * transparent PNG and turns black once compressed to WebP/JPEG.
+ * The page background belongs to `<html>`, or to `<body>` when the root paints
+ * nothing (CSS background propagation). We clone `document.body`, so a root
+ * background is simply not in the tree and the frame comes back transparent.
+ * Resolve the colour the browser would have painted and put it under the
+ * frame — html-to-image's own `toCanvas` fills `options.backgroundColor` the
+ * same way.
  */
 function resolvePageBackgroundColor(): string {
   for (const element of [document.documentElement, document.body]) {
@@ -448,47 +269,22 @@ function resolvePageBackgroundColor(): string {
 }
 
 /**
- * Primary renderer: the browser itself paints the DOM through an SVG
- * foreignObject, so shadows, filters, modern colour functions and text
- * metrics come out exactly as they look on screen. html2canvas cannot do
- * this — it re-implements CSS painting in JS and silently drops whatever it
- * does not support.
- *
- * The scroll offset is applied as a `transform`, never as a margin: a
- * transform moves the painted pixels without touching layout, which is what
- * keeps the frame in the same coordinate system as the annotation canvas.
+ * Runs the same pipeline `html-to-image`'s `toPng` does, with one extra step:
+ * the nested scroll offsets are baked into the clone before it is serialized.
+ * That step is why this is spelled out rather than calling `toPng` directly —
+ * `toPng` never hands out the clone.
  */
-async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise<string> {
-  const transparentPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+async function renderTier(
+  viewport: CaptureViewport,
+  scrollPositions: CaptureScrollPosition[],
+  options: HtmlToImageOptions,
+): Promise<string> {
   const backgroundColor = resolvePageBackgroundColor();
-  const options: HtmlToImageOptions = {
-    width: viewport.width,
-    height: viewport.height,
-    style: {
-      transform: `translate(${-viewport.scrollX}px, ${-viewport.scrollY}px)`,
-      transformOrigin: 'top left',
-      width: `${Math.max(document.documentElement.scrollWidth, viewport.width)}px`,
-      height: `${Math.max(document.documentElement.scrollHeight, viewport.height)}px`,
-    },
-    pixelRatio: 1,
-    imagePlaceholder: transparentPixel,
-    filter: (node: HTMLElement) => {
-      if (node.id === 'buggy-bag-host' || node.hasAttribute?.('data-buggy-bag-standalone-root')) return false;
-      // cloneNode inlines every computed style, so the page keeps its looks
-      // without <link>; an IFRAME/VIDEO cannot paint inside a foreignObject.
-      if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'VIDEO') return false;
-      return true;
-    },
-  };
-
-  const scrollPositions = markScrollPositions();
+  const marked = markScrollPositions(scrollPositions);
   try {
-    // html-to-image normally serializes a deep clone but drops runtime
-    // scrollTop/scrollLeft. Build that clone ourselves, then bake every
-    // scroll offset into transforms before it becomes an SVG foreignObject.
-    const clonedRoot = await cloneNode(document.documentElement, options, true);
+    const clonedRoot = await cloneNode(document.body, options, true);
     if (!clonedRoot) throw new Error('Unable to clone document for screenshot');
-    applyScrollOffsetsToForeignObjectClone(clonedRoot, scrollPositions);
+    applyScrollOffsetsToClone(clonedRoot, marked);
     await embedWebFonts(clonedRoot, options);
     await embedImages(clonedRoot, options);
     applyStyle(clonedRoot, options);
@@ -505,8 +301,21 @@ async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise
     context.drawImage(image, 0, 0, viewport.width, viewport.height);
     return canvas.toDataURL('image/png');
   } finally {
-    clearScrollPositionMarks(scrollPositions);
+    clearScrollPositionMarks(marked);
   }
+}
+
+function baseOptions(viewport: CaptureViewport): HtmlToImageOptions {
+  return {
+    width: viewport.width,
+    height: viewport.height,
+    style: {
+      marginTop: `-${viewport.scrollY}px`,
+      marginLeft: `-${viewport.scrollX}px`,
+    },
+    pixelRatio: 1,
+    imagePlaceholder: TRANSPARENT_PIXEL,
+  };
 }
 
 /**
@@ -524,11 +333,18 @@ async function renderViewportWithHtmlToImage(viewport: CaptureViewport): Promise
 export async function capturePageScreenshot(
   annotationCanvas?: HTMLCanvasElement | null,
   viewport: CaptureViewport = getCaptureViewport(),
+  scrollPositions: CaptureScrollPosition[] = getCaptureScrollPositions(),
 ): Promise<ScreenshotResult> {
+  const host = document.querySelector('#buggy-bag-host') as HTMLElement | null;
+
   let annotationDataUrl: string | null = null;
   if (annotationCanvas) {
     try { annotationDataUrl = annotationCanvas.toDataURL('image/png'); } catch { /* tainted canvas */ }
   }
+
+  // Hide the widget so html-to-image only captures the page underneath it.
+  const prevOpacity = host?.style.opacity ?? '';
+  if (host) host.style.opacity = '0';
 
   let imageUrl = '';
   let fallbackUsed = false;
@@ -537,24 +353,47 @@ export async function capturePageScreenshot(
     let pageDataUrl = '';
 
     try {
-      // Tier 1: the browser paints the DOM itself, so the report looks like
-      // the page actually looked. This is the only renderer that reproduces
-      // shadows, filters and modern colour functions faithfully.
-      pageDataUrl = await renderViewportWithHtmlToImage(viewport);
-      renderer = 'html-to-image-scroll-aware';
+      // Tier 1: High quality, fetch everything (except favicons which are always skipped)
+      pageDataUrl = await renderTier(viewport, scrollPositions, {
+        ...baseOptions(viewport),
+        filter: (node: HTMLElement) => {
+          if (isWidgetElement(node)) return false;
+          if (node.tagName === 'LINK') {
+            const rel = (node as unknown as HTMLLinkElement).rel?.toLowerCase() || '';
+            if (rel.includes('icon')) return false;
+          }
+          return true;
+        },
+      });
+      renderer = 'html-to-image';
     } catch (tier1Err) {
-      console.warn('[BuggyBag] Tier 1 screenshot failed, falling back to html2canvas...', tier1Err);
+      console.warn('[BuggyBag] Tier 1 screenshot failed, trying Tier 2 (preserve fonts, strip media)...', tier1Err);
       fallbackUsed = true;
 
       try {
-        // Tier 2/3 repaint CSS in JS and lose visual fidelity, but they cope
-        // with documents a foreignObject cannot serialize (tainted resources).
-        pageDataUrl = await renderViewportWithHtml2Canvas(viewport, false);
-        renderer = 'html2canvas';
+        // Tier 2: Strip risky elements (images, iframes, stylesheets) but PRESERVE fonts
+        pageDataUrl = await renderTier(viewport, scrollPositions, {
+          ...baseOptions(viewport),
+          filter: (node: HTMLElement) => {
+            if (isWidgetElement(node)) return false;
+            if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'IMG' || node.tagName === 'VIDEO') return false;
+            return true;
+          },
+        });
+        renderer = 'html-to-image-no-media';
       } catch (tier2Err) {
-        console.warn('[BuggyBag] Tier 2 screenshot failed, normalizing modern CSS colors...', tier2Err);
-        pageDataUrl = await renderViewportWithHtml2Canvas(viewport, true);
-        renderer = 'html2canvas-normalized';
+        console.warn('[BuggyBag] Tier 2 screenshot failed, trying Tier 3 (absolute safe-mode)...', tier2Err);
+        // Tier 3: Absolute fallback, strip EVERYTHING including fonts
+        pageDataUrl = await renderTier(viewport, scrollPositions, {
+          ...baseOptions(viewport),
+          skipFonts: true,
+          filter: (node: HTMLElement) => {
+            if (isWidgetElement(node)) return false;
+            if (node.tagName === 'LINK' || node.tagName === 'IFRAME' || node.tagName === 'IMG' || node.tagName === 'VIDEO' || node.tagName === 'SVG') return false;
+            return true;
+          },
+        });
+        renderer = 'html-to-image-safe';
       }
     }
 
@@ -586,6 +425,8 @@ export async function capturePageScreenshot(
     }
   } catch (e) {
     console.warn('[BuggyBag] screenshot completely failed', e);
+  } finally {
+    if (host) host.style.opacity = prevOpacity;
   }
 
   if (imageUrl) {
